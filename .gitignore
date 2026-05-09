@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py~
+
+# Django
+backend/static/
+backend/media/
+backend/dist/
+backend/.env
+data/
+data/*
+
+# Vue / Node
+frontend/node_modules/
+frontend/dist/
+frontend/npm-debug.log
+frontend/yarn.lock
+frontend/.cache/
+frontend/.DS_Store
+
+# Docker
+*.pid
+*.log
+docker-compose.override.yml
+**/.docker-cache/
+
+# macOS
+.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+*.iml
+*.swp
+
+# Build artifacts
+dist/
+build/
+tmp/
+cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# pyenv
+.python-version
+
+# pytest
+.cache/
+.coverage
+htmlcov/
+
+# Others
+*.zip
+*.tar
+*.tar.gz
