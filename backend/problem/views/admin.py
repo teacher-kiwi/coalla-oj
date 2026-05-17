@@ -7,11 +7,11 @@ import zipfile
 from wsgiref.util import FileWrapper
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import StreamingHttpResponse, FileResponse
 
-from account.decorators import problem_permission_required, ensure_created_by
+from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
 from contest.models import Contest, ContestStatus
 from fps.parser import FPSHelper, FPSParser
 from judge.dispatcher import SPJCompiler
@@ -27,8 +27,110 @@ from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            ProblemAdminSerializer, TestCaseUploadForm, ContestProblemMakePublicSerializer,
                            AddContestProblemSerializer, ExportProblemSerializer,
                            ExportProblemRequestSerialzier, UploadProblemForm, ImportProblemSerializer,
-                           FPSProblemSerializer)
-from ..utils import TEMPLATE_BASE, build_problem_template
+                           FPSProblemSerializer, TagSerializer, CreateProblemTagSerializer,
+                           EditProblemTagSerializer)
+from ..utils import (TEMPLATE_BASE, build_problem_template, filter_problem_tags_by_keyword,
+                     normalize_tag_aliases)
+
+
+def get_existing_problem_tags(tag_names):
+    tag_names = list(dict.fromkeys(tag_names))
+    tag_map = {tag.name: tag for tag in ProblemTag.objects.filter(name__in=tag_names)}
+    missing = [name for name in tag_names if name not in tag_map]
+    if missing:
+        return None, f"Invalid tag: {', '.join(missing)}"
+    return [tag_map[name] for name in tag_names], None
+
+
+class ProblemTagAdminAPI(APIView):
+    def paginate_tag_list(self, request, tags):
+        try:
+            limit = int(request.GET.get("limit", "10"))
+        except ValueError:
+            limit = 10
+        if limit < 0 or limit > 250:
+            limit = 10
+        try:
+            offset = int(request.GET.get("offset", "0"))
+        except ValueError:
+            offset = 0
+        if offset < 0:
+            offset = 0
+        return {
+            "results": TagSerializer(tags[offset:offset + limit], many=True).data,
+            "total": len(tags)
+        }
+
+    @admin_role_required
+    def get(self, request):
+        tag_id = request.GET.get("id")
+        if tag_id:
+            try:
+                return self.success(TagSerializer(ProblemTag.objects.get(id=tag_id)).data)
+            except ProblemTag.DoesNotExist:
+                return self.error("Tag does not exist")
+
+        tags = ProblemTag.objects.order_by("name")
+        keyword = request.GET.get("keyword", "").strip()
+        if keyword:
+            tags = filter_problem_tags_by_keyword(tags, keyword)
+        if request.GET.get("paging") == "true":
+            if isinstance(tags, list):
+                return self.success(self.paginate_tag_list(request, tags))
+            else:
+                return self.success(self.paginate_data(request, tags, TagSerializer))
+        return self.success(TagSerializer(tags, many=True).data)
+
+    @validate_serializer(CreateProblemTagSerializer)
+    @super_admin_required
+    def post(self, request):
+        name = request.data["name"].strip()
+        aliases = normalize_tag_aliases(request.data.get("aliases", []))
+        if not name:
+            return self.error("Tag name is required")
+        if ProblemTag.objects.filter(name=name).exists():
+            return self.error("Tag already exists")
+        try:
+            tag = ProblemTag.objects.create(name=name, aliases=aliases)
+        except IntegrityError:
+            return self.error("Tag already exists")
+        return self.success(TagSerializer(tag).data)
+
+    @validate_serializer(EditProblemTagSerializer)
+    @super_admin_required
+    def put(self, request):
+        data = request.data
+        try:
+            tag = ProblemTag.objects.get(id=data["id"])
+        except ProblemTag.DoesNotExist:
+            return self.error("Tag does not exist")
+        name = data["name"].strip()
+        aliases = normalize_tag_aliases(data.get("aliases", []))
+        if not name:
+            return self.error("Tag name is required")
+        if ProblemTag.objects.exclude(id=tag.id).filter(name=name).exists():
+            return self.error("Tag already exists")
+        tag.name = name
+        tag.aliases = aliases
+        try:
+            tag.save(update_fields=["name", "aliases"])
+        except IntegrityError:
+            return self.error("Tag already exists")
+        return self.success(TagSerializer(tag).data)
+
+    @super_admin_required
+    def delete(self, request):
+        tag_id = request.GET.get("id")
+        if not tag_id:
+            return self.error("Invalid parameter, id is required")
+        try:
+            tag = ProblemTag.objects.get(id=tag_id)
+        except ProblemTag.DoesNotExist:
+            return self.error("Tag does not exist")
+        if Problem.objects.filter(tags=tag).exists():
+            return self.error("Tag is used by problems")
+        tag.delete()
+        return self.success()
 
 
 class TestCaseZipProcessor(object):
@@ -213,15 +315,12 @@ class ProblemAPI(ProblemBase):
 
         # todo check filename and score info
         tags = data.pop("tags")
+        tag_objs, error = get_existing_problem_tags(tags)
+        if error:
+            return self.error(error)
         data["created_by"] = request.user
         problem = Problem.objects.create(**data)
-
-        for item in tags:
-            try:
-                tag = ProblemTag.objects.get(name=item)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=item)
-            problem.tags.add(tag)
+        problem.tags.set(tag_objs)
         return self.success(ProblemAdminSerializer(problem).data)
 
     @problem_permission_required
@@ -274,19 +373,15 @@ class ProblemAPI(ProblemBase):
             return self.error(error_info)
         # todo check filename and score info
         tags = data.pop("tags")
+        tag_objs, error = get_existing_problem_tags(tags)
+        if error:
+            return self.error(error)
         data["languages"] = list(data["languages"])
 
         for k, v in data.items():
             setattr(problem, k, v)
         problem.save()
-
-        problem.tags.remove(*problem.tags.all())
-        for tag in tags:
-            try:
-                tag = ProblemTag.objects.get(name=tag)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=tag)
-            problem.tags.add(tag)
+        problem.tags.set(tag_objs)
 
         return self.success()
 
@@ -334,15 +429,12 @@ class ContestProblemAPI(ProblemBase):
         # todo check filename and score info
         data["contest"] = contest
         tags = data.pop("tags")
+        tag_objs, error = get_existing_problem_tags(tags)
+        if error:
+            return self.error(error)
         data["created_by"] = request.user
         problem = Problem.objects.create(**data)
-
-        for item in tags:
-            try:
-                tag = ProblemTag.objects.get(name=item)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=item)
-            problem.tags.add(tag)
+        problem.tags.set(tag_objs)
         return self.success(ProblemAdminSerializer(problem).data)
 
     def get(self, request):
@@ -404,19 +496,15 @@ class ContestProblemAPI(ProblemBase):
             return self.error(error_info)
         # todo check filename and score info
         tags = data.pop("tags")
+        tag_objs, error = get_existing_problem_tags(tags)
+        if error:
+            return self.error(error)
         data["languages"] = list(data["languages"])
 
         for k, v in data.items():
             setattr(problem, k, v)
         problem.save()
-
-        problem.tags.remove(*problem.tags.all())
-        for tag in tags:
-            try:
-                tag = ProblemTag.objects.get(name=tag)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=tag)
-            problem.tags.add(tag)
+        problem.tags.set(tag_objs)
         return self.success()
 
     def delete(self, request):
@@ -578,6 +666,9 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                             for item in problem_info["template"].keys():
                                 if item not in SysOptions.language_names:
                                     return self.error(f"Unsupported language {item}")
+                            tag_objs, error = get_existing_problem_tags(problem_info["tags"])
+                            if error:
+                                return self.error(error)
 
                         problem_info["display_id"] = problem_info["display_id"][:24]
                         for k, v in problem_info["template"].items():
@@ -619,9 +710,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                                                              if rule_type == ProblemRuleType.OI else 0,
                                                              test_case_id=test_case_id
                                                              )
-                        for tag_name in problem_info["tags"]:
-                            tag_obj, _ = ProblemTag.objects.get_or_create(name=tag_name)
-                            problem_obj.tags.add(tag_obj)
+                        problem_obj.tags.set(tag_objs)
         return self.success({"import_count": count})
 
 

@@ -4,16 +4,16 @@ from utils.api import APIView
 from account.decorators import check_contest_permission
 from ..models import ProblemTag, Problem, ProblemRuleType
 from ..serializers import ProblemSerializer, TagSerializer, ProblemSafeSerializer
+from ..utils import filter_problem_tags_by_keyword
 from contest.models import ContestRuleType
 
 
 class ProblemTagAPI(APIView):
     def get(self, request):
-        qs = ProblemTag.objects
         keyword = request.GET.get("keyword")
+        tags = ProblemTag.objects.annotate(problem_count=Count("problem")).filter(problem_count__gt=0)
         if keyword:
-            qs = ProblemTag.objects.filter(name__icontains=keyword)
-        tags = qs.annotate(problem_count=Count("problem")).filter(problem_count__gt=0)
+            tags = filter_problem_tags_by_keyword(tags, keyword)
         return self.success(TagSerializer(tags, many=True).data)
 
 

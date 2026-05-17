@@ -24,6 +24,7 @@
         {{ t('m.Problem') }}
       </template>
       <el-menu-item index="/problems">{{ t('m.Problem_List') }}</el-menu-item>
+      <el-menu-item v-if="userStore.isSuperAdmin" index="/problem/tags">Problem Tags</el-menu-item>
       <el-menu-item index="/problem/create">{{ t('m.Create_Problem') }}</el-menu-item>
       <el-menu-item index="/problem/batch_ops">{{ t('m.Export_Import_Problem') }}</el-menu-item>
     </el-sub-menu>

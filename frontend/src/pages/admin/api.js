@@ -113,6 +113,19 @@ export default {
   getProblemTagList (params) {
     return ajax('problem/tags', 'get', { params })
   },
+  getAdminProblemTagList (params) {
+    params = utils.filterEmptyValue(params || {})
+    return ajax('admin/problem/tags', 'get', { params })
+  },
+  createProblemTag (data) {
+    return ajax('admin/problem/tags', 'post', { data })
+  },
+  editProblemTag (data) {
+    return ajax('admin/problem/tags', 'put', { data })
+  },
+  deleteProblemTag (id) {
+    return ajax('admin/problem/tags', 'delete', { params: { id } })
+  },
   compileSPJ (data) {
     return ajax('admin/compile_spj', 'post', { data })
   },

@@ -175,7 +175,7 @@ def import_problems():
             problem.create_time = data["create_time"]
             problem.save()
             for tag_id in tag_ids:
-                tag, _ = ProblemTag.objects.get_or_create(name=tags[tag_id])
+                tag = ProblemTag.objects.get(name=tags[tag_id])
                 problem.tags.add(tag)
             i += 1
             print("%s imported successfully" % data["title"])

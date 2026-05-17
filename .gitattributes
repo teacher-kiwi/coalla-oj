@@ -1,0 +1,9 @@
+.gitattributes text eol=lf
+backend/problem/** text eol=lf
+backend/utils/migrate_data.py text eol=lf
+frontend/src/pages/admin/api.js text eol=lf
+frontend/src/pages/admin/components/SideMenu.vue text eol=lf
+frontend/src/pages/admin/router.js text eol=lf
+frontend/src/pages/admin/views/index.js text eol=lf
+frontend/src/pages/admin/views/problem/Problem.vue text eol=lf
+frontend/src/pages/admin/views/problem/ProblemTags.vue text eol=lf

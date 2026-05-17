@@ -58,10 +58,7 @@ class ProblemCreateTestBase(APITestCase):
         problem = Problem.objects.create(**data)
 
         for item in tags:
-            try:
-                tag = ProblemTag.objects.get(name=item)
-            except ProblemTag.DoesNotExist:
-                tag = ProblemTag.objects.create(name=item)
+            tag = ProblemTag.objects.get(name=item)
             problem.tags.add(tag)
         return problem
 
@@ -135,6 +132,7 @@ class ProblemAdminAPITest(APITestCase):
     def setUp(self):
         self.url = self.reverse("problem_admin_api")
         self.create_super_admin()
+        ProblemTag.objects.create(name="test")
         self.data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
 
     def test_create_problem(self):
@@ -176,11 +174,48 @@ class ProblemAdminAPITest(APITestCase):
         resp = self.client.put(self.url, data=data)
         self.assertSuccess(resp)
 
+    def test_create_problem_with_unknown_tag(self):
+        data = copy.deepcopy(self.data)
+        data["tags"] = ["unknown"]
+        resp = self.client.post(self.url, data=data)
+        self.assertFailed(resp, "Invalid tag: unknown")
+        self.assertFalse(ProblemTag.objects.filter(name="unknown").exists())
+
+
+class ProblemTagAdminAPITest(APITestCase):
+    def setUp(self):
+        self.url = self.reverse("problem_tag_admin_api")
+        self.create_super_admin()
+
+    def test_create_tag(self):
+        resp = self.client.post(self.url, data={"name": "math", "aliases": ["math", " math "]})
+        self.assertSuccess(resp)
+        tag = ProblemTag.objects.get(name="math")
+        self.assertEqual(tag.aliases, ["math"])
+
+    def test_get_tag_by_alias_keyword(self):
+        ProblemTag.objects.create(name="동적계획법", aliases=["dp", "dynamic_programming"])
+        resp = self.client.get(self.url, data={"keyword": "dynamic programming"})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"][0]["name"], "동적계획법")
+
+    def test_duplicate_tag(self):
+        ProblemTag.objects.create(name="math")
+        resp = self.client.post(self.url, data={"name": "math"})
+        self.assertFailed(resp, "Tag already exists")
+
+    def test_delete_used_tag(self):
+        ProblemTag.objects.create(name="test")
+        problem = ProblemCreateTestBase.add_problem(DEFAULT_PROBLEM_DATA, self.create_admin(login=False))
+        resp = self.client.delete(self.url + "?id=" + str(problem.tags.first().id))
+        self.assertFailed(resp, "Tag is used by problems")
+
 
 class ProblemAPITest(ProblemCreateTestBase):
     def setUp(self):
         self.url = self.reverse("problem_api")
         admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="test")
         self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
         self.create_user("test", "test123")
 
@@ -197,6 +232,7 @@ class ContestProblemAdminTest(APITestCase):
     def setUp(self):
         self.url = self.reverse("contest_problem_admin_api")
         self.create_admin()
+        ProblemTag.objects.create(name="test")
         self.contest = self.client.post(self.reverse("contest_admin_api"), data=DEFAULT_CONTEST_DATA).data["data"]
 
     def test_create_contest_problem(self):
@@ -224,6 +260,7 @@ class ContestProblemAdminTest(APITestCase):
 class ContestProblemTest(ProblemCreateTestBase):
     def setUp(self):
         admin = self.create_admin()
+        ProblemTag.objects.create(name="test")
         url = self.reverse("contest_admin_api")
         contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
         contest_data["password"] = ""
@@ -263,6 +300,7 @@ class ContestProblemTest(ProblemCreateTestBase):
 class AddProblemFromPublicProblemAPITest(ProblemCreateTestBase):
     def setUp(self):
         admin = self.create_admin()
+        ProblemTag.objects.create(name="test")
         url = self.reverse("contest_admin_api")
         contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
         contest_data["password"] = ""

@@ -8,7 +8,8 @@ from utils.constants import Choices
 
 
 class ProblemTag(models.Model):
-    name = models.TextField()
+    name = models.TextField(unique=True)
+    aliases = JSONField(default=list)
 
     class Meta:
         db_table = "problem_tag"
