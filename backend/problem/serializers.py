@@ -95,6 +95,15 @@ class TagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class CreateProblemTagSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=32)
+    aliases = serializers.ListField(child=serializers.CharField(max_length=64), allow_empty=True, required=False)
+
+
+class EditProblemTagSerializer(CreateProblemTagSerializer):
+    id = serializers.IntegerField()
+
+
 class CompileSPJSerializer(serializers.Serializer):
     spj_language = SPJLanguageNameChoiceField()
     spj_code = serializers.CharField()
@@ -254,7 +263,7 @@ class ImportProblemSerializer(serializers.Serializer):
     rule_type = serializers.ChoiceField(choices=ProblemRuleType.choices())
     source = serializers.CharField(max_length=200, allow_blank=True, allow_null=True)
     answers = serializers.ListField(child=AnswerSerializer())
-    tags = serializers.ListField(child=serializers.CharField())
+    tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
 
 
 class FPSProblemSerializer(serializers.Serializer):

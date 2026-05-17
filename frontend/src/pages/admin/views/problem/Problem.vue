@@ -68,18 +68,11 @@
           </el-col>
           <el-col :span="8">
             <el-form-item :label="t('m.Tag')" :error="error.tags" required>
-              <span class="tags">
-                <el-tag v-for="tag in problem.tags" :key="tag" closable type="success" @close="closeTag(tag)">
-                  {{ tag }}
-                </el-tag>
-              </span>
-              <el-autocomplete v-if="inputVisible" size="small" class="input-new-tag"
-                               popper-class="problem-tag-poper" v-model="tagInput"
-                               :trigger-on-focus="false" @keyup.enter="addTag"
-                               @select="addTag" :fetch-suggestions="querySearch" />
-              <el-button v-else class="button-new-tag" size="small" @click="inputVisible = true">
-                + {{ t('m.New_Tag') }}
-              </el-button>
+              <el-select v-model="problem.tags" multiple filterable remote reserve-keyword
+                         class="tag-select" :placeholder="t('m.Tag')"
+                         :remote-method="querySearch" :loading="tagLoading">
+                <el-option v-for="tag in tagOptions" :key="tag.name" :label="formatTagLabel(tag)" :value="tag.name" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -241,12 +234,12 @@ const rules = {
 }
 
 const loadingCompile = ref(false)
+const tagLoading = ref(false)
 const mode = ref('')
 const contest = ref({})
 const testCaseUploaded = ref(false)
 const allLanguage = ref({})
-const inputVisible = ref(false)
-const tagInput = ref('')
+const tagOptions = ref([])
 const template = ref({})
 const title = ref('')
 const spjMode = ref('')
@@ -268,6 +261,7 @@ function defaultProblem () {
 const problem = ref(defaultProblem())
 
 onMounted(() => {
+  getTagOptions()
   routeName.value = route.name
   mode.value = (routeName.value === 'edit-problem' || routeName.value === 'edit-contest-problem') ? 'edit' : 'add'
 
@@ -348,26 +342,33 @@ function switchSpj () {
   }
 }
 
-function querySearch (queryString, cb) {
-  api.getProblemTagList({ keyword: queryString }).then(res => {
-    cb(res.data.data.map(tag => ({ value: tag.name })))
-  }).catch(() => {})
+function getTagOptions (keyword = '') {
+  tagLoading.value = true
+  api.getAdminProblemTagList({ keyword }).then(res => {
+    const options = res.data.data || []
+    const optionNames = new Set(options.map(tag => tag.name))
+    const selectedOptions = problem.value.tags
+      .filter(tag => !optionNames.has(tag))
+      .map(tag => ({ name: tag }))
+    tagOptions.value = selectedOptions.concat(options)
+    tagLoading.value = false
+  }, () => {
+    tagLoading.value = false
+  })
+}
+
+function querySearch (queryString) {
+  getTagOptions(queryString)
+}
+
+function formatTagLabel (tag) {
+  return tag.aliases?.length ? `${tag.name} (${tag.aliases.join(', ')})` : tag.name
 }
 
 function resetTestCase () {
   testCaseUploaded.value = false
   problem.value.test_case_score = []
   problem.value.test_case_id = ''
-}
-
-function addTag () {
-  if (tagInput.value) problem.value.tags.push(tagInput.value)
-  inputVisible.value = false
-  tagInput.value = ''
-}
-
-function closeTag (tag) {
-  problem.value.tags.splice(problem.value.tags.indexOf(tag), 1)
 }
 
 function addSample () { problem.value.samples.push({ input: '', output: '' }) }
@@ -453,9 +454,7 @@ function submit () {
     margin-left: 10px;
     &:last-child { margin-right: 20px; }
   }
-  .input-new-tag { width: 78px; }
-  .button-new-tag { height: 24px; line-height: 22px; padding-top: 0; padding-bottom: 0; }
-  .tags { .el-tag { margin-right: 10px; } }
+  .tag-select { width: 100%; }
   .accordion { margin-bottom: 10px; width: 100%; }
   .add-samples {
     width: 100%; background-color: #fff; border: 1px dashed #aaa;
@@ -474,6 +473,5 @@ function submit () {
 </style>
 
 <style>
-.problem-tag-poper { width: 200px !important; }
 .dialog-compile-error { width: auto; max-width: 80%; overflow-x: scroll; }
 </style>
