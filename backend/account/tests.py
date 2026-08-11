@@ -201,6 +201,7 @@ class UserProfileAPITest(APITestCase):
         self.assertEqual(data["language"], "en-US")
 
 
+@mock.patch("account.views.oj.send_email_async.send")
 class ApplyResetPasswordAPITest(CaptchaTest):
     def setUp(self):
         self.create_user("test", "test123", login=False)
