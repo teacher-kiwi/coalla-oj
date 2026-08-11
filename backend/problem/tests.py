@@ -19,7 +19,7 @@ from .utils import parse_problem_template
 
 DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test</p>", "input_description": "test",
                         "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "Low",
-                        "visible": True, "tags": ["test"], "languages": ["C", "C++", "Java", "Python2"], "template": {},
+                        "visible": True, "tags": ["test"], "languages": ["C", "C++", "Java", "Python3"], "template": {},
                         "samples": [{"input": "test", "output": "test"}], "spj": False, "spj_language": "C",
                         "spj_code": "", "spj_compile_ok": True, "test_case_id": "499b26290cc7994e0b497212e842ea85",
                         "test_case_score": [{"output_name": "1.out", "input_name": "1.in", "output_size": 0,
@@ -178,7 +178,7 @@ class ProblemAdminAPITest(APITestCase):
         data = copy.deepcopy(self.data)
         data["tags"] = ["unknown"]
         resp = self.client.post(self.url, data=data)
-        self.assertFailed(resp, "Invalid tag: unknown")
+        self.assertFailed(resp, "등록되지 않은 태그입니다: unknown")
         self.assertFalse(ProblemTag.objects.filter(name="unknown").exists())
 
 
@@ -194,7 +194,8 @@ class ProblemTagAdminAPITest(APITestCase):
         self.assertEqual(tag.aliases, ["math"])
 
     def test_get_tag_by_alias_keyword(self):
-        ProblemTag.objects.create(name="동적계획법", aliases=["dp", "dynamic_programming"])
+        ProblemTag.objects.update_or_create(name="동적계획법",
+                                            defaults={"aliases": ["dp", "dynamic_programming"]})
         resp = self.client.get(self.url, data={"keyword": "dynamic programming"})
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"][0]["name"], "동적계획법")
