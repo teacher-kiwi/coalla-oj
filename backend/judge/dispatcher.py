@@ -127,7 +127,16 @@ class JudgeDispatcher(DispatcherBase):
         # Block Coding은 Python3로 채점
         if language == "Block Coding":
             language = "Python3"
-        sub_config = list(filter(lambda item: language == item["name"], SysOptions.languages))[0]
+        sub_config = next((item for item in SysOptions.languages if item["name"] == language), None)
+        if sub_config is None:
+            # 언어 설정이 시스템에서 제거된 경우. 여기서 예외가 나면 태스크가 죽고
+            # 제출은 영원히 Pending 으로 남으므로 상태를 명시적으로 정리한다.
+            logger.error(f"Language {language} is not configured, submission id: {self.submission.id}")
+            self.submission.result = JudgeStatus.SYSTEM_ERROR
+            self.submission.statistic_info["err_info"] = f"Language {language} is not configured"
+            self.submission.statistic_info["score"] = 0
+            self.submission.save()
+            return
         spj_config = {}
         if self.problem.spj_code:
             for lang in SysOptions.spj_languages:

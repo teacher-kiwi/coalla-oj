@@ -23,7 +23,7 @@
         <el-button type="primary" size="small" @click="openTagDialog(null)" :icon="Plus">
           Create
         </el-button>
-        <el-pagination class="page" layout="prev, pager, next"
+        <el-pagination class="page" layout="prev, pager, next" :current-page="currentPage"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
       </div>
     </Panel>
@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search as SearchIcon } from '@element-plus/icons-vue'
 import api from '../../api.js'
@@ -132,7 +132,14 @@ function deleteTag (id) {
 }
 
 onMounted(() => getTags())
-watch(keyword, () => currentChange(1))
+
+// 키 입력마다 조회하지 않도록 살짝 지연시킨다.
+let keywordTimer = null
+watch(keyword, () => {
+  clearTimeout(keywordTimer)
+  keywordTimer = setTimeout(() => currentChange(1), 300)
+})
+onBeforeUnmount(() => clearTimeout(keywordTimer))
 </script>
 
 <style scoped>

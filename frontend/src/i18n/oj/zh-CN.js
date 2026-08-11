@@ -112,6 +112,7 @@ export const m = {
   Problems: '题目',
   Announcements: '公告',
   Submissions: '提交信息',
+  Problem_Submissions: '该题提交信息',
   Rankings: '排名',
   Overview: '概要',
   Admin_Helper: '管理员助手',
@@ -257,5 +258,10 @@ export const m = {
   UserHomeserSubmissions: '提交次数',
   UserHomeScore: '分数',
   List_Solved_Problems: '已解决问题的列表',
-  UserHomeIntro: '这个家伙太懒了，还没有做题呢...'
+  UserHomeIntro: '这个家伙太懒了，还没有做题呢...',
+  // BlocklyEditor.vue
+  Block_Coding: '积木编程',
+  Block_Editor: '积木编辑器',
+  Convert_to_Code: '转换为代码',
+  Show_Generated_Code: '查看生成的代码'
 }

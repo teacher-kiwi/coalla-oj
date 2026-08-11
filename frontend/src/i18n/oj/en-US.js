@@ -112,6 +112,7 @@ export const m = {
   Problems: 'Problems',
   Announcements: 'Announcements',
   Submissions: 'Submissions',
+  Problem_Submissions: 'Problem Submissions',
   Rankings: 'Rankings',
   Overview: 'Overview',
   Admin_Helper: 'Admin Helper',

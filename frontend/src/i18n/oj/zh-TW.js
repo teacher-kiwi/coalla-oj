@@ -112,6 +112,7 @@ export const m = {
   Problems: '題目',
   Announcements: '公告',
   Submissions: '提交資訊',
+  Problem_Submissions: '該題提交資訊',
   Rankings: '排名',
   Overview: '概要',
   Admin_Helper: '管理員助手',
@@ -257,5 +258,10 @@ export const m = {
   UserHomeserSubmissions: '提交次數',
   UserHomeScore: '分數',
   List_Solved_Problems: '已完成題目的列表',
-  UserHomeIntro: '這個使用者尚未解題...'
+  UserHomeIntro: '這個使用者尚未解題...',
+  // BlocklyEditor.vue
+  Block_Coding: '積木程式',
+  Block_Editor: '積木編輯器',
+  Convert_to_Code: '轉換為程式碼',
+  Show_Generated_Code: '檢視產生的程式碼'
 }

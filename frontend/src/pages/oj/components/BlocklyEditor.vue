@@ -57,7 +57,9 @@ const generatedCode = ref('')
 let workspace = null
 
 function updateCode (event) {
-  if (event && (event.type === Blockly.Events.UI || event.type === Blockly.Events.DRAG)) return
+  // 클릭/스크롤/줌/드래그 같은 UI 이벤트에는 코드를 다시 만들 필요가 없다.
+  // (Blockly 12 에는 Events.DRAG 상수가 없다. isUiEvent 가 권장 방식)
+  if (event && event.isUiEvent) return
   generatedCode.value = pythonGenerator.workspaceToCode(workspace)
   emit('input', generatedCode.value)
   emit('update:code', generatedCode.value)
@@ -67,9 +69,13 @@ function updateCode (event) {
 
 function clearWorkspace () {
   ElMessageBox.confirm('작업 공간을 초기화하시겠습니까?', '확인').then(() => {
+    // clear() 도 변경 이벤트를 발생시키지만, 초기화 직후 상태가 확실히
+    // 부모까지 전달되도록 코드와 블록 상태를 함께 비운다.
     workspace.clear()
     generatedCode.value = ''
     emit('input', '')
+    emit('update:code', '')
+    emit('update:blocks', '')
   }).catch(() => {})
 }
 

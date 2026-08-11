@@ -149,6 +149,15 @@ export default {
   }
 }
 
+// 에러 본문이 항상 문자열인 건 아니고(직렬화 에러는 객체다), 네트워크 오류면
+// res.data 자체가 없다. 에러 처리 중에 다시 예외가 나지 않도록 문자열로 정규화한다.
+function errorMessage (res) {
+  const detail = res && res.data && res.data.data
+  if (typeof detail === 'string') return detail
+  if (detail) return JSON.stringify(detail)
+  return (res && res.message) || 'Network error'
+}
+
 function ajax (url, method, options) {
   if (options !== undefined) {
     var { params = {}, data = {} } = options
@@ -158,9 +167,10 @@ function ajax (url, method, options) {
   return new Promise((resolve, reject) => {
     axios({ url, method, params, data }).then(res => {
       if (res.data.error !== null) {
-        ElMessage.error(res.data.data)
+        const detail = errorMessage(res)
+        ElMessage.error(detail)
         reject(res)
-        if (res.data.data.startsWith('Please login')) {
+        if (detail.startsWith('Please login')) {
           import('@/store/app').then(({ useAppStore }) => {
             useAppStore().changeModalStatus({ mode: 'login', visible: true })
           })
@@ -170,7 +180,7 @@ function ajax (url, method, options) {
       }
     }, res => {
       reject(res)
-      ElMessage.error(res.data.data)
+      ElMessage.error(errorMessage(res))
     })
   })
 }

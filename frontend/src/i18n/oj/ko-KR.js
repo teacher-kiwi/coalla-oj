@@ -112,6 +112,7 @@ export const m = {
     Problems: '문제',
     Announcements: '공지',
     Submissions: '제출',
+    Problem_Submissions: '문제별 제출',
     Rankings: '순위',
     Overview: '개요',
     Admin_Helper: '관리자 도우미',

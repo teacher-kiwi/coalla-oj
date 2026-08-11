@@ -22,7 +22,7 @@
               </el-dropdown>
             </li>
             <li>
-              <el-switch v-model="tagsVisible" @change="handleTagsVisible">
+              <el-switch v-model="tagsVisible">
                 <template #active-action><span class="switch-label">Tag</span></template>
                 <template #inactive-action><span class="switch-label">Tag</span></template>
               </el-switch>
@@ -193,10 +193,6 @@ function filterByDifficulty (difficulty) {
 function filterByKeyword () {
   query.page = 1
   pushRouter()
-}
-
-function handleTagsVisible () {
-  // tagsVisible toggled by v-model already
 }
 
 function onPageChange (newPage) {

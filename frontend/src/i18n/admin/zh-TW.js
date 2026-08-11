@@ -106,5 +106,16 @@ export const m = {
   DashBoardJudge_Server: 'Judge 伺服器',
   HTTPS_Status: 'HTTPS 狀態',
   Force_HTTPS: '強制 HTTPS',
-  CDN_HOST: 'CDN HOST'
+  CDN_HOST: 'CDN HOST',
+  // Login.vue
+  Welcome_to_Login: '歡迎登入 OnlineJudge 後台管理系統',
+  username: '使用者名稱',
+  password: '密碼',
+  GO: '登入',
+  // Problem.vue
+  Add_Problem: '新增題目',
+  Edit_Problem: '編輯題目',
+  Contest_Problem_List: '比賽題目列表',
+  Tag: '標籤',
+  New_Tag: '新增標籤'
 }

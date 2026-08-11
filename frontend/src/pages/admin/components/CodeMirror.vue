@@ -15,12 +15,12 @@ import { cpp } from '@codemirror/lang-cpp'
 import { python } from '@codemirror/lang-python'
 
 const props = defineProps({
-  value: { type: String, default: '' },
+  modelValue: { type: String, default: '' },
   mode: { type: String, default: 'text/x-csrc' }
 })
 
-const emit = defineEmits(['change', 'input', 'update:value'])
-const currentValue = ref(props.value)
+const emit = defineEmits(['change', 'update:modelValue'])
+const currentValue = ref(props.modelValue)
 
 const extensions = computed(() => {
   const base = [EditorView.lineWrapping]
@@ -32,11 +32,10 @@ const extensions = computed(() => {
 function onChange (val) {
   currentValue.value = val
   emit('change', val)
-  emit('input', val)
-  emit('update:value', val)
+  emit('update:modelValue', val)
 }
 
-watch(() => props.value, (val) => {
+watch(() => props.modelValue, (val) => {
   if (currentValue.value !== val) currentValue.value = val
 })
 </script>

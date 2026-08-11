@@ -32,7 +32,9 @@ export const useUserStore = defineStore('user', {
     changeProfile (profile) {
       this.profile = profile
       if (profile.language) {
-        i18n.global.locale = profile.language
+        // legacy:false 모드에서 global.locale 은 ref 다. .value 없이 대입하면
+        // ref 자체가 문자열로 교체되어 언어 전환이 먹지 않는다.
+        i18n.global.locale.value = profile.language
       }
       storage.set(STORAGE_KEY.AUTHED, !!profile.user)
     },
