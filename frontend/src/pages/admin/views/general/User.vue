@@ -134,12 +134,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="2단계 인증">
-              <el-switch v-model="editingUser.two_factor_auth" :disabled="!editingUser.real_tfa" active-color="#13ce66" inactive-color="#ff4949" />
-            </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="Open API"><el-switch v-model="editingUser.open_api" active-color="#13ce66" inactive-color="#ff4949" /></el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="비활성화"><el-switch v-model="editingUser.is_disabled" /></el-form-item>
@@ -198,7 +194,6 @@ function openUserDialog (id) {
   api.getUser(id).then(res => {
     editingUser.value = res.data.data
     editingUser.value.password = ''
-    editingUser.value.real_tfa = editingUser.value.two_factor_auth
   })
 }
 

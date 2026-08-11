@@ -7,9 +7,6 @@
       <el-form-item prop="password">
         <el-input type="password" v-model="formLogin.password" placeholder="비밀번호" size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
       </el-form-item>
-      <el-form-item v-if="tfaRequired" prop="tfa_code">
-        <el-input v-model="formLogin.tfa_code" placeholder="TFA 앱 코드" :prefix-icon="Key" />
-      </el-form-item>
     </el-form>
     <div class="footer">
       <el-button type="primary" class="btn" :loading="btnLoginLoading" @click="handleLogin">
@@ -25,7 +22,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Key } from '@element-plus/icons-vue'
+import { User, Lock } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
 import { useAppStore } from '@/store/app'
@@ -36,23 +33,12 @@ const userStore = useUserStore()
 const { validateForm } = useForm()
 
 const formRef = ref(null)
-const tfaRequired = ref(false)
 const btnLoginLoading = ref(false)
-const formLogin = ref({ username: '', password: '', tfa_code: '' })
-
-const CheckRequiredTFA = (rule, value, callback) => {
-  if (value !== '') {
-    api.tfaRequiredCheck(value).then((res) => {
-      tfaRequired.value = res.data.data.result
-    })
-  }
-  callback()
-}
+const formLogin = ref({ username: '', password: '' })
 
 const ruleLogin = {
   username: [
-    { required: true, trigger: 'blur' },
-    { validator: CheckRequiredTFA, trigger: 'blur' }
+    { required: true, trigger: 'blur' }
   ],
   password: [
     { required: true, trigger: 'change', min: 6, max: 20 }
@@ -68,7 +54,6 @@ async function handleLogin () {
   if (!valid) return
   btnLoginLoading.value = true
   const formData = { ...formLogin.value }
-  if (!tfaRequired.value) delete formData.tfa_code
   try {
     await api.login(formData)
     btnLoginLoading.value = false

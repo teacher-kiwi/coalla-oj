@@ -13,9 +13,6 @@
           <el-form-item label="새 비밀번호 확인" prop="again_password">
             <el-input v-model="formPassword.again_password" type="password" />
           </el-form-item>
-          <el-form-item v-if="visible.tfaRequired" label="2단계 인증" prop="tfa_code">
-            <el-input v-model="formPassword.tfa_code" />
-          </el-form-item>
           <el-form-item v-if="visible.passwordAlert">
             <el-alert type="success" :closable="false">You will need to login again after 5 seconds..</el-alert>
           </el-form-item>
@@ -36,9 +33,6 @@
           </el-form-item>
           <el-form-item label="새 이메일" prop="new_email">
             <el-input v-model="formEmail.new_email" />
-          </el-form-item>
-          <el-form-item v-if="visible.tfaRequired" label="2단계 인증" prop="tfa_code">
-            <el-input v-model="formEmail.tfa_code" />
           </el-form-item>
           <el-button type="primary" :loading="loading.btnEmail" @click="changeEmail">이메일 변경</el-button>
         </el-form>
@@ -62,10 +56,10 @@ const formPasswordRef = ref(null)
 const formEmailRef = ref(null)
 
 const loading = reactive({ btnPassword: false, btnEmail: false })
-const visible = reactive({ passwordAlert: false, emailAlert: false, tfaRequired: false })
+const visible = reactive({ passwordAlert: false, emailAlert: false })
 
-const formPassword = ref({ tfa_code: '', old_password: '', new_password: '', again_password: '' })
-const formEmail = ref({ tfa_code: '', password: '', old_email: '', new_email: '' })
+const formPassword = ref({ old_password: '', new_password: '', again_password: '' })
+const formEmail = ref({ password: '', old_email: '', new_email: '' })
 
 const CheckAgainPassword = (rule, value, callback) => {
   if (value !== formPassword.value.new_password) callback(new Error('password does not match'))
@@ -81,7 +75,6 @@ const CheckNewPassword = (rule, value, callback) => {
 }
 
 const oldPasswordCheck = [{ required: true, trigger: 'blur', min: 6, max: 20 }]
-const tfaCheck = [{ required: true, trigger: 'change' }]
 
 const rulePassword = {
   old_password: oldPasswordCheck,
@@ -91,14 +84,12 @@ const rulePassword = {
   ],
   again_password: [
     { required: true, validator: CheckAgainPassword, trigger: 'change' }
-  ],
-  tfa_code: tfaCheck
+  ]
 }
 
 const ruleEmail = {
   password: oldPasswordCheck,
-  new_email: [{ required: true, type: 'email', trigger: 'change' }],
-  tfa_code: tfaCheck
+  new_email: [{ required: true, type: 'email', trigger: 'change' }]
 }
 
 async function changePassword () {
@@ -107,7 +98,6 @@ async function changePassword () {
   loading.btnPassword = true
   const data = { ...formPassword.value }
   delete data.again_password
-  if (!visible.tfaRequired) delete data.tfa_code
   try {
     await api.changePassword(data)
     loading.btnPassword = false
@@ -118,7 +108,6 @@ async function changePassword () {
       router.push({ name: 'logout' })
     }, 5000)
   } catch (res) {
-    if (res?.data?.data === 'tfa_required') visible.tfaRequired = true
     loading.btnPassword = false
   }
 }
@@ -128,7 +117,6 @@ async function changeEmail () {
   if (!valid) return
   loading.btnEmail = true
   const data = { ...formEmail.value }
-  if (!visible.tfaRequired) delete data.tfa_code
   try {
     await api.changeEmail(data)
     loading.btnEmail = false
@@ -136,7 +124,6 @@ async function changeEmail () {
     ElMessage.success('이메일을 변경했습니다')
     formEmailRef.value?.resetFields()
   } catch (res) {
-    if (res?.data?.data === 'tfa_required') visible.tfaRequired = true
     loading.btnEmail = false
   }
 }

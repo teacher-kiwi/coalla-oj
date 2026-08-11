@@ -2,28 +2,26 @@ import os
 from datetime import timedelta
 from importlib import import_module
 
-import qrcode
 from django.conf import settings
 from django.contrib import auth
 from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
-from otpauth import OtpAuth
 
 from problem.models import Problem
 from utils.constants import ContestRuleType
 from options.options import SysOptions
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.captcha import Captcha
-from utils.shortcuts import rand_str, img2base64, datetime2str
+from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
 from ..models import User, UserProfile, AdminType
 from ..serializers import (ApplyResetPasswordSerializer, ResetPasswordSerializer,
                            UserChangePasswordSerializer, UserLoginSerializer,
                            UserRegisterSerializer, UsernameOrEmailCheckSerializer,
                            RankInfoSerializer, UserChangeEmailSerializer, SSOSerializer)
-from ..serializers import (TwoFactorAuthCodeSerializer, UserProfileSerializer,
+from ..serializers import (UserProfileSerializer,
                            EditUserProfileSerializer, ImageUploadForm)
 from ..tasks import send_email_async
 
@@ -88,70 +86,6 @@ class AvatarUploadAPI(APIView):
         return self.success("Succeeded")
 
 
-class TwoFactorAuthAPI(APIView):
-    @login_required
-    def get(self, request):
-        """
-        Get QR code
-        """
-        user = request.user
-        if user.two_factor_auth:
-            return self.error("2단계 인증이 이미 켜져 있습니다")
-        token = rand_str()
-        user.tfa_token = token
-        user.save()
-
-        label = f"{SysOptions.website_name_shortcut}:{user.username}"
-        image = qrcode.make(OtpAuth(token).to_uri("totp", label, SysOptions.website_name.replace(" ", "")))
-        return self.success(img2base64(image))
-
-    @login_required
-    @validate_serializer(TwoFactorAuthCodeSerializer)
-    def post(self, request):
-        """
-        Open 2FA
-        """
-        code = request.data["code"]
-        user = request.user
-        if OtpAuth(user.tfa_token).valid_totp(code):
-            user.two_factor_auth = True
-            user.save()
-            return self.success("Succeeded")
-        else:
-            return self.error("인증 코드가 올바르지 않습니다")
-
-    @login_required
-    @validate_serializer(TwoFactorAuthCodeSerializer)
-    def put(self, request):
-        code = request.data["code"]
-        user = request.user
-        if not user.two_factor_auth:
-            return self.error("2단계 인증이 이미 꺼져 있습니다")
-        if OtpAuth(user.tfa_token).valid_totp(code):
-            user.two_factor_auth = False
-            user.save()
-            return self.success("Succeeded")
-        else:
-            return self.error("인증 코드가 올바르지 않습니다")
-
-
-class CheckTFARequiredAPI(APIView):
-    @validate_serializer(UsernameOrEmailCheckSerializer)
-    def post(self, request):
-        """
-        Check TFA is required
-        """
-        data = request.data
-        result = False
-        if data.get("username"):
-            try:
-                user = User.objects.get(username=data["username"])
-                result = user.two_factor_auth
-            except User.DoesNotExist:
-                pass
-        return self.success({"result": result})
-
-
 class UserLoginAPI(APIView):
     @validate_serializer(UserLoginSerializer)
     def post(self, request):
@@ -164,19 +98,8 @@ class UserLoginAPI(APIView):
         if user:
             if user.is_disabled:
                 return self.error("비활성화된 계정입니다")
-            if not user.two_factor_auth:
-                auth.login(request, user)
-                return self.success("Succeeded")
-
-            # `tfa_code` not in post data
-            if user.two_factor_auth and "tfa_code" not in data:
-                return self.error("tfa_required")
-
-            if OtpAuth(user.tfa_token).valid_totp(data["tfa_code"]):
-                auth.login(request, user)
-                return self.success("Succeeded")
-            else:
-                return self.error("인증 코드가 올바르지 않습니다")
+            auth.login(request, user)
+            return self.success("Succeeded")
         else:
             return self.error("사용자명 또는 비밀번호가 올바르지 않습니다")
 
@@ -239,11 +162,6 @@ class UserChangeEmailAPI(APIView):
         data = request.data
         user = auth.authenticate(username=request.user.username, password=data["password"])
         if user:
-            if user.two_factor_auth:
-                if "tfa_code" not in data:
-                    return self.error("tfa_required")
-                if not OtpAuth(user.tfa_token).valid_totp(data["tfa_code"]):
-                    return self.error("인증 코드가 올바르지 않습니다")
             data["new_email"] = data["new_email"].lower()
             if User.objects.filter(email=data["new_email"]).exists():
                 return self.error("다른 계정이 사용 중인 이메일입니다")
@@ -265,11 +183,6 @@ class UserChangePasswordAPI(APIView):
         username = request.user.username
         user = auth.authenticate(username=username, password=data["old_password"])
         if user:
-            if user.two_factor_auth:
-                if "tfa_code" not in data:
-                    return self.error("tfa_required")
-                if not OtpAuth(user.tfa_token).valid_totp(data["tfa_code"]):
-                    return self.error("인증 코드가 올바르지 않습니다")
             user.set_password(data["new_password"])
             user.save()
             return self.success("Succeeded")
@@ -324,7 +237,6 @@ class ResetPasswordAPI(APIView):
         if user.reset_password_token_expire_time < now():
             return self.error("토큰이 만료되었습니다")
         user.reset_password_token = None
-        user.two_factor_auth = False
         user.set_password(data["password"])
         user.save()
         return self.success("Succeeded")
@@ -404,18 +316,6 @@ class ProfileProblemDisplayIDRefreshAPI(APIView):
             v["_id"] = id_map[k]
         profile.save(update_fields=["acm_problems_status", "oi_problems_status"])
         return self.success()
-
-
-class OpenAPIAppkeyAPI(APIView):
-    @login_required
-    def post(self, request):
-        user = request.user
-        if not user.open_api:
-            return self.error("OpenAPI 기능이 꺼져 있습니다")
-        api_appkey = rand_str()
-        user.open_api_appkey = api_appkey
-        user.save()
-        return self.success({"appkey": api_appkey})
 
 
 class SSOAPI(CSRFExemptAPIView):

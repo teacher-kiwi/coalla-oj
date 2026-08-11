@@ -6,7 +6,6 @@ from copy import deepcopy
 
 from django.contrib import auth
 from django.utils.timezone import now
-from otpauth import OtpAuth
 
 from utils.api.tests import APIClient, APITestCase
 from utils.shortcuts import rand_str
@@ -64,36 +63,11 @@ class DuplicateUserCheckAPITest(APITestCase):
         self.assertFalse(resp.data["data"]["email"])
 
 
-class TFARequiredCheckAPITest(APITestCase):
-    def setUp(self):
-        self.url = self.reverse("tfa_required_check")
-        self.create_user("test", "test123", login=False)
-
-    def test_not_required_tfa(self):
-        resp = self.client.post(self.url, data={"username": "test"})
-        self.assertSuccess(resp)
-        self.assertEqual(resp.data["data"]["result"], False)
-
-    def test_required_tfa(self):
-        user = User.objects.first()
-        user.two_factor_auth = True
-        user.save()
-        resp = self.client.post(self.url, data={"username": "test"})
-        self.assertEqual(resp.data["data"]["result"], True)
-
-
 class UserLoginAPITest(APITestCase):
     def setUp(self):
         self.username = self.password = "test"
         self.user = self.create_user(username=self.username, password=self.password, login=False)
         self.login_url = self.reverse("user_login_api")
-
-    def _set_tfa(self):
-        self.user.two_factor_auth = True
-        tfa_token = rand_str(32)
-        self.user.tfa_token = tfa_token
-        self.user.save()
-        return tfa_token
 
     def test_login_with_correct_info(self):
         response = self.client.post(self.login_url,
@@ -117,40 +91,6 @@ class UserLoginAPITest(APITestCase):
         user = auth.get_user(self.client)
         self.assertFalse(user.is_authenticated)
 
-    def test_tfa_login(self):
-        token = self._set_tfa()
-        code = OtpAuth(token).totp()
-        if len(str(code)) < 6:
-            code = (6 - len(str(code))) * "0" + str(code)
-        response = self.client.post(self.login_url,
-                                    data={"username": self.username,
-                                          "password": self.password,
-                                          "tfa_code": code})
-        self.assertDictEqual(response.data, {"error": None, "data": "Succeeded"})
-
-        user = auth.get_user(self.client)
-        self.assertTrue(user.is_authenticated)
-
-    def test_tfa_login_wrong_code(self):
-        self._set_tfa()
-        response = self.client.post(self.login_url,
-                                    data={"username": self.username,
-                                          "password": self.password,
-                                          "tfa_code": "qqqqqq"})
-        self.assertDictEqual(response.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
-
-        user = auth.get_user(self.client)
-        self.assertFalse(user.is_authenticated)
-
-    def test_tfa_login_without_code(self):
-        self._set_tfa()
-        response = self.client.post(self.login_url,
-                                    data={"username": self.username,
-                                          "password": self.password})
-        self.assertDictEqual(response.data, {"error": "error", "data": "tfa_required"})
-
-        user = auth.get_user(self.client)
-        self.assertFalse(user.is_authenticated)
 
     def test_user_disabled(self):
         self.user.is_disabled = True
@@ -261,50 +201,6 @@ class UserProfileAPITest(APITestCase):
         self.assertEqual(data["language"], "en-US")
 
 
-class TwoFactorAuthAPITest(APITestCase):
-    def setUp(self):
-        self.url = self.reverse("two_factor_auth_api")
-        self.create_user("test", "test123")
-
-    def _get_tfa_code(self):
-        user = User.objects.first()
-        code = OtpAuth(user.tfa_token).totp()
-        if len(str(code)) < 6:
-            code = (6 - len(str(code))) * "0" + str(code)
-        return code
-
-    def test_get_image(self):
-        resp = self.client.get(self.url)
-        self.assertSuccess(resp)
-
-    def test_open_tfa_with_invalid_code(self):
-        self.test_get_image()
-        resp = self.client.post(self.url, data={"code": "000000"})
-        self.assertDictEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
-
-    def test_open_tfa_with_correct_code(self):
-        self.test_get_image()
-        code = self._get_tfa_code()
-        resp = self.client.post(self.url, data={"code": code})
-        self.assertSuccess(resp)
-        user = User.objects.first()
-        self.assertEqual(user.two_factor_auth, True)
-
-    def test_close_tfa_with_invalid_code(self):
-        self.test_open_tfa_with_correct_code()
-        resp = self.client.post(self.url, data={"code": "000000"})
-        self.assertDictEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
-
-    def test_close_tfa_with_correct_code(self):
-        self.test_open_tfa_with_correct_code()
-        code = self._get_tfa_code()
-        resp = self.client.put(self.url, data={"code": code})
-        self.assertSuccess(resp)
-        user = User.objects.first()
-        self.assertEqual(user.two_factor_auth, False)
-
-
-@mock.patch("account.views.oj.send_email_async.send")
 class ApplyResetPasswordAPITest(CaptchaTest):
     def setUp(self):
         self.create_user("test", "test123", login=False)
@@ -405,12 +301,6 @@ class UserChangePasswordAPITest(APITestCase):
 
         self.data = {"old_password": self.old_password, "new_password": self.new_password}
 
-    def _get_tfa_code(self):
-        user = User.objects.first()
-        code = OtpAuth(user.tfa_token).totp()
-        if len(str(code)) < 6:
-            code = (6 - len(str(code))) * "0" + str(code)
-        return code
 
     def test_login_required(self):
         response = self.client.post(self.url, data=self.data)
@@ -427,19 +317,6 @@ class UserChangePasswordAPITest(APITestCase):
         self.data["old_password"] = "invalid"
         response = self.client.post(self.url, data=self.data)
         self.assertEqual(response.data, {"error": "error", "data": "기존 비밀번호가 올바르지 않습니다"})
-
-    def test_tfa_code_required(self):
-        self.user.two_factor_auth = True
-        self.user.tfa_token = "tfa_token"
-        self.user.save()
-        self.assertTrue(self.client.login(username=self.username, password=self.old_password))
-        self.data["tfa_code"] = rand_str(6)
-        resp = self.client.post(self.url, data=self.data)
-        self.assertEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
-
-        self.data["tfa_code"] = self._get_tfa_code()
-        resp = self.client.post(self.url, data=self.data)
-        self.assertSuccess(resp)
 
 
 class UserRankAPITest(APITestCase):
@@ -505,8 +382,7 @@ class AdminUserTest(APITestCase):
         self.url = self.reverse("user_admin_api")
         self.data = {"id": self.regular_user.id, "username": self.username, "real_name": "test_name",
                      "email": "test@qq.com", "admin_type": AdminType.REGULAR_USER,
-                     "problem_permission": ProblemPermission.OWN, "open_api": True,
-                     "two_factor_auth": False, "is_disabled": False}
+                     "problem_permission": ProblemPermission.OWN, "is_disabled": False}
 
     def test_user_list(self):
         response = self.client.get(self.url)
@@ -518,8 +394,6 @@ class AdminUserTest(APITestCase):
         resp_data = response.data["data"]
         self.assertEqual(resp_data["username"], self.username)
         self.assertEqual(resp_data["email"], "test@qq.com")
-        self.assertEqual(resp_data["open_api"], True)
-        self.assertEqual(resp_data["two_factor_auth"], False)
         self.assertEqual(resp_data["is_disabled"], False)
         self.assertEqual(resp_data["problem_permission"], ProblemPermission.NONE)
 
@@ -535,43 +409,6 @@ class AdminUserTest(APITestCase):
         self.assertFalse(user.check_password(self.password))
         self.assertTrue(user.check_password(new_password))
 
-    def test_edit_user_tfa(self):
-        data = self.data
-        self.assertIsNone(self.regular_user.tfa_token)
-        data["two_factor_auth"] = True
-        response = self.client.put(self.url, data=data)
-        self.assertSuccess(response)
-        resp_data = response.data["data"]
-        # if `tfa_token` is None, a new value will be generated
-        self.assertTrue(resp_data["two_factor_auth"])
-        token = User.objects.get(id=self.regular_user.id).tfa_token
-        self.assertIsNotNone(token)
-
-        response = self.client.put(self.url, data=data)
-        self.assertSuccess(response)
-        resp_data = response.data["data"]
-        # if `tfa_token` is not None, the value is not changed
-        self.assertTrue(resp_data["two_factor_auth"])
-        self.assertEqual(User.objects.get(id=self.regular_user.id).tfa_token, token)
-
-    def test_edit_user_openapi(self):
-        data = self.data
-        self.assertIsNone(self.regular_user.open_api_appkey)
-        data["open_api"] = True
-        response = self.client.put(self.url, data=data)
-        self.assertSuccess(response)
-        resp_data = response.data["data"]
-        # if `open_api_appkey` is None, a new value will be generated
-        self.assertTrue(resp_data["open_api"])
-        key = User.objects.get(id=self.regular_user.id).open_api_appkey
-        self.assertIsNotNone(key)
-
-        response = self.client.put(self.url, data=data)
-        self.assertSuccess(response)
-        resp_data = response.data["data"]
-        # if `openapi_app_key` is not None, the value is not changed
-        self.assertTrue(resp_data["open_api"])
-        self.assertEqual(User.objects.get(id=self.regular_user.id).open_api_appkey, key)
 
     def test_import_users(self):
         data = {"users": [["user1", "pass1", "eami1@e.com", "user1"],
@@ -628,19 +465,3 @@ class GenerateUserAPITest(APITestCase):
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         mock_workbook.assert_called()
-
-
-class OpenAPIAppkeyAPITest(APITestCase):
-    def setUp(self):
-        self.user = self.create_super_admin()
-        self.url = self.reverse("open_api_appkey_api")
-
-    def test_reset_appkey(self):
-        resp = self.client.post(self.url, data={})
-        self.assertFailed(resp)
-
-        self.user.open_api = True
-        self.user.save()
-        resp = self.client.post(self.url, data={})
-        self.assertSuccess(resp)
-        self.assertEqual(resp.data["data"]["appkey"], User.objects.get(username=self.user.username).open_api_appkey)

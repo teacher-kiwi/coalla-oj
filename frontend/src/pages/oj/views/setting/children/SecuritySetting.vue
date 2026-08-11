@@ -18,44 +18,16 @@
       </el-card>
     </div>
 
-    <p class="section-title">2단계 인증</p>
-    <div class="mini-container setting-content">
-      <el-form>
-        <el-alert v-if="TFAOpened" type="success" class="notice" show-icon :closable="false">
-          2단계 인증이 활성화되어 있습니다.
-        </el-alert>
-        <el-form-item v-if="!TFAOpened">
-          <div v-loading="loadingQRcode" class="oj-relative">
-            <img :src="qrcodeSrc" id="qr-img" />
-          </div>
-        </el-form-item>
-        <template v-if="!loadingQRcode">
-          <el-form-item class="tfa-input">
-            <el-input v-model="formTwoFactor.code" placeholder="앱에 표시된 코드를 입력하세요" />
-          </el-form-item>
-          <el-button v-if="!TFAOpened" type="primary" :loading="loadingBtn" @click="updateTFA(false)">2단계 인증 사용</el-button>
-          <el-button v-else type="danger" :loading="loadingBtn" @click="closeTFA">2단계 인증 해제</el-button>
-        </template>
-      </el-form>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { useUserStore } from '@/store/user'
-const userStore = useUserStore()
 
-const qrcodeSrc = ref('')
-const loadingQRcode = ref(false)
-const loadingBtn = ref(false)
-const formTwoFactor = reactive({ code: '' })
 const sessions = ref([])
-
-const TFAOpened = computed(() => userStore.user && userStore.user.two_factor_auth)
 
 function getBrowser (userAgent = '') {
   if (!userAgent) return 'Unknown'
@@ -78,13 +50,6 @@ function localtime (val) {
   return time.utcToLocal(val)
 }
 
-function getAuthImg () {
-  loadingQRcode.value = true
-  api.twoFactorAuth('get').then((res) => {
-    loadingQRcode.value = false
-    qrcodeSrc.value = res.data.data
-  })
-}
 
 function getSessions () {
   api.getSessions().then((res) => {
@@ -103,51 +68,12 @@ function deleteSession (sessionKey) {
   }).catch(() => {})
 }
 
-function closeTFA () {
-  ElMessageBox.confirm('2단계 인증은 계정을 보호하는 강력한 수단입니다. 정말 해제하시겠습니까?', '확인').then(() => {
-    updateTFA(true)
-  }).catch(() => {})
-}
 
-function updateTFA (close) {
-  const method = close === false ? 'post' : 'put'
-  loadingBtn.value = true
-  api.twoFactorAuth(method, { code: formTwoFactor.code }).then(() => {
-    loadingBtn.value = false
-    userStore.getProfile()
-    if (close === true) getAuthImg()
-    formTwoFactor.code = ''
-  }, (err) => {
-    formTwoFactor.code = ''
-    loadingBtn.value = false
-    if (err?.data?.data?.indexOf('session') > -1) {
-      userStore.getProfile()
-      getAuthImg()
-    }
-  })
-}
 
-onMounted(() => {
-  getSessions()
-  if (!TFAOpened.value) getAuthImg()
-})
+onMounted(getSessions)
 </script>
 
 <style lang="less" scoped>
-  .notice {
-    font-size: 16px;
-    margin-bottom: 20px;
-    display: inline-block;
-  }
-
-  .oj-relative {
-    width: 150px;
-    #qr-img {
-      width: 300px;
-      margin: -10px 0 -30px -20px;
-    }
-  }
-
   .flex-container {
     display: flex;
     flex-flow: row wrap;
@@ -161,10 +87,6 @@ onMounted(() => {
         margin-bottom: 0;
       }
     }
-  }
-
-  .tfa-input {
-    width: 250px;
   }
 
   .card-header {

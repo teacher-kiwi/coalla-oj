@@ -36,12 +36,6 @@ export default {
   freshDisplayID (userID) {
     return ajax('profile/fresh_display_id', 'get', { params: { user_id: userID } })
   },
-  twoFactorAuth (method, data) {
-    return ajax('two_factor_auth', method, { data })
-  },
-  tfaRequiredCheck (username) {
-    return ajax('tfa_required', 'post', { data: { username } })
-  },
   getSessions () {
     return ajax('sessions', 'get')
   },
