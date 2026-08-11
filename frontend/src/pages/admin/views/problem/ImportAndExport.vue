@@ -1,47 +1,47 @@
 <template>
   <div>
-    <Panel title="Export Problems (beta)">
+    <Panel title="문제 내보내기 (베타)">
       <template #header>
-        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="Keywords" />
+        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="검색어" />
       </template>
       <el-table :data="problems" v-loading="loadingProblems" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="60" />
         <el-table-column label="ID" width="100" prop="id" />
-        <el-table-column label="DisplayID" width="200" prop="_id" />
-        <el-table-column label="Title" prop="title" />
-        <el-table-column prop="created_by.username" label="Author" />
-        <el-table-column prop="create_time" label="Create Time">
+        <el-table-column label="표시 ID" width="200" prop="_id" />
+        <el-table-column label="제목" prop="title" />
+        <el-table-column prop="created_by.username" label="작성자" />
+        <el-table-column prop="create_time" label="생성 일시">
           <template #default="{ row }">{{ localtime(row.create_time) }}</template>
         </el-table-column>
       </el-table>
       <div class="panel-options">
-        <el-button type="primary" size="small" v-show="selectedProblems.length" @click="exportProblems">Export</el-button>
+        <el-button type="primary" size="small" v-show="selectedProblems.length" @click="exportProblems">내보내기</el-button>
         <el-pagination class="page" layout="prev, pager, next"
                        @current-change="getProblems" :page-size="limit" :total="total" />
       </div>
     </Panel>
 
-    <Panel title="Import QDUOJ Problems (beta)">
+    <Panel title="QDUOJ 문제 가져오기 (베타)">
       <el-upload ref="qduRef" action="/api/admin/import_problem" name="file"
                  :file-list="fileList1" :show-file-list="true" :with-credentials="true"
                  :limit="3" :on-change="onFile1Change" :auto-upload="false"
                  :on-success="uploadSucceeded" :on-error="uploadFailed">
         <template #trigger>
-          <el-button size="small" type="primary">Choose File</el-button>
+          <el-button size="small" type="primary">파일 선택</el-button>
         </template>
-        <el-button class="upload-btn" size="small" type="success" @click="qduRef?.submit()">Upload</el-button>
+        <el-button class="upload-btn" size="small" type="success" @click="qduRef?.submit()">업로드</el-button>
       </el-upload>
     </Panel>
 
-    <Panel title="Import FPS Problems (beta)">
+    <Panel title="FPS 문제 가져오기 (베타)">
       <el-upload ref="fpsRef" action="/api/admin/import_fps" name="file"
                  :file-list="fileList2" :show-file-list="true" :with-credentials="true"
                  :limit="3" :on-change="onFile2Change" :auto-upload="false"
                  :on-success="uploadSucceeded" :on-error="uploadFailed">
         <template #trigger>
-          <el-button size="small" type="primary">Choose File</el-button>
+          <el-button size="small" type="primary">파일 선택</el-button>
         </template>
-        <el-button class="upload-btn" size="small" type="success" @click="fpsRef?.submit()">Upload</el-button>
+        <el-button class="upload-btn" size="small" type="success" @click="fpsRef?.submit()">업로드</el-button>
       </el-upload>
     </Panel>
   </div>
@@ -91,12 +91,12 @@ function uploadSucceeded (response) {
   if (response.error) {
     ElMessage.error(response.data)
   } else {
-    ElMessage.success('Successfully imported ' + response.data.import_count + ' problems')
+    ElMessage.success('문제 ' + response.data.import_count + '개를 가져왔습니다')
     getProblems()
   }
 }
 
-function uploadFailed () { ElMessage.error('Upload failed') }
+function uploadFailed () { ElMessage.error('업로드에 실패했습니다') }
 
 onMounted(() => { getProblems() })
 watch(keyword, () => { getProblems() })

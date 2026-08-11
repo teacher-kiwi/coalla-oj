@@ -1,8 +1,6 @@
 <template>
-  <el-button plain type="primary">{{ t('m.Cancel') }}</el-button>
+  <el-button plain type="primary">취소</el-button>
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 </script>

@@ -2,25 +2,25 @@
   <div>
     <Panel>
       <template #title>
-        {{ t('m.Test_Case_Prune_Test_Case') }}
+        테스트 케이스 정리
         <el-popover placement="right" trigger="hover">
           <template #reference><el-icon class="help-icon"><QuestionFilled /></el-icon></template>
           These test cases are not owned by any problem, you can clean them safely.
         </el-popover>
       </template>
       <el-table :data="data">
-        <el-table-column label="Last Modified">
+        <el-table-column label="최종 수정">
           <template #default="{ row }">{{ timestampFormat(row.create_time) }}</template>
         </el-table-column>
-        <el-table-column prop="id" label="Test Case ID" />
-        <el-table-column label="Option" fixed="right" width="200">
+        <el-table-column prop="id" label="테스트 케이스 ID" />
+        <el-table-column label="옵션" fixed="right" width="200">
           <template #default="{ row }">
-            <icon-btn name="Delete" icon="Delete" @click="deleteTestCase(row.id)" />
+            <icon-btn name="삭제" icon="Delete" @click="deleteTestCase(row.id)" />
           </template>
         </el-table-column>
       </el-table>
       <div class="panel-options" v-show="data.length > 0">
-        <el-button type="warning" size="small" :loading="loading" @click="deleteTestCase()">Delete All</el-button>
+        <el-button type="warning" size="small" :loading="loading" @click="deleteTestCase()">전체 삭제</el-button>
       </div>
     </Panel>
   </div>
@@ -28,12 +28,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import api from '@admin/api'
-
-const { t } = useI18n()
 
 const data = ref([])
 const loading = ref(false)

@@ -38,7 +38,7 @@ def get_existing_problem_tags(tag_names):
     tag_map = {tag.name: tag for tag in ProblemTag.objects.filter(name__in=tag_names)}
     missing = [name for name in tag_names if name not in tag_map]
     if missing:
-        return None, f"Invalid tag: {', '.join(missing)}"
+        return None, f"등록되지 않은 태그입니다: {', '.join(missing)}"
     return [tag_map[name] for name in tag_names], None
 
 
@@ -68,7 +68,7 @@ class ProblemTagAdminAPI(APIView):
             try:
                 return self.success(TagSerializer(ProblemTag.objects.get(id=tag_id)).data)
             except ProblemTag.DoesNotExist:
-                return self.error("Tag does not exist")
+                return self.error("태그가 존재하지 않습니다")
 
         tags = ProblemTag.objects.order_by("name")
         keyword = request.GET.get("keyword", "").strip()
@@ -87,13 +87,13 @@ class ProblemTagAdminAPI(APIView):
         name = request.data["name"].strip()
         aliases = normalize_tag_aliases(request.data.get("aliases", []))
         if not name:
-            return self.error("Tag name is required")
+            return self.error("태그 이름을 입력하세요")
         if ProblemTag.objects.filter(name=name).exists():
-            return self.error("Tag already exists")
+            return self.error("이미 존재하는 태그입니다")
         try:
             tag = ProblemTag.objects.create(name=name, aliases=aliases)
         except IntegrityError:
-            return self.error("Tag already exists")
+            return self.error("이미 존재하는 태그입니다")
         return self.success(TagSerializer(tag).data)
 
     @validate_serializer(EditProblemTagSerializer)
@@ -103,32 +103,32 @@ class ProblemTagAdminAPI(APIView):
         try:
             tag = ProblemTag.objects.get(id=data["id"])
         except ProblemTag.DoesNotExist:
-            return self.error("Tag does not exist")
+            return self.error("태그가 존재하지 않습니다")
         name = data["name"].strip()
         aliases = normalize_tag_aliases(data.get("aliases", []))
         if not name:
-            return self.error("Tag name is required")
+            return self.error("태그 이름을 입력하세요")
         if ProblemTag.objects.exclude(id=tag.id).filter(name=name).exists():
-            return self.error("Tag already exists")
+            return self.error("이미 존재하는 태그입니다")
         tag.name = name
         tag.aliases = aliases
         try:
             tag.save(update_fields=["name", "aliases"])
         except IntegrityError:
-            return self.error("Tag already exists")
+            return self.error("이미 존재하는 태그입니다")
         return self.success(TagSerializer(tag).data)
 
     @super_admin_required
     def delete(self, request):
         tag_id = request.GET.get("id")
         if not tag_id:
-            return self.error("Invalid parameter, id is required")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
             tag = ProblemTag.objects.get(id=tag_id)
         except ProblemTag.DoesNotExist:
-            return self.error("Tag does not exist")
+            return self.error("태그가 존재하지 않습니다")
         if Problem.objects.filter(tags=tag).exists():
-            return self.error("Tag is used by problems")
+            return self.error("문제에서 사용 중인 태그입니다")
         tag.delete()
         return self.success()
 
@@ -219,11 +219,11 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
     def get(self, request):
         problem_id = request.GET.get("problem_id")
         if not problem_id:
-            return self.error("Parameter error, problem_id is required")
+            return self.error("잘못된 요청입니다. problem_id가 필요합니다")
         try:
             problem = Problem.objects.get(id=problem_id)
         except Problem.DoesNotExist:
-            return self.error("Problem does not exists")
+            return self.error("문제가 존재하지 않습니다")
 
         if problem.contest:
             ensure_created_by(problem.contest, request.user)
@@ -232,7 +232,7 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
 
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         if not os.path.isdir(test_case_dir):
-            return self.error("Test case does not exists")
+            return self.error("테스트 케이스가 존재하지 않습니다")
         name_list = self.filter_name_list(os.listdir(test_case_dir), problem.spj)
         name_list.append("info")
         file_name = os.path.join(test_case_dir, problem.test_case_id + ".zip")
@@ -252,7 +252,7 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
             spj = form.cleaned_data["spj"] == "true"
             file = form.cleaned_data["file"]
         else:
-            return self.error("Upload failed")
+            return self.error("업로드에 실패했습니다")
         zip_file = f"/tmp/{rand_str()}.zip"
         with open(zip_file, "wb") as f:
             for chunk in file:
@@ -305,9 +305,9 @@ class ProblemAPI(ProblemBase):
         data = request.data
         _id = data["_id"]
         if not _id:
-            return self.error("Display ID is required")
+            return self.error("표시 ID를 입력하세요")
         if Problem.objects.filter(_id=_id, contest_id__isnull=True).exists():
-            return self.error("Display ID already exists")
+            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -334,12 +334,12 @@ class ProblemAPI(ProblemBase):
                 ensure_created_by(problem, request.user)
                 return self.success(ProblemAdminSerializer(problem).data)
             except Problem.DoesNotExist:
-                return self.error("Problem does not exist")
+                return self.error("문제가 존재하지 않습니다")
 
         problems = Problem.objects.filter(contest_id__isnull=True).order_by("-create_time")
         if rule_type:
             if rule_type not in ProblemRuleType.choices():
-                return self.error("Invalid rule_type")
+                return self.error("규칙 유형이 올바르지 않습니다")
             else:
                 problems = problems.filter(rule_type=rule_type)
 
@@ -360,13 +360,13 @@ class ProblemAPI(ProblemBase):
             problem = Problem.objects.get(id=problem_id)
             ensure_created_by(problem, request.user)
         except Problem.DoesNotExist:
-            return self.error("Problem does not exist")
+            return self.error("문제가 존재하지 않습니다")
 
         _id = data["_id"]
         if not _id:
-            return self.error("Display ID is required")
+            return self.error("표시 ID를 입력하세요")
         if Problem.objects.exclude(id=problem_id).filter(_id=_id, contest_id__isnull=True).exists():
-            return self.error("Display ID already exists")
+            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -389,11 +389,11 @@ class ProblemAPI(ProblemBase):
     def delete(self, request):
         id = request.GET.get("id")
         if not id:
-            return self.error("Invalid parameter, id is required")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
             problem = Problem.objects.get(id=id, contest_id__isnull=True)
         except Problem.DoesNotExist:
-            return self.error("Problem does not exists")
+            return self.error("문제가 존재하지 않습니다")
         ensure_created_by(problem, request.user)
         # d = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         # if os.path.isdir(d):
@@ -410,17 +410,17 @@ class ContestProblemAPI(ProblemBase):
             contest = Contest.objects.get(id=data.pop("contest_id"))
             ensure_created_by(contest, request.user)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
 
         if data["rule_type"] != contest.rule_type:
-            return self.error("Invalid rule type")
+            return self.error("규칙 유형이 올바르지 않습니다")
 
         _id = data["_id"]
         if not _id:
-            return self.error("Display ID is required")
+            return self.error("표시 ID를 입력하세요")
 
         if Problem.objects.filter(_id=_id, contest=contest).exists():
-            return self.error("Duplicate Display id")
+            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -446,16 +446,16 @@ class ContestProblemAPI(ProblemBase):
                 problem = Problem.objects.get(id=problem_id)
                 ensure_created_by(problem.contest, user)
             except Problem.DoesNotExist:
-                return self.error("Problem does not exist")
+                return self.error("문제가 존재하지 않습니다")
             return self.success(ProblemAdminSerializer(problem).data)
 
         if not contest_id:
-            return self.error("Contest id is required")
+            return self.error("잘못된 요청입니다. contest_id가 필요합니다")
         try:
             contest = Contest.objects.get(id=contest_id)
             ensure_created_by(contest, user)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
         problems = Problem.objects.filter(contest=contest).order_by("-create_time")
         if user.is_admin():
             problems = problems.filter(contest__created_by=user)
@@ -473,23 +473,23 @@ class ContestProblemAPI(ProblemBase):
             contest = Contest.objects.get(id=data.pop("contest_id"))
             ensure_created_by(contest, user)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
 
         if data["rule_type"] != contest.rule_type:
-            return self.error("Invalid rule type")
+            return self.error("규칙 유형이 올바르지 않습니다")
 
         problem_id = data.pop("id")
 
         try:
             problem = Problem.objects.get(id=problem_id, contest=contest)
         except Problem.DoesNotExist:
-            return self.error("Problem does not exist")
+            return self.error("문제가 존재하지 않습니다")
 
         _id = data["_id"]
         if not _id:
-            return self.error("Display ID is required")
+            return self.error("표시 ID를 입력하세요")
         if Problem.objects.exclude(id=problem_id).filter(_id=_id, contest=contest).exists():
-            return self.error("Display ID already exists")
+            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -510,14 +510,14 @@ class ContestProblemAPI(ProblemBase):
     def delete(self, request):
         id = request.GET.get("id")
         if not id:
-            return self.error("Invalid parameter, id is required")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
             problem = Problem.objects.get(id=id, contest_id__isnull=False)
         except Problem.DoesNotExist:
-            return self.error("Problem does not exists")
+            return self.error("문제가 존재하지 않습니다")
         ensure_created_by(problem.contest, request.user)
         if Submission.objects.filter(problem=problem).exists():
-            return self.error("Can't delete the problem as it has submissions")
+            return self.error("제출 기록이 있어 문제를 삭제할 수 없습니다")
         # d = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         # if os.path.isdir(d):
         #    shutil.rmtree(d, ignore_errors=True)
@@ -532,15 +532,15 @@ class MakeContestProblemPublicAPIView(APIView):
         data = request.data
         display_id = data.get("display_id")
         if Problem.objects.filter(_id=display_id, contest_id__isnull=True).exists():
-            return self.error("Duplicate display ID")
+            return self.error("이미 사용 중인 표시 ID입니다")
 
         try:
             problem = Problem.objects.get(id=data["id"])
         except Problem.DoesNotExist:
-            return self.error("Problem does not exist")
+            return self.error("문제가 존재하지 않습니다")
 
         if not problem.contest or problem.is_public:
-            return self.error("Already be a public problem")
+            return self.error("이미 공개된 문제입니다")
         problem.is_public = True
         problem.save()
         # https://docs.djangoproject.com/en/1.11/topics/db/queries/#copying-model-instances
@@ -564,12 +564,12 @@ class AddContestProblemAPI(APIView):
             contest = Contest.objects.get(id=data["contest_id"])
             problem = Problem.objects.get(id=data["problem_id"])
         except (Contest.DoesNotExist, Problem.DoesNotExist):
-            return self.error("Contest or Problem does not exist")
+            return self.error("대회 또는 문제가 존재하지 않습니다")
 
         if contest.status == ContestStatus.CONTEST_ENDED:
-            return self.error("Contest has ended")
+            return self.error("종료된 대회입니다")
         if Problem.objects.filter(contest=contest, _id=data["display_id"]).exists():
-            return self.error("Duplicate display id in this contest")
+            return self.error("이 대회에 이미 같은 표시 ID가 있습니다")
 
         tags = problem.tags.all()
         problem.pk = None
@@ -646,7 +646,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                 for chunk in file:
                     f.write(chunk)
         else:
-            return self.error("Upload failed")
+            return self.error("업로드에 실패했습니다")
 
         count = 0
         with zipfile.ZipFile(tmp_file, "r") as zip_file:
@@ -660,12 +660,12 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                         problem_info = json.load(f)
                         serializer = ImportProblemSerializer(data=problem_info)
                         if not serializer.is_valid():
-                            return self.error(f"Invalid problem format, error is {serializer.errors}")
+                            return self.error(f"문제 형식이 올바르지 않습니다: {serializer.errors}")
                         else:
                             problem_info = serializer.data
                             for item in problem_info["template"].keys():
                                 if item not in SysOptions.language_names:
-                                    return self.error(f"Unsupported language {item}")
+                                    return self.error(f"지원하지 않는 언어입니다: {item}")
                             tag_objs, error = get_existing_problem_tags(problem_info["tags"])
                             if error:
                                 return self.error(error)
@@ -771,7 +771,7 @@ class FPSProblemImport(CSRFExemptAPIView):
 
                 problems = FPSParser(tf.name).parse()
         else:
-            return self.error("Parse upload file error")
+            return self.error("업로드한 파일을 분석할 수 없습니다")
 
         helper = FPSHelper()
         with transaction.atomic():
@@ -786,7 +786,7 @@ class FPSProblemImport(CSRFExemptAPIView):
                 problem_data = helper.save_image(_problem, settings.UPLOAD_DIR, settings.UPLOAD_PREFIX)
                 s = FPSProblemSerializer(data=problem_data)
                 if not s.is_valid():
-                    return self.error(f"Parse FPS file error: {s.errors}")
+                    return self.error(f"FPS 파일 분석에 실패했습니다: {s.errors}")
                 problem_data = s.data
                 problem_data["test_case_id"] = test_case_id
                 problem_data["test_case_score"] = score

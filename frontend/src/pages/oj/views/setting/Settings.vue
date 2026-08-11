@@ -18,9 +18,9 @@
               </div>
             </div>
 
-            <el-menu-item index="/setting/profile">{{ t('m.Profile') }}</el-menu-item>
-            <el-menu-item index="/setting/account">{{ t('m.Account') }}</el-menu-item>
-            <el-menu-item index="/setting/security">{{ t('m.Security') }}</el-menu-item>
+            <el-menu-item index="/setting/profile">프로필</el-menu-item>
+            <el-menu-item index="/setting/account">계정</el-menu-item>
+            <el-menu-item index="/setting/security">보안</el-menu-item>
           </el-menu>
         </div>
         <div class="panel">
@@ -38,11 +38,8 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { Camera } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()

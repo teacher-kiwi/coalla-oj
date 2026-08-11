@@ -2,38 +2,38 @@
   <el-row :gutter="18">
     <el-col :span="19">
       <Panel shadow>
-        <template #title>{{ t('m.Problem_List') }}</template>
+        <template #title>문제 목록</template>
         <template #extra>
           <ul class="filter">
             <li>
               <el-dropdown @command="filterByDifficulty">
                 <span class="el-dropdown-link">
-                  {{ query.difficulty === '' ? t('m.Difficulty') : t('m.' + query.difficulty) }}
+                  {{ query.difficulty === '' ? '난이도' : DIFFICULTY_LABEL[query.difficulty] }}
                   <el-icon><ArrowDown /></el-icon>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="">{{ t('m.All') }}</el-dropdown-item>
-                    <el-dropdown-item command="Low">{{ t('m.Low') }}</el-dropdown-item>
-                    <el-dropdown-item command="Mid">{{ t('m.Mid') }}</el-dropdown-item>
-                    <el-dropdown-item command="High">{{ t('m.High') }}</el-dropdown-item>
+                    <el-dropdown-item command="">전체</el-dropdown-item>
+                    <el-dropdown-item command="Low">낮음</el-dropdown-item>
+                    <el-dropdown-item command="Mid">중간</el-dropdown-item>
+                    <el-dropdown-item command="High">높음</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
             </li>
             <li>
               <el-switch v-model="tagsVisible">
-                <template #active-action><span class="switch-label">Tag</span></template>
-                <template #inactive-action><span class="switch-label">Tag</span></template>
+                <template #active-action><span class="switch-label">태그</span></template>
+                <template #inactive-action><span class="switch-label">태그</span></template>
               </el-switch>
             </li>
             <li>
-              <el-input v-model="query.keyword" placeholder="keyword" @keyup.enter="filterByKeyword">
+              <el-input v-model="query.keyword" placeholder="검색어" @keyup.enter="filterByKeyword">
                 <template #suffix><el-icon><Search /></el-icon></template>
               </el-input>
             </li>
             <li>
-              <el-button type="primary" :icon="RefreshIcon" @click="onReset">{{ t('m.Reset') }}</el-button>
+              <el-button type="primary" :icon="RefreshIcon" @click="onReset">초기화</el-button>
             </li>
           </ul>
         </template>
@@ -55,23 +55,23 @@
               </el-button>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Title')" width="400">
+          <el-table-column label="제목" width="400">
             <template #default="{ row }">
               <el-button link type="primary" class="title-btn" @click="router.push({ name: 'problem-details', params: { problemID: row._id } })">
                 {{ row.title }}
               </el-button>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Level')">
+          <el-table-column label="난이도">
             <template #default="{ row }">
-              <el-tag :type="difficultyColor(row.difficulty)">{{ t('m.' + row.difficulty) }}</el-tag>
+              <el-tag :type="difficultyColor(row.difficulty)">{{ DIFFICULTY_LABEL[row.difficulty] }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Total')" prop="submission_number" />
-          <el-table-column :label="t('m.AC_Rate')">
+          <el-table-column label="총 제출" prop="submission_number" />
+          <el-table-column label="정답률">
             <template #default="{ row }">{{ getACRate(row.accepted_number, row.submission_number) }}</template>
           </el-table-column>
-          <el-table-column v-if="tagsVisible" :label="t('m.Tags')" align="center">
+          <el-table-column v-if="tagsVisible" label="태그" align="center">
             <template #default="{ row }">
               <div class="tag-list">
                 <el-tag v-for="tag in row.tags" :key="tag" class="tag-item">{{ tag }}</el-tag>
@@ -87,7 +87,7 @@
 
     <el-col :span="5">
       <Panel :padding="10">
-        <template #title><div class="taglist-title">{{ t('m.Tags') }}</div></template>
+        <template #title><div class="taglist-title">태그</div></template>
         <div v-loading="loadings.tag">
           <el-button v-for="tag in tagList" :key="tag.name" @click="filterByTag(tag.name)"
                      :disabled="query.tag === tag.name" round class="tag-btn">
@@ -95,7 +95,7 @@
           </el-button>
           <el-button id="pick-one" @click="pickone">
             <el-icon><Switch /></el-icon>
-            {{ t('m.Pick_One') }}
+            선택
           </el-button>
         </div>
       </Panel>
@@ -106,15 +106,14 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Search, Refresh as RefreshIcon, Switch, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import utils from '@/utils/utils'
+import { DIFFICULTY_LABEL } from '@/utils/constants'
 import Pagination from '@oj/components/Pagination.vue'
 import { useUserStore } from '@/store/user'
 
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -212,7 +211,7 @@ function onReset () {
 
 function pickone () {
   api.pickone().then(res => {
-    ElMessage.success('Good Luck')
+    ElMessage.success('행운을 빕니다')
     router.push({ name: 'problem-details', params: { problemID: res.data.data } })
   })
 }

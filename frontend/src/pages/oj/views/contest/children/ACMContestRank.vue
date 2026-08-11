@@ -9,27 +9,27 @@
         </template>
         <div id="switches">
           <p>
-            <span>{{ t('m.Menu') }}</span>
+            <span>메뉴</span>
             <el-switch v-model="showMenu" />
-            <span>{{ t('m.Chart') }}</span>
+            <span>차트</span>
             <el-switch v-model="showChart" />
           </p>
           <p>
-            <span>{{ t('m.Auto_Refresh') }}(10s)</span>
+            <span>자동 새로고침(10s)</span>
             <el-switch :disabled="refreshDisabled" @change="onAutoRefresh" />
           </p>
           <template v-if="isContestAdmin">
             <p>
-              <span>{{ t('m.RealName') }}</span>
+              <span>실명</span>
               <el-switch v-model="showRealName" />
             </p>
             <p>
-              <span>{{ t('m.Force_Update') }}</span>
+              <span>강제 업데이트</span>
               <el-switch :disabled="refreshDisabled" v-model="forceUpdate" />
             </p>
           </template>
           <p>
-            <el-button type="primary" size="small" @click="downloadRankCSV">{{ t('m.download_csv') }}</el-button>
+            <el-button type="primary" size="small" @click="downloadRankCSV">CSV 다운로드</el-button>
           </p>
         </div>
       </el-popover>
@@ -43,7 +43,7 @@
       <el-table-column align="center" width="50">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
-      <el-table-column :label="t('m.User_User')" align="center" width="150">
+      <el-table-column label="사용자" align="center" width="150">
         <template #default="{ row }">
           <a class="link-text truncate"
              @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
@@ -51,10 +51,10 @@
           </a>
         </template>
       </el-table-column>
-      <el-table-column v-if="showRealName" label="RealName" align="center" width="150">
+      <el-table-column v-if="showRealName" label="실명" align="center" width="150">
         <template #default="{ row }">{{ row.user.real_name }}</template>
       </el-table-column>
-      <el-table-column :label="'AC / ' + t('m.Total')" align="center" width="100">
+      <el-table-column label="AC / 총 제출" align="center" width="100">
         <template #default="{ row }">
           <span>{{ row.accepted_number }} / </span>
           <a class="link-text" @click="router.push({ name: 'contest-submission-list', query: { username: row.user.username } })">
@@ -62,7 +62,7 @@
           </a>
         </template>
       </el-table-column>
-      <el-table-column :label="t('m.TotalTime')" align="center" width="100">
+      <el-table-column label="총 시간" align="center" width="100">
         <template #default="{ row }">{{ parseTotalTime(row.total_time) }}</template>
       </el-table-column>
       <el-table-column v-for="prob in contestProblems" :key="prob.id" align="center"
@@ -92,7 +92,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import dayjs from 'dayjs'
 import duration from 'dayjs/plugin/duration'
 import { Setting } from '@element-plus/icons-vue'
@@ -103,8 +102,6 @@ import time from '@/utils/time'
 import utils from '@/utils/utils'
 
 dayjs.extend(duration)
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -120,11 +117,11 @@ const contestID = ref('')
 const chart = ref(null)
 const dataRank = ref([])
 const options = ref({
-  title: { text: t('m.Top_10_Teams'), left: 'center' },
+  title: { text: '상위 10개 팀', left: 'center' },
   dataZoom: [{ type: 'inside', filterMode: 'none', xAxisIndex: [0], start: 0, end: 100 }],
   toolbox: {
     show: true,
-    feature: { saveAsImage: { show: true, title: t('m.save_as_image') } },
+    feature: { saveAsImage: { show: true, title: '이미지로 저장' } },
     right: '5%'
   },
   tooltip: { trigger: 'axis', axisPointer: { type: 'cross', axis: 'x' } },

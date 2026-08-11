@@ -1,7 +1,7 @@
 <template>
   <MdEditor
     v-model="editorText"
-    :language="mdEditorLang"
+    language="en-US"
     :toolbars-exclude="['github']"
     :preview="false"
     :footers="[]"
@@ -11,18 +11,11 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, watch } from 'vue'
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 
-const { locale } = useI18n()
-
-const mdEditorLang = computed(() => {
-  if (locale.value.startsWith('zh')) return 'zh-CN'
-  return 'en-US'
-})
-
+// md-editor-v3 는 zh-CN/en-US 만 내장하고 있어 도구모음 툴팁은 영어로 둔다.
 // 저장/표시 포맷은 HTML이다. 문제 설명 등은 OJ 화면에서 v-html 로 렌더되고,
 // DB 의 기존 데이터도 모두 HTML 이므로 이 컴포넌트는 HTML 을 주고받는다.
 // 편집기 자체는 마크다운으로 입력받되(markdown-it 의 html:true 로 기존 HTML 은 그대로 통과),

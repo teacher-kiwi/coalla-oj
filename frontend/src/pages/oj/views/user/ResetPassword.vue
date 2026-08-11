@@ -1,23 +1,23 @@
 <template>
   <Panel :padding="30" class="container">
     <template #title>
-      <div class="center">{{ t('m.Reset_Password') }}</div>
+      <div class="center">비밀번호 찾기</div>
     </template>
     <template v-if="!resetSuccess">
       <el-form ref="formRef" :model="formResetPassword" :rules="ruleResetPassword">
         <el-form-item prop="password">
-          <el-input type="password" v-model="formResetPassword.password" :placeholder="t('m.RPassword')" size="large" :prefix-icon="Lock" />
+          <el-input type="password" v-model="formResetPassword.password" placeholder="비밀번호" size="large" :prefix-icon="Lock" />
         </el-form-item>
         <el-form-item prop="passwordAgain">
-          <el-input type="password" v-model="formResetPassword.passwordAgain" :placeholder="t('m.RPassword_Again')" size="large" :prefix-icon="Lock" />
+          <el-input type="password" v-model="formResetPassword.passwordAgain" placeholder="비밀번호 확인" size="large" :prefix-icon="Lock" />
         </el-form-item>
         <el-form-item prop="captcha" class="captcha-item">
           <div id="captcha">
             <div id="captchaCode">
-              <el-input v-model="formResetPassword.captcha" :placeholder="t('m.RCaptcha')" size="large" :prefix-icon="Key" />
+              <el-input v-model="formResetPassword.captcha" placeholder="보안 문자" size="large" :prefix-icon="Key" />
             </div>
             <div id="captchaImg">
-              <el-tooltip content="Click to refresh" placement="top">
+              <el-tooltip content="클릭하면 새로고침" placement="top">
                 <img :src="captchaSrc" @click="getCaptchaSrc" />
               </el-tooltip>
             </div>
@@ -25,11 +25,11 @@
         </el-form-item>
       </el-form>
       <el-button type="primary" class="btn" :loading="btnLoading" @click="resetPassword">
-        {{ t('m.Reset_Password') }}
+        비밀번호 찾기
       </el-button>
     </template>
     <template v-else>
-      <el-alert type="success" :closable="false">{{ t('m.Your_password_has_been_reset') }}</el-alert>
+      <el-alert type="success" :closable="false">비밀번호가 재설정되었습니다.</el-alert>
     </template>
   </Panel>
 </template>
@@ -37,12 +37,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { Lock, Key } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
-
-const { t } = useI18n()
 const route = useRoute()
 const { captchaSrc, validateForm, getCaptchaSrc } = useForm()
 
@@ -58,7 +55,7 @@ const CheckPassword = (rule, value, callback) => {
   callback()
 }
 const CheckAgainPassword = (rule, value, callback) => {
-  if (value !== formResetPassword.value.password) callback(new Error(t('m.password_does_not_match')))
+  if (value !== formResetPassword.value.password) callback(new Error('비밀번호가 일치하지 않습니다'))
   else callback()
 }
 

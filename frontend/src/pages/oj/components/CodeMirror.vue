@@ -3,17 +3,17 @@
     <el-row type="flex" justify="space-between" class="header">
       <el-col :span="12">
         <div>
-          <span>{{ t('m.Language') }}:</span>
+          <span>언어:</span>
           <el-select :model-value="language" @change="onLangChange" class="adjust">
-            <el-option v-if="languages.includes('Python3')" value="Block Coding" :label="t('m.Block_Coding')" />
+            <el-option v-if="languages.includes('Python3')" value="Block Coding" label="블록 코딩" />
             <el-option v-for="item in languages" :key="item" :value="item" :label="item" />
           </el-select>
 
-          <el-tooltip :content="t('m.Reset_to_default_code_definition')" placement="top">
+          <el-tooltip content="기본 코드로 초기화" placement="top">
             <el-button :icon="Refresh" class="action-btn" @click="onResetClick" />
           </el-tooltip>
 
-          <el-tooltip :content="t('m.Upload_file')" placement="top">
+          <el-tooltip content="파일 업로드" placement="top">
             <el-button :icon="Upload" class="action-btn" @click="onUploadFile" />
           </el-tooltip>
 
@@ -22,7 +22,7 @@
       </el-col>
       <el-col :span="12">
         <div class="fl-right">
-          <span>{{ t('m.Theme') }}:</span>
+          <span>테마:</span>
           <el-select :model-value="theme" @change="onThemeChange" class="adjust">
             <el-option v-for="item in themes" :key="item.value" :value="item.value" :label="item.label" />
           </el-select>
@@ -40,7 +40,6 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { Codemirror } from 'vue-codemirror'
 import { EditorView } from '@codemirror/view'
 import { cpp } from '@codemirror/lang-cpp'
@@ -59,14 +58,12 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:value', 'changeLang', 'changeTheme', 'resetCode'])
-
-const { t } = useI18n()
 const fileInputRef = ref(null)
 
 const themes = computed(() => [
-  { label: t('m.Monokai'), value: 'monokai' },
-  { label: t('m.Solarized_Light'), value: 'solarized' },
-  { label: t('m.Material'), value: 'material' }
+  { label: 'Monokai', value: 'monokai' },
+  { label: 'Solarized Light', value: 'solarized' },
+  { label: 'Material', value: 'material' }
 ])
 
 function langExtension (name) {

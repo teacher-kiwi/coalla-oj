@@ -1,31 +1,31 @@
 <template>
   <div class="announcement view">
-    <Panel :title="t('m.General_Announcement')">
+    <Panel title="공지사항">
       <div class="list">
         <el-table v-loading="loading" :data="announcementList" class="full-width">
           <el-table-column width="100" prop="id" label="ID" />
-          <el-table-column prop="title" label="Title" />
-          <el-table-column prop="create_time" label="CreateTime">
+          <el-table-column prop="title" label="제목" />
+          <el-table-column prop="create_time" label="생성 일시">
             <template #default="{ row }">{{ localtime(row.create_time) }}</template>
           </el-table-column>
-          <el-table-column prop="last_update_time" label="LastUpdateTime">
+          <el-table-column prop="last_update_time" label="최종 수정 일시">
             <template #default="{ row }">{{ localtime(row.last_update_time) }}</template>
           </el-table-column>
-          <el-table-column prop="created_by.username" label="Author" />
-          <el-table-column width="100" prop="visible" label="Visible">
+          <el-table-column prop="created_by.username" label="작성자" />
+          <el-table-column width="100" prop="visible" label="공개">
             <template #default="{ row }">
               <el-switch v-model="row.visible" @change="handleVisibleSwitch(row)" />
             </template>
           </el-table-column>
-          <el-table-column fixed="right" label="Option" width="200">
+          <el-table-column fixed="right" label="옵션" width="200">
             <template #default="{ row }">
-              <icon-btn name="Edit" icon="Edit" @click="openAnnouncementDialog(row.id)" />
-              <icon-btn name="Delete" icon="Delete" @click="deleteAnnouncement(row.id)" />
+              <icon-btn name="수정" icon="Edit" @click="openAnnouncementDialog(row.id)" />
+              <icon-btn name="삭제" icon="Delete" @click="deleteAnnouncement(row.id)" />
             </template>
           </el-table-column>
         </el-table>
         <div class="panel-options">
-          <el-button type="primary" size="small" @click="openAnnouncementDialog(null)" :icon="Plus">Create</el-button>
+          <el-button type="primary" size="small" @click="openAnnouncementDialog(null)" :icon="Plus">생성</el-button>
           <el-pagination v-if="!contestID" class="page" layout="prev, pager, next"
                          @current-change="currentChange" :page-size="pageSize" :total="total" />
         </div>
@@ -34,14 +34,14 @@
 
     <el-dialog :title="announcementDialogTitle" v-model="showEditAnnouncementDialog" :close-on-click-modal="false">
       <el-form label-position="top">
-        <el-form-item :label="t('m.Announcement_Title')" required>
-          <el-input v-model="announcement.title" :placeholder="t('m.Announcement_Title')" class="title-input" />
+        <el-form-item label="제목" required>
+          <el-input v-model="announcement.title" placeholder="제목" class="title-input" />
         </el-form-item>
-        <el-form-item :label="t('m.Announcement_Content')" required>
+        <el-form-item label="내용" required>
           <Simditor v-model="announcement.content" />
         </el-form-item>
         <div class="visible-box">
-          <span>{{ t('m.Announcement_visible') }}</span>
+          <span>공개</span>
           <el-switch v-model="announcement.visible" />
         </div>
       </el-form>
@@ -56,14 +56,11 @@
 <script setup>
 import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import Simditor from '../../components/Simditor.vue'
 import api from '../../api.js'
 import time from '@/utils/time'
-
-const { t } = useI18n()
 const route = useRoute()
 
 const contestID = ref('')
@@ -74,7 +71,7 @@ const total = ref(0)
 const currentAnnouncementId = ref(null)
 const mode = ref('create')
 const announcement = reactive({ title: '', visible: true, content: '' })
-const announcementDialogTitle = ref('Edit Announcement')
+const announcementDialogTitle = ref('공지 수정')
 const loading = ref(true)
 const currentPage = ref(0)
 
@@ -136,9 +133,9 @@ function submitAnnouncement (data) {
 }
 
 function deleteAnnouncement (announcementId) {
-  ElMessageBox.confirm('Are you sure you want to delete this announcement?', 'Warning', {
-    confirmButtonText: 'Delete',
-    cancelButtonText: 'Cancel',
+  ElMessageBox.confirm('이 공지를 삭제하시겠습니까?', '경고', {
+    confirmButtonText: '삭제',
+    cancelButtonText: '취소',
     type: 'warning'
   }).then(() => {
     loading.value = true
@@ -154,7 +151,7 @@ function openAnnouncementDialog (id) {
   showEditAnnouncementDialog.value = true
   if (id !== null) {
     currentAnnouncementId.value = id
-    announcementDialogTitle.value = 'Edit Announcement'
+    announcementDialogTitle.value = '공지 수정'
     const item = announcementList.value.find(item => item.id === id)
     if (item) {
       announcement.title = item.title
@@ -163,7 +160,7 @@ function openAnnouncementDialog (id) {
       mode.value = 'edit'
     }
   } else {
-    announcementDialogTitle.value = 'Create Announcement'
+    announcementDialogTitle.value = '공지 등록'
     announcement.title = ''
     announcement.visible = true
     announcement.content = ''

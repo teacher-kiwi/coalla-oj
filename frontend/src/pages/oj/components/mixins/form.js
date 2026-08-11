@@ -13,7 +13,7 @@ export function useForm () {
       }
       formRef.validate((valid) => {
         if (!valid) {
-          ElMessage.error('please validate the error fields')
+          ElMessage.error('입력값을 확인해주세요')
           resolve(false)
         } else {
           resolve(true)

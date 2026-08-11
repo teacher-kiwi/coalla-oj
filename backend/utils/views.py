@@ -18,14 +18,14 @@ class SimditorImageUploadAPIView(CSRFExemptAPIView):
         else:
             return self.response({
                 "success": False,
-                "msg": "Upload failed",
+                "msg": "업로드에 실패했습니다",
                 "file_path": ""})
 
         suffix = os.path.splitext(img.name)[-1].lower()
         if suffix not in [".gif", ".jpg", ".jpeg", ".bmp", ".png"]:
             return self.response({
                 "success": False,
-                "msg": "Unsupported file format",
+                "msg": "지원하지 않는 파일 형식입니다",
                 "file_path": ""})
         img_name = rand_str(10) + suffix
         try:
@@ -54,7 +54,7 @@ class SimditorFileUploadAPIView(CSRFExemptAPIView):
         else:
             return self.response({
                 "success": False,
-                "msg": "Upload failed"
+                "msg": "업로드에 실패했습니다"
             })
 
         suffix = os.path.splitext(file.name)[-1].lower()

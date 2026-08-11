@@ -63,14 +63,14 @@ class SMTPTestAPI(APIView):
     @validate_serializer(TestSMTPConfigSerializer)
     def post(self, request):
         if not SysOptions.smtp_config:
-            return self.error("Please setup SMTP config at first")
+            return self.error("먼저 SMTP 설정을 완료하세요")
         try:
             send_email(smtp_config=SysOptions.smtp_config,
                        from_name=SysOptions.website_name_shortcut,
                        to_name=request.user.username,
                        to_email=request.data["email"],
-                       subject="You have successfully configured SMTP",
-                       content="You have successfully configured SMTP")
+                       subject="SMTP 설정이 완료되었습니다",
+                       content="SMTP 설정이 정상적으로 완료되었습니다.")
         except smtplib.SMTPResponseException as e:
             # guess error message encoding
             msg = b"Failed to send email"
@@ -135,7 +135,7 @@ class JudgeServerHeartbeatAPI(CSRFExemptAPIView):
         data = request.data
         client_token = request.META.get("HTTP_X_JUDGE_SERVER_TOKEN")
         if hashlib.sha256(SysOptions.judge_server_token.encode("utf-8")).hexdigest() != client_token:
-            return self.error("Invalid token")
+            return self.error("토큰이 올바르지 않습니다")
 
         try:
             server = JudgeServer.objects.get(hostname=data["hostname"])

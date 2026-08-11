@@ -4,79 +4,79 @@
       <el-form ref="formRef" :model="problem" :rules="rules" label-position="top" label-width="70px">
         <el-row :gutter="20">
           <el-col :span="6">
-            <el-form-item prop="_id" :label="t('m.Display_ID')"
+            <el-form-item prop="_id" label="표시 ID"
                           :required="routeName === 'create-contest-problem' || routeName === 'edit-contest-problem'">
-              <el-input :placeholder="t('m.Display_ID')" v-model="problem._id" />
+              <el-input placeholder="표시 ID" v-model="problem._id" />
             </el-form-item>
           </el-col>
           <el-col :span="18">
-            <el-form-item prop="title" :label="t('m.Title')" required>
-              <el-input :placeholder="t('m.Title')" v-model="problem.title" />
+            <el-form-item prop="title" label="제목" required>
+              <el-input placeholder="제목" v-model="problem.title" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item prop="description" :label="t('m.Description')" required>
+            <el-form-item prop="description" label="설명" required>
               <Simditor v-model="problem.description" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item prop="input_description" :label="t('m.Input_Description')" required>
+            <el-form-item prop="input_description" label="입력 설명" required>
               <Simditor v-model="problem.input_description" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item prop="output_description" :label="t('m.Output_Description')" required>
+            <el-form-item prop="output_description" label="출력 설명" required>
               <Simditor v-model="problem.output_description" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item :label="t('m.Time_Limit') + ' (ms)'" required>
-              <el-input type="number" :placeholder="t('m.Time_Limit')" v-model="problem.time_limit" />
+            <el-form-item label="시간 제한 (ms)" required>
+              <el-input type="number" placeholder="시간 제한" v-model="problem.time_limit" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="t('m.Memory_limit') + ' (MB)'" required>
-              <el-input type="number" :placeholder="t('m.Memory_limit')" v-model="problem.memory_limit" />
+            <el-form-item label="메모리 제한 (MB)" required>
+              <el-input type="number" placeholder="메모리 제한" v-model="problem.memory_limit" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="t('m.Difficulty')">
-              <el-select class="difficulty-select" size="small" :placeholder="t('m.Difficulty')" v-model="problem.difficulty">
-                <el-option :label="t('m.Low')" value="Low" />
-                <el-option :label="t('m.Mid')" value="Mid" />
-                <el-option :label="t('m.High')" value="High" />
+            <el-form-item label="난이도">
+              <el-select class="difficulty-select" size="small" placeholder="난이도" v-model="problem.difficulty">
+                <el-option label="낮음" value="Low" />
+                <el-option label="중간" value="Mid" />
+                <el-option label="높음" value="High" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="4">
-            <el-form-item :label="t('m.Visible')">
+            <el-form-item label="공개">
               <el-switch v-model="problem.visible" />
             </el-form-item>
           </el-col>
           <el-col :span="4">
-            <el-form-item :label="t('m.ShareSubmission')">
+            <el-form-item label="제출 공유">
               <el-switch v-model="problem.share_submission" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="t('m.Tag')" :error="error.tags" required>
+            <el-form-item label="태그" :error="error.tags" required>
               <el-select v-model="problem.tags" multiple filterable remote reserve-keyword
-                         class="tag-select" :placeholder="t('m.Tag')"
+                         class="tag-select" placeholder="태그"
                          :remote-method="querySearch" :loading="tagLoading">
                 <el-option v-for="tag in tagOptions" :key="tag.name" :label="formatTagLabel(tag)" :value="tag.name" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="t('m.Languages')" :error="error.languages" required>
+            <el-form-item label="언어" :error="error.languages" required>
               <el-checkbox-group v-model="problem.languages">
                 <el-tooltip v-for="lang in allLanguage.languages" :key="'lang' + lang.name"
                             class="spj-radio" effect="dark" :content="lang.description" placement="top-start">
@@ -91,17 +91,17 @@
           <el-form-item v-for="(sample, index) in problem.samples" :key="'sample' + index">
             <Accordion :title="'Sample ' + (index + 1)">
               <template #header>
-                <el-button type="warning" size="small" :icon="Delete" @click="deleteSample(index)">Delete</el-button>
+                <el-button type="warning" size="small" :icon="Delete" @click="deleteSample(index)">삭제</el-button>
               </template>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item :label="t('m.Input_Samples')" required>
-                    <el-input :rows="5" type="textarea" :placeholder="t('m.Input_Samples')" v-model="sample.input" />
+                  <el-form-item label="입력 예제" required>
+                    <el-input :rows="5" type="textarea" placeholder="입력 예제" v-model="sample.input" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item :label="t('m.Output_Samples')" required>
-                    <el-input :rows="5" type="textarea" :placeholder="t('m.Output_Samples')" v-model="sample.output" />
+                  <el-form-item label="출력 예제" required>
+                    <el-input :rows="5" type="textarea" placeholder="출력 예제" v-model="sample.output" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -110,15 +110,15 @@
         </div>
         <div class="add-sample-btn">
           <button type="button" class="add-samples" @click="addSample">
-            <el-icon class="add-icon"><Plus /></el-icon>{{ t('m.Add_Sample') }}
+            <el-icon class="add-icon"><Plus /></el-icon>예제 추가
           </button>
         </div>
 
-        <el-form-item class="hint-item" :label="t('m.Hint')">
+        <el-form-item class="hint-item" label="힌트">
           <Simditor v-model="problem.hint" placeholder="" />
         </el-form-item>
 
-        <el-form-item :label="t('m.Code_Template')">
+        <el-form-item label="코드 템플릿">
           <el-row class="full-width">
             <el-col :span="24" v-for="(v, k) in template" :key="'template' + k">
               <el-checkbox v-model="v.checked">{{ k }}</el-checkbox>
@@ -129,15 +129,15 @@
           </el-row>
         </el-form-item>
 
-        <el-form-item :label="t('m.Special_Judge')" :error="error.spj">
+        <el-form-item label="스페셜 저지" :error="error.spj">
           <el-col :span="24">
-            <el-checkbox :model-value="problem.spj" @click.prevent="switchSpj">{{ t('m.Use_Special_Judge') }}</el-checkbox>
+            <el-checkbox :model-value="problem.spj" @click.prevent="switchSpj">Special Judge 사용</el-checkbox>
           </el-col>
         </el-form-item>
         <el-form-item v-if="problem.spj">
-          <Accordion :title="t('m.Special_Judge_Code')">
+          <Accordion title="Special Judge 코드">
             <template #header>
-              <span>{{ t('m.SPJ_language') }}</span>
+              <span>SPJ 언어</span>
               <el-radio-group v-model="problem.spj_language">
                 <el-tooltip v-for="lang in allLanguage.spj_languages" :key="lang.name"
                             class="spj-radio" effect="dark" :content="lang.description" placement="top-start">
@@ -145,7 +145,7 @@
                 </el-tooltip>
               </el-radio-group>
               <el-button type="primary" size="small" @click="compileSPJ" :loading="loadingCompile">
-                {{ t('m.Compile') }}
+                컴파일
               </el-button>
             </template>
             <code-mirror v-model="problem.spj_code" :mode="spjMode" />
@@ -154,7 +154,7 @@
 
         <el-row :gutter="20">
           <el-col :span="4">
-            <el-form-item :label="t('m.Type')">
+            <el-form-item label="유형">
               <el-radio-group v-model="problem.rule_type" :disabled="disableRuleType">
                 <el-radio label="ACM">ACM</el-radio>
                 <el-radio label="OI">OI</el-radio>
@@ -162,38 +162,38 @@
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item :label="t('m.TestCase')" :error="error.testCase">
+            <el-form-item label="테스트 케이스" :error="error.testCase">
               <el-upload action="/api/admin/test_case" name="file" :data="{ spj: problem.spj }"
                          :show-file-list="true" :on-success="uploadSucceeded" :on-error="uploadFailed">
-                <el-button size="small" type="primary">Choose File</el-button>
+                <el-button size="small" type="primary">파일 선택</el-button>
               </el-upload>
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item :label="t('m.IOMode')">
+            <el-form-item label="IO 모드">
               <el-radio-group v-model="problem.io_mode.io_mode">
-                <el-radio label="Standard IO">Standard IO</el-radio>
-                <el-radio label="File IO">File IO</el-radio>
+                <el-radio label="Standard IO">표준 입출력</el-radio>
+                <el-radio label="File IO">파일 입출력</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
           <el-col :span="4" v-if="problem.io_mode.io_mode === 'File IO'">
-            <el-form-item :label="t('m.InputFileName')" required>
+            <el-form-item label="입력 파일명" required>
               <el-input v-model="problem.io_mode.input" />
             </el-form-item>
           </el-col>
           <el-col :span="4" v-if="problem.io_mode.io_mode === 'File IO'">
-            <el-form-item :label="t('m.OutputFileName')" required>
+            <el-form-item label="출력 파일명" required>
               <el-input v-model="problem.io_mode.output" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-table :data="problem.test_case_score" class="full-width">
-              <el-table-column prop="input_name" :label="t('m.Input')" />
-              <el-table-column prop="output_name" :label="t('m.Output')" />
-              <el-table-column prop="score" :label="t('m.Score')">
+              <el-table-column prop="input_name" label="입력" />
+              <el-table-column prop="output_name" label="출력" />
+              <el-table-column prop="score" label="점수">
                 <template #default="{ row }">
-                  <el-input size="small" :placeholder="t('m.Score')" v-model="row.score"
+                  <el-input size="small" placeholder="점수" v-model="row.score"
                             :disabled="problem.rule_type !== 'OI'" />
                 </template>
               </el-table-column>
@@ -201,10 +201,10 @@
           </el-col>
         </el-row>
 
-        <el-form-item :label="t('m.Source')">
-          <el-input :placeholder="t('m.Source')" v-model="problem.source" />
+        <el-form-item label="출처">
+          <el-input placeholder="출처" v-model="problem.source" />
         </el-form-item>
-        <save @click="submit">Save</save>
+        <save @click="submit">저장</save>
       </el-form>
     </Panel>
   </div>
@@ -213,24 +213,21 @@
 <script setup>
 import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import Simditor from '../../components/Simditor.vue'
 import Accordion from '../../components/Accordion.vue'
 import CodeMirror from '../../components/CodeMirror.vue'
 import api from '../../api.js'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
 const formRef = ref(null)
 const rules = {
-  _id: { required: true, message: 'Display ID is required', trigger: 'blur' },
-  title: { required: true, message: 'Title is required', trigger: 'blur' },
-  input_description: { required: true, message: 'Input Description is required', trigger: 'blur' },
-  output_description: { required: true, message: 'Output Description is required', trigger: 'blur' }
+  _id: { required: true, message: '표시 ID를 입력하세요', trigger: 'blur' },
+  title: { required: true, message: '제목을 입력하세요', trigger: 'blur' },
+  input_description: { required: true, message: '입력 설명을 입력하세요', trigger: 'blur' },
+  output_description: { required: true, message: '출력 설명을 입력하세요', trigger: 'blur' }
 }
 
 const loadingCompile = ref(false)
@@ -282,7 +279,7 @@ onMounted(() => {
     allLanguage.value = res.data.data
 
     if (mode.value === 'edit') {
-      title.value = t('m.Edit_Problem')
+      title.value = '문제 수정'
       const funcName = { 'edit-problem': 'getProblem', 'edit-contest-problem': 'getContestProblem' }[routeName.value]
       api[funcName](route.params.problemId).then(problemRes => {
         const data = problemRes.data.data
@@ -292,7 +289,7 @@ onMounted(() => {
         testCaseUploaded.value = true
       })
     } else {
-      title.value = t('m.Add_Problem')
+      title.value = '문제 추가'
       for (const item of res.data.data.languages) {
         problem.value.languages.push(item.name)
       }
@@ -331,8 +328,8 @@ watch(() => problem.value.spj_language, () => {
 
 function switchSpj () {
   if (testCaseUploaded.value) {
-    ElMessageBox.confirm('If you change problem judge method, you need to re-upload test cases', 'Warning', {
-      confirmButtonText: 'Yes', cancelButtonText: 'Cancel', type: 'warning'
+    ElMessageBox.confirm('채점 방식을 바꾸면 테스트 케이스를 다시 업로드해야 합니다', '경고', {
+      confirmButtonText: 'Yes', cancelButtonText: '취소', type: 'warning'
     }).then(() => {
       problem.value.spj = !problem.value.spj
       resetTestCase()
@@ -386,7 +383,7 @@ function uploadSucceeded (response) {
   problem.value.test_case_id = response.data.id
 }
 
-function uploadFailed () { ElMessage.error('Upload failed') }
+function uploadFailed () { ElMessage.error('업로드에 실패했습니다') }
 
 function compileSPJ () {
   loadingCompile.value = true
@@ -399,14 +396,14 @@ function compileSPJ () {
   }, (err) => {
     loadingCompile.value = false
     problem.value.spj_compile_ok = false
-    ElMessageBox.alert(err.data?.data || 'Compile error', 'Compile Error', { type: 'error', customClass: 'dialog-compile-error' })
+    ElMessageBox.alert(err.data?.data || '컴파일 오류', '컴파일 에러', { type: 'error', customClass: 'dialog-compile-error' })
   })
 }
 
 function submit () {
-  if (!problem.value.samples.length) { ElMessage.error('Sample is required'); return }
+  if (!problem.value.samples.length) { ElMessage.error('예제를 입력하세요'); return }
   for (const sample of problem.value.samples) {
-    if (!sample.input || !sample.output) { ElMessage.error('Sample input and output is required'); return }
+    if (!sample.input || !sample.output) { ElMessage.error('예제 입력과 출력을 모두 입력하세요'); return }
   }
   if (!problem.value.tags.length) { error.tags = 'Please add at least one tag'; ElMessage.error(error.tags); return }
   if (problem.value.spj) {
@@ -419,7 +416,7 @@ function submit () {
   if (problem.value.rule_type === 'OI') {
     for (const item of problem.value.test_case_score) {
       if (parseInt(item.score) <= 0 || isNaN(parseInt(item.score))) {
-        ElMessage.error('Invalid test case score'); return
+        ElMessage.error('테스트 케이스 점수가 올바르지 않습니다'); return
       }
     }
   }

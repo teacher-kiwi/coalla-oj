@@ -18,7 +18,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   if (to.matched.some(record => record.meta.requiresAuth)) {
     if (!storage.get(STORAGE_KEY.AUTHED)) {
-      ElMessage.error('Please login first')
+      ElMessage.error('먼저 로그인하세요')
       const { useAppStore } = await import('@/store/app')
       useAppStore().changeModalStatus({ mode: 'login', visible: true })
       next({ name: 'home' })

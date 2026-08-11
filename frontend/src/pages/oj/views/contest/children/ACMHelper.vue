@@ -1,28 +1,28 @@
 <template>
   <Panel shadow>
-    <template #title>{{ t('m.ACM_Helper') }}</template>
+    <template #title>ACM 도우미</template>
     <template #extra>
       <ul class="filter">
         <li>
-          {{ t('m.Auto_Refresh') }} (10s)
+          자동 새로고침 (10s)
           <el-switch class="auto-refresh-switch" @change="handleAutoRefreshToggle" />
         </li>
         <li>
-          <el-button type="primary" @click="getACInfo">{{ t('m.Refresh') }}</el-button>
+          <el-button type="primary" @click="getACInfo">새로고침</el-button>
         </li>
       </ul>
     </template>
 
     <el-table :data="pagedAcInfo" v-loading="loadingTable" stripe>
-      <el-table-column :label="t('m.AC_Time')" prop="ac_time" />
-      <el-table-column :label="t('m.ProblemID')" align="center" prop="problem_display_id" />
-      <el-table-column :label="t('m.First_Blood')" align="center">
+      <el-table-column label="AC 시간" prop="ac_time" />
+      <el-table-column label="문제 ID" align="center" prop="problem_display_id" />
+      <el-table-column label="최초 해결" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.ac_info.is_first_ac" type="danger">{{ t('m.First_Blood') }}</el-tag>
+          <el-tag v-if="row.ac_info.is_first_ac" type="danger">최초 해결</el-tag>
           <span v-else>----</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('m.Username')" align="center">
+      <el-table-column label="사용자명" align="center">
         <template #default="{ row }">
           <a class="link-text truncate"
              @click="router.push({ name: 'contest-submission-list', query: { username: row.username } })">
@@ -30,22 +30,22 @@
           </a>
         </template>
       </el-table-column>
-      <el-table-column :label="t('m.RealName')" align="center">
+      <el-table-column label="실명" align="center">
         <template #default="{ row }">
           <span class="truncate">{{ row.real_name }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('m.Status')" align="center">
+      <el-table-column label="상태" align="center">
         <template #default="{ row }">
           <el-tag :type="row.checked ? 'success' : 'warning'">
-            {{ row.checked ? t('m.Checked') : t('m.Not_Checked') }}
+            {{ row.checked ? '확인됨' : '미확인' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('m.Option')" align="center" width="100">
+      <el-table-column label="옵션" align="center" width="100">
         <template #default="{ row }">
           <el-button size="small" :disabled="row.checked" @click="updateCheckedStatus(row)">
-            {{ t('m.Check_It') }}
+            확인하기
           </el-button>
         </template>
       </el-table-column>
@@ -60,14 +60,11 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import Pagination from '@oj/components/Pagination.vue'
 import api from '@oj/api'
 import { useContestStore } from '@/store/contest'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
@@ -118,7 +115,7 @@ function updateCheckedStatus (row) {
     checked: true
   }
   api.updateACInfoCheckedStatus(data).then(() => {
-    ElMessage.success('Succeeded')
+    ElMessage.success('완료되었습니다')
     getACInfo()
   }).catch(() => {})
 }

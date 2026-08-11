@@ -9,21 +9,21 @@
         </template>
         <div id="switches">
           <p>
-            <span>{{ t('m.Menu') }}</span>
+            <span>메뉴</span>
             <el-switch v-model="showMenu" />
-            <span>{{ t('m.Chart') }}</span>
+            <span>차트</span>
             <el-switch v-model="showChart" />
           </p>
           <p>
-            <span>{{ t('m.Auto_Refresh') }}(10s)</span>
+            <span>자동 새로고침(10s)</span>
             <el-switch :disabled="refreshDisabled" @change="onAutoRefresh" />
           </p>
           <p v-if="isContestAdmin">
-            <span>{{ t('m.RealName') }}</span>
+            <span>실명</span>
             <el-switch v-model="showRealName" />
           </p>
           <p>
-            <el-button type="primary" size="small" @click="downloadRankCSV">{{ t('m.download_csv') }}</el-button>
+            <el-button type="primary" size="small" @click="downloadRankCSV">CSV 다운로드</el-button>
           </p>
         </div>
       </el-popover>
@@ -37,7 +37,7 @@
       <el-table-column align="center" width="60">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
-      <el-table-column :label="t('m.User_User')" align="center">
+      <el-table-column label="사용자" align="center">
         <template #default="{ row }">
           <a class="link-text truncate"
              @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
@@ -45,10 +45,10 @@
           </a>
         </template>
       </el-table-column>
-      <el-table-column v-if="showRealName" label="RealName" align="center" width="150">
+      <el-table-column v-if="showRealName" label="실명" align="center" width="150">
         <template #default="{ row }">{{ row.user.real_name }}</template>
       </el-table-column>
-      <el-table-column :label="t('m.Total_Score')" align="center">
+      <el-table-column label="총점" align="center">
         <template #default="{ row }">
           <a class="link-text" @click="router.push({ name: 'contest-submission-list', query: { username: row.user.username } })">
             {{ row.total_score }}
@@ -77,14 +77,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { Setting } from '@element-plus/icons-vue'
 import Pagination from '@oj/components/Pagination.vue'
 import ScreenFull from '@admin/components/ScreenFull.vue'
 import { useContestRank } from './contestRankMixin'
 import utils from '@/utils/utils'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -100,7 +97,7 @@ const contestID = ref('')
 const chart = ref(null)
 const dataRank = ref([])
 const options = ref({
-  title: { text: t('m.Top_10_Teams'), left: 'center' },
+  title: { text: '상위 10개 팀', left: 'center' },
   tooltip: { trigger: 'axis' },
   toolbox: {
     show: true,
@@ -122,7 +119,7 @@ const options = ref({
   }],
   yAxis: [{ type: 'value' }],
   series: [{
-    name: t('m.Score'), type: 'bar', barMaxWidth: '80', data: [0],
+    name: '점수', type: 'bar', barMaxWidth: '80', data: [0],
     markPoint: { data: [{ type: 'max', name: 'max' }] }
   }]
 })

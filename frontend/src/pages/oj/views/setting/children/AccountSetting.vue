@@ -2,45 +2,45 @@
   <div class="setting-main">
     <div class="flex-container">
       <div class="left">
-        <p class="section-title">{{ t('m.ChangePassword') }}</p>
+        <p class="section-title">비밀번호 변경</p>
         <el-form class="setting-content" ref="formPasswordRef" :model="formPassword" :rules="rulePassword" label-width="160px">
-          <el-form-item label="Old Password" prop="old_password">
+          <el-form-item label="기존 비밀번호" prop="old_password">
             <el-input v-model="formPassword.old_password" type="password" />
           </el-form-item>
-          <el-form-item label="New Password" prop="new_password">
+          <el-form-item label="새 비밀번호" prop="new_password">
             <el-input v-model="formPassword.new_password" type="password" />
           </el-form-item>
-          <el-form-item label="Confirm New Password" prop="again_password">
+          <el-form-item label="새 비밀번호 확인" prop="again_password">
             <el-input v-model="formPassword.again_password" type="password" />
           </el-form-item>
-          <el-form-item v-if="visible.tfaRequired" label="Two Factor Auth" prop="tfa_code">
+          <el-form-item v-if="visible.tfaRequired" label="2단계 인증" prop="tfa_code">
             <el-input v-model="formPassword.tfa_code" />
           </el-form-item>
           <el-form-item v-if="visible.passwordAlert">
             <el-alert type="success" :closable="false">You will need to login again after 5 seconds..</el-alert>
           </el-form-item>
-          <el-button type="primary" :loading="loading.btnPassword" @click="changePassword">{{ t('m.Update_Password') }}</el-button>
+          <el-button type="primary" :loading="loading.btnPassword" @click="changePassword">비밀번호 업데이트</el-button>
         </el-form>
       </div>
 
       <div class="middle separator" />
 
       <div class="right">
-        <p class="section-title">{{ t('m.ChangeEmail') }}</p>
+        <p class="section-title">이메일 변경</p>
         <el-form class="setting-content" ref="formEmailRef" :model="formEmail" :rules="ruleEmail" label-width="160px">
-          <el-form-item label="Current Password" prop="password">
+          <el-form-item label="현재 비밀번호" prop="password">
             <el-input v-model="formEmail.password" type="password" />
           </el-form-item>
-          <el-form-item label="Old Email">
+          <el-form-item label="기존 이메일">
             <el-input v-model="formEmail.old_email" disabled />
           </el-form-item>
-          <el-form-item label="New Email" prop="new_email">
+          <el-form-item label="새 이메일" prop="new_email">
             <el-input v-model="formEmail.new_email" />
           </el-form-item>
-          <el-form-item v-if="visible.tfaRequired" label="Two Factor Auth" prop="tfa_code">
+          <el-form-item v-if="visible.tfaRequired" label="2단계 인증" prop="tfa_code">
             <el-input v-model="formEmail.tfa_code" />
           </el-form-item>
-          <el-button type="primary" :loading="loading.btnEmail" @click="changeEmail">{{ t('m.ChangeEmail') }}</el-button>
+          <el-button type="primary" :loading="loading.btnEmail" @click="changeEmail">이메일 변경</el-button>
         </el-form>
       </div>
     </div>
@@ -50,13 +50,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 const { validateForm } = useForm()
@@ -115,7 +112,7 @@ async function changePassword () {
     await api.changePassword(data)
     loading.btnPassword = false
     visible.passwordAlert = true
-    ElMessage.success('Update password successfully')
+    ElMessage.success('비밀번호를 변경했습니다')
     setTimeout(() => {
       visible.passwordAlert = false
       router.push({ name: 'logout' })
@@ -136,7 +133,7 @@ async function changeEmail () {
     await api.changeEmail(data)
     loading.btnEmail = false
     visible.emailAlert = true
-    ElMessage.success('Change email successfully')
+    ElMessage.success('이메일을 변경했습니다')
     formEmailRef.value?.resetFields()
   } catch (res) {
     if (res?.data?.data === 'tfa_required') visible.tfaRequired = true

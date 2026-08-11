@@ -5,36 +5,36 @@
     </div>
     <el-menu-item index="/">
       <el-icon><Odometer /></el-icon>
-      {{ t('m.Dashboard') }}
+      대시보드
     </el-menu-item>
     <el-sub-menu v-if="userStore.isSuperAdmin" index="general">
       <template #title>
         <el-icon><Menu /></el-icon>
-        {{ t('m.General') }}
+        일반
       </template>
-      <el-menu-item index="/user">{{ t('m.User') }}</el-menu-item>
-      <el-menu-item index="/announcement">{{ t('m.Announcement') }}</el-menu-item>
-      <el-menu-item index="/conf">{{ t('m.System_Config') }}</el-menu-item>
-      <el-menu-item index="/judge-server">{{ t('m.Judge_Server') }}</el-menu-item>
-      <el-menu-item index="/prune-test-case">{{ t('m.Prune_Test_Case') }}</el-menu-item>
+      <el-menu-item index="/user">사용자</el-menu-item>
+      <el-menu-item index="/announcement">공지사항</el-menu-item>
+      <el-menu-item index="/conf">시스템 설정</el-menu-item>
+      <el-menu-item index="/judge-server">채점 서버</el-menu-item>
+      <el-menu-item index="/prune-test-case">테스트 케이스 정리</el-menu-item>
     </el-sub-menu>
     <el-sub-menu v-if="userStore.hasProblemPermission" index="problem">
       <template #title>
         <el-icon><Document /></el-icon>
-        {{ t('m.Problem') }}
+        문제
       </template>
-      <el-menu-item index="/problems">{{ t('m.Problem_List') }}</el-menu-item>
-      <el-menu-item v-if="userStore.isSuperAdmin" index="/problem/tags">Problem Tags</el-menu-item>
-      <el-menu-item index="/problem/create">{{ t('m.Create_Problem') }}</el-menu-item>
-      <el-menu-item index="/problem/batch_ops">{{ t('m.Export_Import_Problem') }}</el-menu-item>
+      <el-menu-item index="/problems">문제 목록</el-menu-item>
+      <el-menu-item v-if="userStore.isSuperAdmin" index="/problem/tags">문제 태그</el-menu-item>
+      <el-menu-item index="/problem/create">문제 생성</el-menu-item>
+      <el-menu-item index="/problem/batch_ops">문제 내보내기/가져오기</el-menu-item>
     </el-sub-menu>
     <el-sub-menu index="contest">
       <template #title>
         <el-icon><Trophy /></el-icon>
-        {{ t('m.Contest') }}
+        대회
       </template>
-      <el-menu-item index="/contest">{{ t('m.Contest_List') }}</el-menu-item>
-      <el-menu-item index="/contest/create">{{ t('m.Create_Contest') }}</el-menu-item>
+      <el-menu-item index="/contest">대회 목록</el-menu-item>
+      <el-menu-item index="/contest/create">대회 생성</el-menu-item>
     </el-sub-menu>
   </el-menu>
 </template>
@@ -42,10 +42,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const currentPath = ref('')

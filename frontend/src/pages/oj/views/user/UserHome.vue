@@ -14,22 +14,22 @@
 
         <div class="flex-container">
           <div class="left">
-            <p>{{ t('m.UserHomeSolved') }}</p>
+            <p>해결</p>
             <p class="emphasis">{{ profile.accepted_number }}</p>
           </div>
           <div class="middle">
-            <p>{{ t('m.UserHomeserSubmissions') }}</p>
+            <p>제출</p>
             <p class="emphasis">{{ profile.submission_number }}</p>
           </div>
           <div class="right">
-            <p>{{ t('m.UserHomeScore') }}</p>
+            <p>점수</p>
             <p class="emphasis">{{ profile.total_score }}</p>
           </div>
         </div>
 
         <div id="problems">
           <div v-if="problems.length">
-            {{ t('m.List_Solved_Problems') }}
+            해결한 문제 목록
             <el-popover v-if="refreshVisible" trigger="hover" placement="right-start">
               <template #reference>
                 <el-icon><QuestionFilled /></el-icon>
@@ -38,7 +38,7 @@
               <el-button type="info" @click="freshProblemDisplayID">regenerate</el-button>
             </el-popover>
           </div>
-          <p v-else>{{ t('m.UserHomeIntro') }}</p>
+          <p v-else>아직 문제를 해결하지 않은 게으른 사람입니다.</p>
           <div class="btns">
             <div class="problem-btn" v-for="problemID of problems" :key="problemID">
               <el-button @click="goProblem(problemID)">{{ problemID }}</el-button>
@@ -59,15 +59,12 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { QuestionFilled, Link, Message, Promotion } from '@element-plus/icons-vue'
 import time from '@/utils/time'
 import api from '@oj/api'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
@@ -113,7 +110,7 @@ function goProblem (problemID) {
 
 function freshProblemDisplayID () {
   api.freshDisplayID().then(() => {
-    ElMessage.success('Update successfully')
+    ElMessage.success('수정되었습니다')
     init()
   })
 }

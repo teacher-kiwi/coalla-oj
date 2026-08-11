@@ -1,7 +1,7 @@
 <template>
   <div class="breadcrumb">
     <el-breadcrumb separator=">">
-      <el-breadcrumb-item :to="{ path: '/' }">Home page</el-breadcrumb-item>
+      <el-breadcrumb-item :to="{ path: '/' }">홈페이지</el-breadcrumb-item>
       <el-breadcrumb-item><slot name="topNavName">PLEASE OVERRIDE ME</slot></el-breadcrumb-item>
     </el-breadcrumb>
   </div>

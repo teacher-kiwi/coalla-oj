@@ -1,8 +1,8 @@
 <template>
   <div class="view">
-    <Panel title="Contest List">
+    <Panel title="대회 목록">
       <template #header>
-        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="Keywords" />
+        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="검색어" />
       </template>
       <el-table v-loading="loading" :data="contestList" class="full-width">
         <el-table-column type="expand">
@@ -14,35 +14,35 @@
           </template>
         </el-table-column>
         <el-table-column prop="id" width="80" label="ID" />
-        <el-table-column prop="title" label="Title" />
-        <el-table-column label="Rule Type" width="130">
+        <el-table-column prop="title" label="제목" />
+        <el-table-column label="규칙 유형" width="130">
           <template #default="{ row }">
             <el-tag type="info">{{ row.rule_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Contest Type" width="180">
+        <el-table-column label="대회 유형" width="180">
           <template #default="{ row }">
             <el-tag :type="row.contest_type === 'Public' ? 'success' : 'primary'">{{ row.contest_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Status" width="130">
+        <el-table-column label="상태" width="130">
           <template #default="{ row }">
             <el-tag :type="row.status === '-1' ? 'danger' : row.status === '0' ? 'success' : 'primary'">
               {{ contestStatus(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column width="100" label="Visible">
+        <el-table-column width="100" label="공개">
           <template #default="{ row }">
             <el-switch v-model="row.visible" @change="handleVisibleSwitch(row)" />
           </template>
         </el-table-column>
-        <el-table-column fixed="right" width="250" label="Operation">
+        <el-table-column fixed="right" width="250" label="관리">
           <template #default="{ row }">
-            <icon-btn name="Edit" icon="Edit" @click="goEdit(row.id)" />
-            <icon-btn name="Problem" icon="List" @click="goContestProblemList(row.id)" />
-            <icon-btn name="Announcement" icon="InfoFilled" @click="goContestAnnouncement(row.id)" />
-            <icon-btn icon="Download" name="Download Accepted Submissions" @click="openDownloadOptions(row.id)" />
+            <icon-btn name="수정" icon="Edit" @click="goEdit(row.id)" />
+            <icon-btn name="문제" icon="List" @click="goContestProblemList(row.id)" />
+            <icon-btn name="공지" icon="InfoFilled" @click="goContestAnnouncement(row.id)" />
+            <icon-btn icon="Download" name="정답 제출 내려받기" @click="openDownloadOptions(row.id)" />
           </template>
         </el-table-column>
       </el-table>
@@ -52,10 +52,10 @@
       </div>
     </Panel>
 
-    <el-dialog title="Download Contest Submissions" width="30%" v-model="downloadDialogVisible">
-      <el-switch v-model="excludeAdmin" active-text="Exclude admin submissions" />
+    <el-dialog title="대회 제출 내려받기" width="30%" v-model="downloadDialogVisible">
+      <el-switch v-model="excludeAdmin" active-text="관리자 제출 제외" />
       <template #footer>
-        <el-button type="primary" @click="downloadSubmissions">Download</el-button>
+        <el-button type="primary" @click="downloadSubmissions">내려받기</el-button>
       </template>
     </el-dialog>
   </div>

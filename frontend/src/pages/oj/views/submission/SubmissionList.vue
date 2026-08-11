@@ -13,9 +13,9 @@
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="">{{ t('m.All') }}</el-dropdown-item>
+                    <el-dropdown-item command="">전체</el-dropdown-item>
                     <el-dropdown-item v-for="s in Object.keys(judgeStatusFiltered)" :key="s" :command="s">
-                      {{ t('m.' + JUDGE_STATUS[s].name.replace(/ /g, '_')) }}
+                      {{ JUDGE_STATUS[s].label }}
                     </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -24,22 +24,22 @@
             <li>
               <el-switch v-model="formFilter.myself" active-text="" inactive-text="" @change="handleQueryChange">
                 <template #active-action><span class="switch-label">My</span></template>
-                <template #inactive-action><span class="switch-label">All</span></template>
+                <template #inactive-action><span class="switch-label">전체</span></template>
               </el-switch>
             </li>
             <li>
-              <el-input v-model="formFilter.username" :placeholder="t('m.Search_Author')" @keyup.enter="handleQueryChange" />
+              <el-input v-model="formFilter.username" placeholder="작성자 검색" @keyup.enter="handleQueryChange" />
             </li>
             <li>
-              <el-button type="primary" :icon="Refresh" @click="getSubmissions">{{ t('m.Refresh') }}</el-button>
+              <el-button type="primary" :icon="Refresh" @click="getSubmissions">새로고침</el-button>
             </li>
           </ul>
         </template>
         <el-table :data="submissions" v-loading="loadingTable" stripe>
-          <el-table-column :label="t('m.When')" align="center">
+          <el-table-column label="시간" align="center">
             <template #default="{ row }">{{ localtime(row.create_time) }}</template>
           </el-table-column>
-          <el-table-column :label="t('m.ID')" align="center">
+          <el-table-column label="ID" align="center">
             <template #default="{ row }">
               <span v-if="row.show_link" class="link-text" @click="router.push('/status/' + row.id)">
                 {{ row.id.slice(0, 12) }}
@@ -47,36 +47,36 @@
               <span v-else>{{ row.id.slice(0, 12) }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Status')" align="center">
+          <el-table-column label="상태" align="center">
             <template #default="{ row }">
               <el-tag :type="JUDGE_STATUS[row.result].type">
-                {{ t('m.' + JUDGE_STATUS[row.result].name.replace(/ /g, '_')) }}
+                {{ JUDGE_STATUS[row.result].label }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Problem')" align="center">
+          <el-table-column label="문제" align="center">
             <template #default="{ row }">
               <span class="link-text" @click="goToProblem(row)">{{ row.problem }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="t('m.Time')" align="center">
+          <el-table-column label="시간" align="center">
             <template #default="{ row }">{{ submissionTimeFormat(row.statistic_info.time_cost) }}</template>
           </el-table-column>
-          <el-table-column :label="t('m.Memory')" align="center">
+          <el-table-column label="메모리" align="center">
             <template #default="{ row }">{{ submissionMemoryFormat(row.statistic_info.memory_cost) }}</template>
           </el-table-column>
-          <el-table-column :label="t('m.Language')" align="center" prop="language" />
-          <el-table-column :label="t('m.Author')" align="center">
+          <el-table-column label="언어" align="center" prop="language" />
+          <el-table-column label="작성자" align="center">
             <template #default="{ row }">
               <a class="link-text truncate" @click="router.push({ name: 'user-home', query: { username: row.username } })">
                 {{ row.username }}
               </a>
             </template>
           </el-table-column>
-          <el-table-column v-if="rejudgeColumnVisible" :label="t('m.Option')" align="center" width="90">
+          <el-table-column v-if="rejudgeColumnVisible" label="옵션" align="center" width="90">
             <template #default="{ row, $index }">
               <el-button type="primary" size="small" :loading="row.loading" @click="handleRejudge(row.id, $index)">
-                {{ t('m.Rejudge') }}
+                재채점
               </el-button>
             </template>
           </el-table-column>
@@ -90,7 +90,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Refresh } from '@element-plus/icons-vue'
 import api from '@oj/api'
@@ -101,7 +100,6 @@ import Pagination from '@oj/components/Pagination.vue'
 import { useUserStore } from '@/store/user'
 
 const { submissionTimeFormat, submissionMemoryFormat } = utils
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -125,13 +123,13 @@ const judgeStatusFiltered = computed(() => {
 })
 
 const title = computed(() => {
-  if (!contestID.value) return t('m.Status')
-  if (problemID.value) return t('m.Problem_Submissions')
-  return t('m.Submissions')
+  if (!contestID.value) return '상태'
+  if (problemID.value) return '문제별 제출'
+  return '제출'
 })
 
 const status = computed(() => {
-  return formFilter.result === '' ? t('m.Status') : t('m.' + JUDGE_STATUS[formFilter.result].name.replace(/ /g, '_'))
+  return formFilter.result === '' ? '상태' : JUDGE_STATUS[formFilter.result].label
 })
 
 const rejudgeColumnVisible = computed(() => {
@@ -220,7 +218,7 @@ function handleRejudge (id, index) {
   submissions.value[index].loading = true
   api.submissionRejudge(id).then(() => {
     submissions.value[index].loading = false
-    ElMessage.success('Succeeded')
+    ElMessage.success('완료되었습니다')
     getSubmissions()
   }, () => {
     submissions.value[index].loading = false

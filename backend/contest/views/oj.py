@@ -24,7 +24,7 @@ class ContestAnnouncementListAPI(APIView):
     def get(self, request):
         contest_id = request.GET.get("contest_id")
         if not contest_id:
-            return self.error("Invalid parameter, contest_id is required")
+            return self.error("잘못된 요청입니다. contest_id가 필요합니다")
         data = ContestAnnouncement.objects.select_related("created_by").filter(contest_id=contest_id, visible=True)
         max_id = request.GET.get("max_id")
         if max_id:
@@ -36,11 +36,11 @@ class ContestAPI(APIView):
     def get(self, request):
         id = request.GET.get("id")
         if not id or not check_is_id(id):
-            return self.error("Invalid parameter, id is required")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
             contest = Contest.objects.get(id=id, visible=True)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
         data = ContestSerializer(contest).data
         data["now"] = datetime2str(now())
         return self.success(data)
@@ -75,9 +75,9 @@ class ContestPasswordVerifyAPI(APIView):
         try:
             contest = Contest.objects.get(id=data["contest_id"], visible=True, password__isnull=False)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
         if not check_contest_password(data["password"], contest.password):
-            return self.error("Wrong password or password expired")
+            return self.error("비밀번호가 올바르지 않거나 만료되었습니다")
 
         # password verify OK.
         if CONTEST_PASSWORD_SESSION_KEY not in request.session:
@@ -97,7 +97,7 @@ class ContestAccessAPI(APIView):
         try:
             contest = Contest.objects.get(id=contest_id, visible=True, password__isnull=False)
         except Contest.DoesNotExist:
-            return self.error("Contest does not exist")
+            return self.error("대회가 존재하지 않습니다")
         session_pass = request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(contest.id)
         return self.success({"access": check_contest_password(session_pass, contest.password)})
 

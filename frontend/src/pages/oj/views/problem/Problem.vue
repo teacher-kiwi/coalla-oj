@@ -5,18 +5,18 @@
       <Panel :padding="40" shadow>
         <template #title>{{ problem.title }}</template>
         <div v-if="problemLoaded" id="problem-content" class="markdown-body" v-katex>
-          <p class="title">{{ t('m.Description') }}</p>
+          <p class="title">문제 설명</p>
           <p class="content" v-html="problem.description"></p>
 
           <p class="title">
-            {{ t('m.Input') }}
-            <span v-if="problem.io_mode.io_mode == 'File IO'">({{ t('m.FromFile') }}: {{ problem.io_mode.input }})</span>
+            입력
+            <span v-if="problem.io_mode.io_mode == 'File IO'">(파일 입력: {{ problem.io_mode.input }})</span>
           </p>
           <p class="content" v-html="problem.input_description"></p>
 
           <p class="title">
-            {{ t('m.Output') }}
-            <span v-if="problem.io_mode.io_mode == 'File IO'">({{ t('m.ToFile') }}: {{ problem.io_mode.output }})</span>
+            출력
+            <span v-if="problem.io_mode.io_mode == 'File IO'">(파일 출력: {{ problem.io_mode.output }})</span>
           </p>
           <p class="content" v-html="problem.output_description"></p>
 
@@ -24,7 +24,7 @@
             <div class="flex-container sample">
               <div class="sample-input">
                 <p class="title">
-                  {{ t('m.Sample_Input') }} {{ index + 1 }}
+                  입력 예제 {{ index + 1 }}
                   <a class="copy" @click="copyToClipboard(sample.input)">
                     <el-icon><DocumentCopy /></el-icon>
                   </a>
@@ -32,21 +32,21 @@
                 <pre>{{ sample.input }}</pre>
               </div>
               <div class="sample-output">
-                <p class="title">{{ t('m.Sample_Output') }} {{ index + 1 }}</p>
+                <p class="title">출력 예제 {{ index + 1 }}</p>
                 <pre>{{ sample.output }}</pre>
               </div>
             </div>
           </div>
 
           <div v-if="problem.hint">
-            <p class="title">{{ t('m.Hint') }}</p>
+            <p class="title">힌트</p>
             <el-card>
               <div class="content" v-html="problem.hint"></div>
             </el-card>
           </div>
 
           <div v-if="problem.source">
-            <p class="title">{{ t('m.Source') }}</p>
+            <p class="title">출처</p>
             <p class="content">{{ problem.source }}</p>
           </div>
         </div>
@@ -79,30 +79,30 @@
           <el-col :span="10">
             <div class="status" v-if="statusVisible">
               <template v-if="!contestID || (contestID && OIContestRealTimePermission)">
-                <span>{{ t('m.Status') }}</span>
+                <span>상태</span>
                 <el-tag :type="submissionStatus.type" @click="handleRoute('/status/' + submissionId)" class="status-tag">
-                  {{ t('m.' + submissionStatus.text.replace(/ /g, '_')) }}
+                  {{ submissionStatus.label }}
                 </el-tag>
               </template>
               <template v-else-if="contestID && !OIContestRealTimePermission">
-                <el-alert type="success" show-icon :closable="false">{{ t('m.Submitted_successfully') }}</el-alert>
+                <el-alert type="success" show-icon :closable="false">제출 완료</el-alert>
               </template>
             </div>
             <div v-else-if="problem.my_status === 0">
-              <el-alert type="success" show-icon :closable="false">{{ t('m.You_have_solved_the_problem') }}</el-alert>
+              <el-alert type="success" show-icon :closable="false">문제를 해결했습니다</el-alert>
             </div>
             <div v-else-if="contestID && !OIContestRealTimePermission && submissionExists">
-              <el-alert type="success" show-icon :closable="false">{{ t('m.You_have_submitted_a_solution') }}</el-alert>
+              <el-alert type="success" show-icon :closable="false">솔루션을 제출했습니다.</el-alert>
             </div>
             <div v-if="contestEnded">
-              <el-alert type="warning" show-icon :closable="false">{{ t('m.Contest_has_ended') }}</el-alert>
+              <el-alert type="warning" show-icon :closable="false">대회가 종료되었습니다</el-alert>
             </div>
           </el-col>
 
           <el-col :span="12">
             <template v-if="captchaRequired">
               <div class="captcha-container">
-                <el-tooltip v-if="captchaRequired" content="Click to refresh" placement="top">
+                <el-tooltip v-if="captchaRequired" content="클릭하면 새로고침" placement="top">
                   <img :src="captchaSrc" @click="getCaptchaSrc" />
                 </el-tooltip>
                 <el-input v-model="captchaCode" class="captcha-code" />
@@ -110,8 +110,8 @@
             </template>
             <el-button type="warning" :loading="submitting" @click="submitCode"
                        :disabled="problemSubmitDisabled || submitted" class="fl-right">
-              <span v-if="submitting">{{ t('m.Submitting') }}</span>
-              <span v-else>{{ t('m.Submit') }}</span>
+              <span v-if="submitting">제출 중</span>
+              <span v-else>제출</span>
             </el-button>
           </el-col>
         </el-row>
@@ -123,28 +123,28 @@
         <template v-if="contestID">
           <VerticalMenuItem :route="{ name: 'contest-problem-list', params: { contestID } }">
             <el-icon><PictureFilled /></el-icon>
-            {{ t('m.Problems') }}
+            문제
           </VerticalMenuItem>
           <VerticalMenuItem :route="{ name: 'contest-announcement-list', params: { contestID } }">
             <el-icon><ChatDotRound /></el-icon>
-            {{ t('m.Announcements') }}
+            공지
           </VerticalMenuItem>
         </template>
 
         <VerticalMenuItem v-if="!contestID || OIContestRealTimePermission" :route="submissionRoute">
           <el-icon><List /></el-icon>
-          {{ t('m.Submissions') }}
+          제출
         </VerticalMenuItem>
 
         <template v-if="contestID">
           <VerticalMenuItem v-if="!contestID || OIContestRealTimePermission"
                             :route="{ name: 'contest-rank', params: { contestID } }">
             <el-icon><TrendCharts /></el-icon>
-            {{ t('m.Rankings') }}
+            순위
           </VerticalMenuItem>
           <VerticalMenuItem :route="{ name: 'contest-details', params: { contestID } }">
             <el-icon><House /></el-icon>
-            {{ t('m.View_Contest') }}
+            대회 보기
           </VerticalMenuItem>
         </template>
       </VerticalMenu>
@@ -153,22 +153,22 @@
         <template #header>
           <div class="header">
             <el-icon><InfoFilled /></el-icon>
-            <span class="card-title">{{ t('m.Information') }}</span>
+            <span class="card-title">정보</span>
           </div>
         </template>
         <ul>
           <li><p>ID</p><p>{{ problem._id }}</p></li>
-          <li><p>{{ t('m.Time_Limit') }}</p><p>{{ problem.time_limit }}MS</p></li>
-          <li><p>{{ t('m.Memory_Limit') }}</p><p>{{ problem.memory_limit }}MB</p></li>
-          <li><p>{{ t('m.IOMode') }}</p><p>{{ problem.io_mode.io_mode }}</p></li>
-          <li><p>{{ t('m.Created') }}</p><p>{{ problem.created_by.username }}</p></li>
-          <li v-if="problem.difficulty"><p>{{ t('m.Level') }}</p><p>{{ t('m.' + problem.difficulty) }}</p></li>
-          <li v-if="problem.total_score"><p>{{ t('m.Score') }}</p><p>{{ problem.total_score }}</p></li>
+          <li><p>시간 제한</p><p>{{ problem.time_limit }}MS</p></li>
+          <li><p>메모리 제한</p><p>{{ problem.memory_limit }}MB</p></li>
+          <li><p>IO 모드</p><p>{{ problem.io_mode.io_mode }}</p></li>
+          <li><p>작성자</p><p>{{ problem.created_by.username }}</p></li>
+          <li v-if="problem.difficulty"><p>난이도</p><p>{{ DIFFICULTY_LABEL[problem.difficulty] }}</p></li>
+          <li v-if="problem.total_score"><p>점수</p><p>{{ problem.total_score }}</p></li>
           <li>
-            <p>{{ t('m.Tags') }}</p>
+            <p>태그</p>
             <p>
               <el-popover trigger="hover" placement="left-end">
-                <template #reference><a>{{ t('m.Show') }}</a></template>
+                <template #reference><a>보기</a></template>
                 <el-tag v-for="tag in problem.tags" :key="tag" class="info-tag">{{ tag }}</el-tag>
               </el-popover>
             </p>
@@ -180,8 +180,8 @@
         <template #header>
           <div class="chart-header">
             <el-icon><DataAnalysis /></el-icon>
-            <span class="card-title">{{ t('m.Statistic') }}</span>
-            <el-button size="small" id="detail" @click="graphVisible = !graphVisible">Details</el-button>
+            <span class="card-title">통계</span>
+            <el-button size="small" id="detail" @click="graphVisible = !graphVisible">자세히</el-button>
           </div>
         </template>
         <div class="echarts">
@@ -195,7 +195,7 @@
         <VChart :option="largePie" autoresize class="large-pie-chart" />
       </div>
       <template #footer>
-        <el-button @click="graphVisible = false">{{ t('m.Close') }}</el-button>
+        <el-button @click="graphVisible = false">닫기</el-button>
       </template>
     </el-dialog>
   </div>
@@ -204,7 +204,6 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   DocumentCopy, PictureFilled, ChatDotRound, List, TrendCharts, House,
@@ -216,7 +215,7 @@ import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import storage from '@/utils/storage'
 import { useForm } from '@oj/components/mixins'
-import { JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey } from '@/utils/constants'
+import { JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey, DIFFICULTY_LABEL } from '@/utils/constants'
 import api from '@oj/api'
 import { pie as pieData, largePie as largePieData } from './chartData'
 import { useContestStore } from '@/store/contest'
@@ -234,7 +233,6 @@ function structuredCloneWithFunctions (obj) {
 
 const filtedStatus = ['-1', '-2', '0', '1', '2', '3', '4', '8']
 
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
@@ -282,6 +280,7 @@ const contestEnded = computed(() => contestStatusVal.value === CONTEST_STATUS.EN
 
 const submissionStatus = computed(() => ({
   text: JUDGE_STATUS[result.value.result]['name'],
+  label: JUDGE_STATUS[result.value.result]['label'],
   color: JUDGE_STATUS[result.value.result]['color'],
   type: JUDGE_STATUS[result.value.result]['type']
 }))
@@ -295,9 +294,9 @@ const submissionRoute = computed(() => {
 
 function copyToClipboard (text) {
   navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success('Code copied')
+    ElMessage.success('복사했습니다')
   }).catch(() => {
-    ElMessage.error('Failed to copy code')
+    ElMessage.error('복사에 실패했습니다')
   })
 }
 
@@ -392,7 +391,7 @@ function onChangeTheme (newTheme) {
 }
 
 function onResetToTemplate () {
-  ElMessageBox.confirm(t('m.Are_you_sure_you_want_to_reset_your_code'), 'Confirm').then(() => {
+  ElMessageBox.confirm('코드를 초기화하시겠습니까?', '확인').then(() => {
     const template = problem.value.template
     if (template && template[language.value]) {
       code.value = template[language.value]
@@ -434,7 +433,7 @@ function checkSubmissionStatus () {
 
 function submitCode () {
   if (code.value.trim() === '') {
-    ElMessage.error(t('m.Code_can_not_be_empty'))
+    ElMessage.error('코드가 비어있습니다')
     return
   }
   submissionId.value = ''
@@ -459,14 +458,14 @@ function submitCode () {
       submitting.value = false
       submissionExists.value = true
       if (!detailsVisible) {
-        ElMessageBox.alert(t('m.Submit_code_successfully'), t('m.Success'))
+        ElMessageBox.alert('코드 제출 성공', '성공')
         return
       }
       submitted.value = true
       checkSubmissionStatus()
     }, res => {
       getCaptchaSrc()
-      if (res.data?.data?.startsWith('Captcha is required')) {
+      if (res.data?.data?.startsWith('보안 문자')) {
         captchaRequired.value = true
       }
       submitting.value = false
@@ -476,7 +475,7 @@ function submitCode () {
 
   if (contestRuleType.value === 'OI' && !OIContestRealTimePermission.value) {
     if (submissionExists.value) {
-      ElMessageBox.confirm(t('m.You_have_submission_in_this_problem_sure_to_cover_it'), '').then(() => {
+      ElMessageBox.confirm('이 문제에 제출 내역이 있습니다. 덮어쓰시겠습니까?', '').then(() => {
         setTimeout(() => submitFunc(data, false), 1000)
       }).catch(() => {
         submitting.value = false

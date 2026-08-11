@@ -5,8 +5,8 @@
         <div class="error404-body-con-title">4<span><el-icon><Compass /></el-icon></span>4</div>
         <p class="error404-body-con-message">YOU&nbsp;&nbsp;LOOK&nbsp;&nbsp;LOST</p>
         <div class="error404-btn-con">
-          <el-button @click="goHome" size="large" class="error-btn">{{ t('m.Go_Home') }}</el-button>
-          <el-button @click="backPage" size="large" class="error-btn error-btn-back" type="primary">{{ t('m.Back') }}</el-button>
+          <el-button @click="goHome" size="large" class="error-btn">홈으로</el-button>
+          <el-button @click="backPage" size="large" class="error-btn error-btn-back" type="primary">뒤로</el-button>
         </div>
       </el-card>
     </div>
@@ -15,11 +15,9 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { Compass } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const { t } = useI18n()
 
 function backPage () {
   router.go(-1)

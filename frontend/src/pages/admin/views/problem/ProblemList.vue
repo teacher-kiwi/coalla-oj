@@ -1,51 +1,51 @@
 <template>
   <div class="view">
-    <Panel :title="contestId ? t('m.Contest_Problem_List') : t('m.Problem_List')">
+    <Panel :title="contestId ? '대회 문제 목록' : '문제 목록'">
       <template #header>
-        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="Keywords" />
+        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="검색어" />
       </template>
       <el-table v-loading="loading" :data="problemList" @row-dblclick="handleDblclick" class="full-width">
         <el-table-column width="100" prop="id" label="ID" />
-        <el-table-column width="150" label="Display ID">
+        <el-table-column width="150" label="표시 ID">
           <template #default="{ row }">
             <span v-show="!row.isEditing">{{ row._id }}</span>
             <el-input v-show="row.isEditing" v-model="row._id" @keyup.enter="handleInlineEdit(row)" />
           </template>
         </el-table-column>
-        <el-table-column prop="title" label="Title">
+        <el-table-column prop="title" label="제목">
           <template #default="{ row }">
             <span v-show="!row.isEditing">{{ row.title }}</span>
             <el-input v-show="row.isEditing" v-model="row.title" @keyup.enter="handleInlineEdit(row)" />
           </template>
         </el-table-column>
-        <el-table-column prop="created_by.username" label="Author" />
-        <el-table-column width="200" prop="create_time" label="Create Time">
+        <el-table-column prop="created_by.username" label="작성자" />
+        <el-table-column width="200" prop="create_time" label="생성 일시">
           <template #default="{ row }">{{ localtime(row.create_time) }}</template>
         </el-table-column>
-        <el-table-column width="100" prop="visible" label="Visible">
+        <el-table-column width="100" prop="visible" label="공개">
           <template #default="{ row }">
             <el-switch v-model="row.visible" @change="updateProblem(row)" />
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="Operation" width="250">
+        <el-table-column fixed="right" label="관리" width="250">
           <template #default="{ row }">
-            <icon-btn name="Edit" icon="Edit" @click="goEdit(row.id)" />
-            <icon-btn v-if="contestId" name="Make Public" icon="CopyDocument" @click="makeContestProblemPublic(row.id)" />
-            <icon-btn icon="Download" name="Download TestCase" @click="downloadTestCase(row.id)" />
-            <icon-btn icon="Delete" name="Delete Problem" @click="deleteProblem(row.id)" />
+            <icon-btn name="수정" icon="Edit" @click="goEdit(row.id)" />
+            <icon-btn v-if="contestId" name="공개로 전환" icon="CopyDocument" @click="makeContestProblemPublic(row.id)" />
+            <icon-btn icon="Download" name="테스트 케이스 내려받기" @click="downloadTestCase(row.id)" />
+            <icon-btn icon="Delete" name="문제 삭제" @click="deleteProblem(row.id)" />
           </template>
         </el-table-column>
       </el-table>
       <div class="panel-options">
-        <el-button type="primary" size="small" @click="goCreateProblem" :icon="Plus">Create</el-button>
+        <el-button type="primary" size="small" @click="goCreateProblem" :icon="Plus">생성</el-button>
         <el-button v-if="contestId" type="primary" size="small" :icon="Plus"
-                   @click="addProblemDialogVisible = true">Add From Public Problem</el-button>
+                   @click="addProblemDialogVisible = true">공개 문제에서 추가</el-button>
         <el-pagination class="page" layout="prev, pager, next"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
       </div>
     </Panel>
 
-    <el-dialog title="Sure to update the problem?" width="20%" v-model="inlineEditDialogVisible"
+    <el-dialog title="문제를 수정하시겠습니까?" width="20%" v-model="inlineEditDialogVisible"
                :close-on-click-modal="false">
       <div>
         <p>DisplayID: {{ currentRow._id }}</p>
@@ -57,7 +57,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-if="contestId" title="Add Contest Problem" width="80%" v-model="addProblemDialogVisible"
+    <el-dialog v-if="contestId" title="대회 문제 추가" width="80%" v-model="addProblemDialogVisible"
                :close-on-click-modal="false">
       <AddProblemComponent :contestID="contestId" @on-change="getProblemList" />
     </el-dialog>
@@ -67,15 +67,12 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { Plus, Search as SearchIcon } from '@element-plus/icons-vue'
 import AddProblemComponent from './AddPublicProblem.vue'
 import api from '../../api.js'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -131,7 +128,7 @@ function getProblemList (page = 1) {
 }
 
 function deleteProblem (id) {
-  ElMessageBox.confirm('Sure to delete this problem? The associated submissions will be deleted as well.', 'Delete Problem', {
+  ElMessageBox.confirm('이 문제를 삭제하시겠습니까? 관련 제출 기록도 함께 삭제됩니다.', '문제 삭제', {
     type: 'warning'
   }).then(() => {
     const funcName = routeName.value === 'problem-list' ? 'deleteProblem' : 'deleteContestProblem'
@@ -140,7 +137,7 @@ function deleteProblem (id) {
 }
 
 function makeContestProblemPublic (problemID) {
-  ElMessageBox.prompt('Please input display id for the public problem', 'Confirm').then(({ value }) => {
+  ElMessageBox.prompt('공개 문제의 표시 ID를 입력하세요', '확인').then(({ value }) => {
     api.makeContestProblemPublic({ id: problemID, display_id: value }).catch(() => {})
   }, () => {})
 }

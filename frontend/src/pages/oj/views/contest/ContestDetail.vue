@@ -20,25 +20,25 @@
             <div v-html="contest.description" class="markdown-body"></div>
             <div v-if="passwordFormVisible" class="contest-password">
               <el-input v-model="contestPassword" type="password"
-                        placeholder="contest password" class="contest-password-input"
+                        placeholder="대회 비밀번호" class="contest-password-input"
                         @keyup.enter="checkPassword" />
-              <el-button type="primary" @click="checkPassword">Enter</el-button>
+              <el-button type="primary" @click="checkPassword">입장</el-button>
             </div>
           </Panel>
           <el-table :data="contestTable" class="contest-info-table">
-            <el-table-column :label="t('m.StartAt')">
+            <el-table-column label="시작 시간">
               <template #default="{ row }">{{ localtime(row.start_time) }}</template>
             </el-table-column>
-            <el-table-column :label="t('m.EndAt')">
+            <el-table-column label="종료 시간">
               <template #default="{ row }">{{ localtime(row.end_time) }}</template>
             </el-table-column>
-            <el-table-column :label="t('m.ContestType')">
-              <template #default="{ row }">{{ row.contest_type ? t('m.' + row.contest_type.replace(' ', '_')) : '' }}</template>
+            <el-table-column label="대회 유형">
+              <template #default="{ row }">{{ row.contest_type ? CONTEST_TYPE_LABEL[row.contest_type] : '' }}</template>
             </el-table-column>
-            <el-table-column :label="t('m.Rule')">
-              <template #default="{ row }">{{ row.rule_type ? t('m.' + row.rule_type) : '' }}</template>
+            <el-table-column label="규칙">
+              <template #default="{ row }">{{ row.rule_type ? RULE_TYPE_LABEL[row.rule_type] : '' }}</template>
             </el-table-column>
-            <el-table-column :label="t('m.Creator')">
+            <el-table-column label="생성자">
               <template #default="{ row }">{{ row.created_by.username }}</template>
             </el-table-column>
           </el-table>
@@ -50,34 +50,34 @@
       <VerticalMenu @on-click="handleRoute">
         <VerticalMenuItem :route="{ name: 'contest-details', params: { contestID } }">
           <el-icon><House /></el-icon>
-          {{ t('m.Overview') }}
+          개요
         </VerticalMenuItem>
         <VerticalMenuItem :disabled="contestMenuDisabled"
                           :route="{ name: 'contest-announcement-list', params: { contestID } }">
           <el-icon><ChatDotRound /></el-icon>
-          {{ t('m.Announcements') }}
+          공지
         </VerticalMenuItem>
         <VerticalMenuItem :disabled="contestMenuDisabled"
                           :route="{ name: 'contest-problem-list', params: { contestID } }">
           <el-icon><PictureFilled /></el-icon>
-          {{ t('m.Problems') }}
+          문제
         </VerticalMenuItem>
         <VerticalMenuItem v-if="OIContestRealTimePermission"
                           :disabled="contestMenuDisabled"
                           :route="{ name: 'contest-submission-list' }">
           <el-icon><List /></el-icon>
-          {{ t('m.Submissions') }}
+          제출
         </VerticalMenuItem>
         <VerticalMenuItem v-if="OIContestRealTimePermission"
                           :disabled="contestMenuDisabled"
                           :route="{ name: 'contest-rank', params: { contestID } }">
           <el-icon><TrendCharts /></el-icon>
-          {{ t('m.Rankings') }}
+          순위
         </VerticalMenuItem>
         <VerticalMenuItem v-if="showAdminHelper"
                           :route="{ name: 'acm-helper', params: { contestID } }">
           <el-icon><MagicStick /></el-icon>
-          {{ t('m.Admin_Helper') }}
+          관리자 도우미
         </VerticalMenuItem>
       </VerticalMenu>
     </div>
@@ -87,19 +87,17 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { House, ChatDotRound, PictureFilled, List, TrendCharts, MagicStick } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { CONTEST_STATUS_REVERSE, CONTEST_STATUS } from '@/utils/constants'
+import { CONTEST_STATUS_REVERSE, CONTEST_STATUS, RULE_TYPE_LABEL, CONTEST_TYPE_LABEL } from '@/utils/constants'
 import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import { useContestStore } from '@/store/contest'
 import { useAppStore } from '@/store/app'
 
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
@@ -141,11 +139,11 @@ function handleRoute (routeObj) {
 
 function checkPassword () {
   if (contestPassword.value === '') {
-    ElMessage.error("Password can't be empty")
+    ElMessage.error('비밀번호를 입력하세요')
     return
   }
   api.checkContestPassword(contestID.value, contestPassword.value).then(() => {
-    ElMessage.success('Succeeded')
+    ElMessage.success('완료되었습니다')
     contestStore.access = true
   }, () => {})
 }

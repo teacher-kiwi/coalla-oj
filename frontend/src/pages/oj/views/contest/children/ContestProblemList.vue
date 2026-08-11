@@ -1,16 +1,16 @@
 <template>
   <div>
     <Panel>
-      <template #title>{{ t('m.Problems_List') }}</template>
+      <template #title>문제 목록</template>
       <el-table v-if="contestRuleType === 'ACM' || OIContestRealTimePermission"
-                :data="problems" @row-click="goContestProblem" :empty-text="t('m.No_Problems')">
+                :data="problems" @row-click="goContestProblem" empty-text="문제 없음">
         <el-table-column label="#" prop="_id" sortable width="150" />
-        <el-table-column :label="t('m.Title')" prop="title" />
-        <el-table-column :label="t('m.Total')" prop="submission_number" />
-        <el-table-column :label="t('m.AC_Rate')">
+        <el-table-column label="제목" prop="title" />
+        <el-table-column label="총 제출" prop="submission_number" />
+        <el-table-column label="정답률">
           <template #default="{ row }">{{ getACRate(row.accepted_number, row.submission_number) }}</template>
         </el-table-column>
-        <el-table-column v-if="statusColumnVisible" :label="t('m.Status')">
+        <el-table-column v-if="statusColumnVisible" label="상태">
           <template #default="{ row }">
             <template v-if="row.my_status === 0">
               <el-icon color="#19be6b"><CircleCheck /></el-icon>
@@ -21,9 +21,9 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-table v-else :data="problems" @row-click="goContestProblem" :empty-text="t('m.No_Problems')">
+      <el-table v-else :data="problems" @row-click="goContestProblem" empty-text="문제 없음">
         <el-table-column label="#" prop="_id" width="150" />
-        <el-table-column :label="t('m.Title')" prop="title" />
+        <el-table-column label="제목" prop="title" />
       </el-table>
     </Panel>
   </div>
@@ -32,13 +32,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import utils from '@/utils/utils'
 import { useContestStore } from '@/store/contest'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()

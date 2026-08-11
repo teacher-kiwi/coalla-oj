@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import storage from '@/utils/storage'
-import i18n from '@/i18n'
 import { STORAGE_KEY, USER_TYPE, PROBLEM_PERMISSION } from '@/utils/constants'
 
 export const useUserStore = defineStore('user', {
@@ -31,11 +30,6 @@ export const useUserStore = defineStore('user', {
     },
     changeProfile (profile) {
       this.profile = profile
-      if (profile.language) {
-        // legacy:false 모드에서 global.locale 은 ref 다. .value 없이 대입하면
-        // ref 자체가 문자열로 교체되어 언어 전환이 먹지 않는다.
-        i18n.global.locale.value = profile.language
-      }
       storage.set(STORAGE_KEY.AUTHED, !!profile.user)
     },
     clearProfile () {

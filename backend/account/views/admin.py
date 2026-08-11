@@ -29,7 +29,7 @@ class UserAdminAPI(APIView):
         user_list = []
         for user_data in data:
             if len(user_data) != 4 or len(user_data[0]) > 32:
-                return self.error(f"Error occurred while processing data '{user_data}'")
+                return self.error(f"데이터 처리 중 오류가 발생했습니다: '{user_data}'")
             user_list.append(User(username=user_data[0], password=make_password(user_data[1]), email=user_data[2]))
 
         try:
@@ -53,11 +53,11 @@ class UserAdminAPI(APIView):
         try:
             user = User.objects.get(id=data["id"])
         except User.DoesNotExist:
-            return self.error("User does not exist")
+            return self.error("사용자가 존재하지 않습니다")
         if User.objects.filter(username=data["username"].lower()).exclude(id=user.id).exists():
-            return self.error("Username already exists")
+            return self.error("이미 사용 중인 사용자명입니다")
         if User.objects.filter(email=data["email"].lower()).exclude(id=user.id).exists():
-            return self.error("Email already exists")
+            return self.error("이미 사용 중인 이메일입니다")
 
         pre_username = user.username
         user.username = data["username"].lower()
@@ -109,7 +109,7 @@ class UserAdminAPI(APIView):
             try:
                 user = User.objects.get(id=user_id)
             except User.DoesNotExist:
-                return self.error("User does not exist")
+                return self.error("사용자가 존재하지 않습니다")
             return self.success(UserAdminSerializer(user).data)
 
         user = User.objects.all().order_by("-create_time")
@@ -125,10 +125,10 @@ class UserAdminAPI(APIView):
     def delete(self, request):
         id = request.GET.get("id")
         if not id:
-            return self.error("Invalid Parameter, id is required")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         ids = id.split(",")
         if str(request.user.id) in ids:
-            return self.error("Current user can not be deleted")
+            return self.error("현재 로그인한 사용자는 삭제할 수 없습니다")
         User.objects.filter(id__in=ids).delete()
         return self.success()
 
@@ -141,12 +141,12 @@ class GenerateUserAPI(APIView):
         """
         file_id = request.GET.get("file_id")
         if not file_id:
-            return self.error("Invalid Parameter, file_id is required")
+            return self.error("잘못된 요청입니다. file_id가 필요합니다")
         if not re.match(r"^[a-zA-Z0-9]+$", file_id):
-            return self.error("Illegal file_id")
+            return self.error("file_id가 올바르지 않습니다")
         file_path = f"/tmp/{file_id}.xlsx"
         if not os.path.isfile(file_path):
-            return self.error("File does not exist")
+            return self.error("파일이 존재하지 않습니다")
         with open(file_path, "rb") as f:
             raw_data = f.read()
         os.remove(file_path)
@@ -164,9 +164,9 @@ class GenerateUserAPI(APIView):
         data = request.data
         number_max_length = max(len(str(data["number_from"])), len(str(data["number_to"])))
         if number_max_length + len(data["prefix"]) + len(data["suffix"]) > 32:
-            return self.error("Username should not more than 32 characters")
+            return self.error("사용자명은 32자를 넘을 수 없습니다")
         if data["number_from"] > data["number_to"]:
-            return self.error("Start number must be lower than end number")
+            return self.error("시작 번호는 끝 번호보다 작아야 합니다")
 
         file_id = rand_str(8)
         filename = f"/tmp/{file_id}.xlsx"

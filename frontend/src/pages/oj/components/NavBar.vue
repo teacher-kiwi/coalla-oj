@@ -10,48 +10,48 @@
       <div class="logo"><span>{{ appStore.website.website_name }}</span></div>
       <el-menu-item index="/">
         <el-icon><HomeFilled /></el-icon>
-        {{ t('m.Home') }}
+        홈
       </el-menu-item>
       <el-menu-item index="/problem">
         <el-icon><Grid /></el-icon>
-        {{ t('m.NavProblems') }}
+        문제
       </el-menu-item>
       <el-menu-item index="/contest">
         <el-icon><Trophy /></el-icon>
-        {{ t('m.Contests') }}
+        대회
       </el-menu-item>
       <el-menu-item index="/status">
         <el-icon><TrendCharts /></el-icon>
-        {{ t('m.NavStatus') }}
+        채점
       </el-menu-item>
       <el-sub-menu index="rank">
         <template #title>
           <el-icon><Medal /></el-icon>
-          {{ t('m.Rank') }}
+          순위
         </template>
-        <el-menu-item index="/acm-rank">{{ t('m.ACM_Rank') }}</el-menu-item>
-        <el-menu-item index="/oi-rank">{{ t('m.OI_Rank') }}</el-menu-item>
+        <el-menu-item index="/acm-rank">ACM 순위</el-menu-item>
+        <el-menu-item index="/oi-rank">OI 순위</el-menu-item>
       </el-sub-menu>
       <el-sub-menu index="about">
         <template #title>
           <el-icon><InfoFilled /></el-icon>
-          {{ t('m.About') }}
+          정보
         </template>
-        <el-menu-item index="/about">{{ t('m.Judger') }}</el-menu-item>
-        <el-menu-item index="/faq">{{ t('m.FAQ') }}</el-menu-item>
+        <el-menu-item index="/about">채점기</el-menu-item>
+        <el-menu-item index="/faq">자주 묻는 질문</el-menu-item>
       </el-sub-menu>
 
       <div class="flex-spacer" />
 
       <div v-if="!userStore.isAuthenticated" class="btn-menu">
-        <el-button round @click="handleBtnClick('login')">{{ t('m.Login') }}</el-button>
+        <el-button round @click="handleBtnClick('login')">로그인</el-button>
         <el-button
           v-if="appStore.website.allow_register"
           round
           @click="handleBtnClick('register')"
           class="btn-register"
         >
-          {{ t('m.Register') }}
+          회원가입
         </el-button>
       </div>
       <el-dropdown v-else class="drop-menu" trigger="click" @command="handleRoute">
@@ -61,11 +61,11 @@
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="/user-home">{{ t('m.MyHome') }}</el-dropdown-item>
-            <el-dropdown-item command="/status?myself=1">{{ t('m.MySubmissions') }}</el-dropdown-item>
-            <el-dropdown-item command="/setting/profile">{{ t('m.Settings') }}</el-dropdown-item>
-            <el-dropdown-item v-if="userStore.isAdminRole" command="/admin">{{ t('m.Management') }}</el-dropdown-item>
-            <el-dropdown-item divided command="/logout">{{ t('m.Logout') }}</el-dropdown-item>
+            <el-dropdown-item command="/user-home">프로필</el-dropdown-item>
+            <el-dropdown-item command="/status?myself=1">내 채점</el-dropdown-item>
+            <el-dropdown-item command="/setting/profile">설정</el-dropdown-item>
+            <el-dropdown-item v-if="userStore.isAdminRole" command="/admin">관리자 페이지</el-dropdown-item>
+            <el-dropdown-item divided command="/logout">로그아웃</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -73,7 +73,7 @@
 
     <el-dialog v-model="modalVisible" :width="400" :show-close="true">
       <template #header>
-        <div class="modal-title">{{ t('m.Welcome_to') }} {{ appStore.website.website_name_shortcut }}</div>
+        <div class="modal-title">환영합니다 {{ appStore.website.website_name_shortcut }}</div>
       </template>
       <component :is="currentModal" v-if="modalVisible" />
     </el-dialog>
@@ -83,13 +83,10 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
 import Login from '@oj/views/user/Login.vue'
 import Register from '@oj/views/user/Register.vue'
-
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()

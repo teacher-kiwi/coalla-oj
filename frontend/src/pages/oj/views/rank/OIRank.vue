@@ -2,7 +2,7 @@
   <el-row justify="space-around">
     <el-col :span="22">
       <Panel :padding="10">
-        <template #title>{{ t('m.OI_Ranklist') }}</template>
+        <template #title>OI 순위</template>
         <div class="echarts">
           <VChart ref="chart" :option="options" autoresize />
         </div>
@@ -11,7 +11,7 @@
         <el-table-column align="center" width="60">
           <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
         </el-table-column>
-        <el-table-column :label="t('m.User_User')" align="center">
+        <el-table-column label="사용자" align="center">
           <template #default="{ row }">
             <a class="link-text truncate"
                @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
@@ -19,11 +19,11 @@
             </a>
           </template>
         </el-table-column>
-        <el-table-column :label="t('m.mood')" align="center" prop="mood" />
-        <el-table-column :label="t('m.Score')" align="center" prop="total_score" />
-        <el-table-column :label="t('m.AC')" align="center" prop="accepted_number" />
-        <el-table-column :label="t('m.Total')" align="center" prop="submission_number" />
-        <el-table-column :label="t('m.Rating')" align="center">
+        <el-table-column label="기분" align="center" prop="mood" />
+        <el-table-column label="점수" align="center" prop="total_score" />
+        <el-table-column label="정답" align="center" prop="accepted_number" />
+        <el-table-column label="총 제출" align="center" prop="submission_number" />
+        <el-table-column label="레이팅" align="center">
           <template #default="{ row }">{{ getACRate(row.accepted_number, row.submission_number) }}</template>
         </el-table-column>
       </el-table>
@@ -37,13 +37,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import api from '@oj/api'
 import Pagination from '@oj/components/Pagination.vue'
 import utils from '@/utils/utils'
 import { RULE_TYPE } from '@/utils/constants'
-
-const { t } = useI18n()
 const router = useRouter()
 
 const page = ref(1)
@@ -54,7 +51,7 @@ const chart = ref(null)
 
 const options = ref({
   tooltip: { trigger: 'axis' },
-  legend: { data: [t('m.Score')] },
+  legend: { data: ['점수'] },
   grid: { x: '3%', x2: '3%' },
   toolbox: {
     show: true,
@@ -76,7 +73,7 @@ const options = ref({
   }],
   yAxis: [{ type: 'value' }],
   series: [{
-    name: t('m.Score'), type: 'bar', data: [0], barMaxWidth: '80',
+    name: '점수', type: 'bar', data: [0], barMaxWidth: '80',
     markPoint: { data: [{ type: 'max', name: 'max' }] }
   }]
 })

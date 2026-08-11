@@ -32,18 +32,18 @@ class SubmissionAPI(APIView):
         #                         redis_conn=cache, **SysOptions.throttling["ip"])
         # can_consume, wait = ip_bucket.consume()
         # if not can_consume:
-        #     return "Captcha is required"
+        #     return "보안 문자를 입력해야 합니다"
 
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):
         contest = self.contest
         if contest.status == ContestStatus.CONTEST_ENDED:
-            return self.error("The contest have ended")
+            return self.error("종료된 대회입니다")
         if not request.user.is_contest_admin(contest):
             user_ip = ipaddress.ip_address(request.session.get("ip"))
             if contest.allowed_ip_ranges:
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
-                    return self.error("Your IP is not allowed in this contest")
+                    return self.error("이 대회에서 허용되지 않은 IP입니다")
 
     @validate_serializer(CreateSubmissionSerializer)
     @login_required
@@ -60,7 +60,7 @@ class SubmissionAPI(APIView):
 
         if data.get("captcha"):
             if not Captcha(request).check(data["captcha"]):
-                return self.error("Invalid captcha")
+                return self.error("보안 문자가 올바르지 않습니다")
         error = self.throttling(request)
         if error:
             return self.error(error)
@@ -68,12 +68,12 @@ class SubmissionAPI(APIView):
         try:
             problem = Problem.objects.get(id=data["problem_id"], contest_id=data.get("contest_id"), visible=True)
         except Problem.DoesNotExist:
-            return self.error("Problem not exist")
+            return self.error("문제가 존재하지 않습니다")
         if data["language"] == "Block Coding":
             if "Python3" not in problem.languages:
-                return self.error("Block Coding requires Python3 to be available for this problem")
+                return self.error("블록 코딩은 이 문제에서 Python3가 허용되어야 사용할 수 있습니다")
         elif data["language"] not in problem.languages:
-            return self.error(f"{data['language']} is not allowed in the problem")
+            return self.error(f"{data['language']} 언어는 이 문제에서 사용할 수 없습니다")
         
         submission = Submission.objects.create(user_id=request.user.id,
                                                username=request.user.username,
@@ -95,13 +95,13 @@ class SubmissionAPI(APIView):
     def get(self, request):
         submission_id = request.GET.get("id")
         if not submission_id:
-            return self.error("Parameter id doesn't exist")
+            return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
             submission = Submission.objects.select_related("problem").get(id=submission_id)
         except Submission.DoesNotExist:
-            return self.error("Submission doesn't exist")
+            return self.error("제출 기록이 존재하지 않습니다")
         if not submission.check_user_permission(request.user):
-            return self.error("No permission for this submission")
+            return self.error("이 제출 기록에 접근할 권한이 없습니다")
 
         if submission.problem.rule_type == ProblemRuleType.OI or request.user.is_admin_role():
             submission_data = SubmissionModelSerializer(submission).data
@@ -120,11 +120,11 @@ class SubmissionAPI(APIView):
         try:
             submission = Submission.objects.select_related("problem").get(id=request.data["id"])
         except Submission.DoesNotExist:
-            return self.error("Submission doesn't exist")
+            return self.error("제출 기록이 존재하지 않습니다")
         if not submission.check_user_permission(request.user, check_share=False):
-            return self.error("No permission to share the submission")
+            return self.error("제출 기록을 공유할 권한이 없습니다")
         if submission.contest and submission.contest.status == ContestStatus.CONTEST_UNDERWAY:
-            return self.error("Can not share submission now")
+            return self.error("지금은 제출 기록을 공유할 수 없습니다")
         submission.shared = request.data["shared"]
         submission.save(update_fields=["shared"])
         return self.success()
@@ -133,9 +133,9 @@ class SubmissionAPI(APIView):
 class SubmissionListAPI(APIView):
     def get(self, request):
         if not request.GET.get("limit"):
-            return self.error("Limit is needed")
+            return self.error("limit 값이 필요합니다")
         if request.GET.get("contest_id"):
-            return self.error("Parameter error")
+            return self.error("잘못된 요청입니다")
 
         submissions = Submission.objects.filter(contest_id__isnull=True).select_related("problem__created_by")
         problem_id = request.GET.get("problem_id")
@@ -146,7 +146,7 @@ class SubmissionListAPI(APIView):
             try:
                 problem = Problem.objects.get(_id=problem_id, contest_id__isnull=True, visible=True)
             except Problem.DoesNotExist:
-                return self.error("Problem doesn't exist")
+                return self.error("문제가 존재하지 않습니다")
             submissions = submissions.filter(problem=problem)
         if (myself and myself == "1") or not SysOptions.submission_list_show_all:
             submissions = submissions.filter(user_id=request.user.id)
@@ -163,7 +163,7 @@ class ContestSubmissionListAPI(APIView):
     @check_contest_permission(check_type="submissions")
     def get(self, request):
         if not request.GET.get("limit"):
-            return self.error("Limit is needed")
+            return self.error("limit 값이 필요합니다")
 
         contest = self.contest
         submissions = Submission.objects.filter(contest_id=contest.id).select_related("problem__created_by")
@@ -175,7 +175,7 @@ class ContestSubmissionListAPI(APIView):
             try:
                 problem = Problem.objects.get(_id=problem_id, contest_id=contest.id, visible=True)
             except Problem.DoesNotExist:
-                return self.error("Problem doesn't exist")
+                return self.error("문제가 존재하지 않습니다")
             submissions = submissions.filter(problem=problem)
 
         if myself and myself == "1":
@@ -202,7 +202,7 @@ class ContestSubmissionListAPI(APIView):
 class SubmissionExistsAPI(APIView):
     def get(self, request):
         if not request.GET.get("problem_id"):
-            return self.error("Parameter error, problem_id is required")
+            return self.error("잘못된 요청입니다. problem_id가 필요합니다")
         return self.success(request.user.is_authenticated and
                             Submission.objects.filter(problem_id=request.GET["problem_id"],
                                                       user_id=request.user.id).exists())

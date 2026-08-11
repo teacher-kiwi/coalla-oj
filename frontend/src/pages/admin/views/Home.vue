@@ -13,7 +13,7 @@
         </span>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="logout">Logout</el-dropdown-item>
+            <el-dropdown-item command="logout">로그아웃</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -29,7 +29,7 @@
       </div>
     </div>
 
-    <el-dialog :title="t('m.Latex_Editor')" v-model="katexVisible">
+    <el-dialog title="Latex 편집기" v-model="katexVisible">
       <KatexEditor />
     </el-dialog>
   </div>
@@ -38,15 +38,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ArrowDown, EditPen } from '@element-plus/icons-vue'
 import SideMenu from '../components/SideMenu.vue'
 import ScreenFull from '@admin/components/ScreenFull.vue'
 import KatexEditor from '@admin/components/KatexEditor.vue'
 import api from '../api'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 

@@ -2,21 +2,21 @@
   <div>
     <el-form ref="formRef" :model="formLogin" :rules="ruleLogin">
       <el-form-item prop="username">
-        <el-input v-model="formLogin.username" :placeholder="t('m.LoginUsername')" size="large" :prefix-icon="User" @keyup.enter="handleLogin" />
+        <el-input v-model="formLogin.username" placeholder="사용자명" size="large" :prefix-icon="User" @keyup.enter="handleLogin" />
       </el-form-item>
       <el-form-item prop="password">
-        <el-input type="password" v-model="formLogin.password" :placeholder="t('m.LoginPassword')" size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
+        <el-input type="password" v-model="formLogin.password" placeholder="비밀번호" size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
       </el-form-item>
       <el-form-item v-if="tfaRequired" prop="tfa_code">
-        <el-input v-model="formLogin.tfa_code" :placeholder="t('m.TFA_Code')" :prefix-icon="Key" />
+        <el-input v-model="formLogin.tfa_code" placeholder="TFA 앱 코드" :prefix-icon="Key" />
       </el-form-item>
     </el-form>
     <div class="footer">
       <el-button type="primary" class="btn" :loading="btnLoginLoading" @click="handleLogin">
-        {{ t('m.UserLogin') }}
+        로그인
       </el-button>
-      <a v-if="appStore.website.allow_register" @click.stop="handleBtnClick('register')">{{ t('m.No_Account') }}</a>
-      <a @click.stop="goResetPassword" class="forget-link">{{ t('m.Forget_Password') }}</a>
+      <a v-if="appStore.website.allow_register" @click.stop="handleBtnClick('register')">계정이 없으신가요? 지금 가입하세요!</a>
+      <a @click.stop="goResetPassword" class="forget-link">비밀번호 찾기</a>
     </div>
   </div>
 </template>
@@ -24,15 +24,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
@@ -77,7 +74,7 @@ async function handleLogin () {
     btnLoginLoading.value = false
     appStore.changeModalStatus({ visible: false })
     userStore.getProfile()
-    ElMessage.success(t('m.Welcome_back'))
+    ElMessage.success('OJ에 오신 것을 환영합니다')
   } catch (e) {
     btnLoginLoading.value = false
   }

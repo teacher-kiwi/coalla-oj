@@ -13,9 +13,9 @@
         </el-row>
         <hr />
         <div class="last-info">
-          <p class="last-info-title">{{ t('m.Last_Login') }}</p>
+          <p class="last-info-title">마지막 로그인</p>
           <el-form label-width="80px" class="last-info-body">
-            <el-form-item label="Time:">
+            <el-form-item label="시간:">
               <span>{{ localtime(session.last_activity) }}</span>
             </el-form-item>
             <el-form-item label="IP:">
@@ -24,21 +24,21 @@
             <el-form-item label="OS">
               <span>{{ os }}</span>
             </el-form-item>
-            <el-form-item label="Browser:">
+            <el-form-item label="브라우저:">
               <span>{{ browser }}</span>
             </el-form-item>
           </el-form>
         </div>
       </el-card>
-      <Panel :title="t('m.System_Overview')" v-if="userStore.isSuperAdmin">
-        <p>{{ t('m.DashBoardJudge_Server') }}: {{ infoData.judge_server_count }}</p>
-        <p>{{ t('m.HTTPS_Status') }}:
+      <Panel title="시스템 개요" v-if="userStore.isSuperAdmin">
+        <p>채점 서버: {{ infoData.judge_server_count }}</p>
+        <p>HTTPS 상태:
           <el-tag :type="https ? 'success' : 'danger'" size="small">{{ https ? 'Enabled' : 'Disabled' }}</el-tag>
         </p>
-        <p>{{ t('m.Force_HTTPS') }}:
+        <p>HTTPS 강제:
           <el-tag :type="forceHttps ? 'success' : 'danger'" size="small">{{ forceHttps ? 'Enabled' : 'Disabled' }}</el-tag>
         </p>
-        <p>{{ t('m.CDN_HOST') }}:
+        <p>CDN 호스트:
           <el-tag :type="cdn ? 'success' : 'warning'" size="small">{{ cdn ? cdn : 'Not Use' }}</el-tag>
         </p>
       </Panel>
@@ -46,16 +46,16 @@
 
     <el-col :md="14" :lg="16" v-if="userStore.isSuperAdmin">
       <div class="info-container">
-        <InfoCard color="#909399" icon="User" message="Total Users" iconSize="30px" class="info-item"
+        <InfoCard color="#909399" icon="User" message="전체 사용자" iconSize="30px" class="info-item"
                   :value="infoData.user_count" />
-        <InfoCard color="#67C23A" icon="List" message="Today Submissions" class="info-item"
+        <InfoCard color="#67C23A" icon="List" message="오늘 제출" class="info-item"
                   :value="infoData.today_submission_count" />
-        <InfoCard color="#409EFF" icon="Trophy" message="Recent Contests" class="info-item"
+        <InfoCard color="#409EFF" icon="Trophy" message="최근 대회" class="info-item"
                   :value="infoData.recent_contest_count" />
       </div>
       <Panel class="release-panel">
         <template #title>
-          <span v-loading="loadingReleases">Release Notes
+          <span v-loading="loadingReleases">릴리스 노트
             <el-popover placement="right" trigger="hover">
               <template #reference><el-icon class="help-icon"><QuestionFilled /></el-icon></template>
               <p>Please upgrade to the latest version to enjoy the new features.</p>
@@ -66,7 +66,7 @@
           <el-collapse-item v-for="(release, index) in releases" :key="'release' + index" :name="index + 1">
             <template #title>
               <div v-if="release.new_version">{{ release.title }}
-                <el-tag size="small" type="success">New Version</el-tag>
+                <el-tag size="small" type="success">새 버전</el-tag>
               </div>
               <span v-else>{{ release.title }}</span>
             </template>
@@ -86,14 +86,11 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import InfoCard from '@admin/components/infoCard.vue'
 import api from '@admin/api'
 import time from '@/utils/time'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const userStore = useUserStore()
 
 const infoData = reactive({

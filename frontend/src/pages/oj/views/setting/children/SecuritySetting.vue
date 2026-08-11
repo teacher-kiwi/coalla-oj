@@ -1,28 +1,28 @@
 <template>
   <div class="setting-main">
-    <p class="section-title">{{ t('m.Sessions') }}</p>
+    <p class="section-title">세션</p>
     <div class="flex-container setting-content">
       <el-card v-for="session in sessions" :key="session.session_key" :body-style="{ padding: '20px' }" class="flex-child">
         <template #header>
           <div class="card-header">
             <span>{{ session.ip }}</span>
-            <el-tag v-if="session.current_session" type="success">Current</el-tag>
-            <el-button v-else type="warning" size="small" @click="deleteSession(session.session_key)">Revoke</el-button>
+            <el-tag v-if="session.current_session" type="success">현재 세션</el-tag>
+            <el-button v-else type="warning" size="small" @click="deleteSession(session.session_key)">해제</el-button>
           </div>
         </template>
         <el-form label-width="120px">
           <el-form-item label="OS :" class="item">{{ getPlatform(session.user_agent) }}</el-form-item>
-          <el-form-item label="Browser :" class="item">{{ getBrowser(session.user_agent) }}</el-form-item>
-          <el-form-item label="Last Activity :" class="item">{{ localtime(session.last_activity) }}</el-form-item>
+          <el-form-item label="브라우저 :" class="item">{{ getBrowser(session.user_agent) }}</el-form-item>
+          <el-form-item label="마지막 활동 :" class="item">{{ localtime(session.last_activity) }}</el-form-item>
         </el-form>
       </el-card>
     </div>
 
-    <p class="section-title">{{ t('m.Two_Factor_Authentication') }}</p>
+    <p class="section-title">2단계 인증</p>
     <div class="mini-container setting-content">
       <el-form>
         <el-alert v-if="TFAOpened" type="success" class="notice" show-icon :closable="false">
-          You have enabled two-factor authentication.
+          2단계 인증이 활성화되어 있습니다.
         </el-alert>
         <el-form-item v-if="!TFAOpened">
           <div v-loading="loadingQRcode" class="oj-relative">
@@ -31,10 +31,10 @@
         </el-form-item>
         <template v-if="!loadingQRcode">
           <el-form-item class="tfa-input">
-            <el-input v-model="formTwoFactor.code" placeholder="Enter the code from your application" />
+            <el-input v-model="formTwoFactor.code" placeholder="앱에 표시된 코드를 입력하세요" />
           </el-form-item>
-          <el-button v-if="!TFAOpened" type="primary" :loading="loadingBtn" @click="updateTFA(false)">Open TFA</el-button>
-          <el-button v-else type="danger" :loading="loadingBtn" @click="closeTFA">Close TFA</el-button>
+          <el-button v-if="!TFAOpened" type="primary" :loading="loadingBtn" @click="updateTFA(false)">2단계 인증 사용</el-button>
+          <el-button v-else type="danger" :loading="loadingBtn" @click="closeTFA">2단계 인증 해제</el-button>
         </template>
       </el-form>
     </div>
@@ -43,13 +43,10 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import api from '@oj/api'
 import time from '@/utils/time'
 import { useUserStore } from '@/store/user'
-
-const { t } = useI18n()
 const userStore = useUserStore()
 
 const qrcodeSrc = ref('')
@@ -101,13 +98,13 @@ function getSessions () {
 }
 
 function deleteSession (sessionKey) {
-  ElMessageBox.confirm('Are you sure to revoke the session?', 'Confirm').then(() => {
+  ElMessageBox.confirm('이 세션을 해제하시겠습니까?', '확인').then(() => {
     api.deleteSession(sessionKey).then(getSessions)
   }).catch(() => {})
 }
 
 function closeTFA () {
-  ElMessageBox.confirm('Two-factor Authentication is a powerful tool to protect your account, are you sure to close it?', 'Confirm').then(() => {
+  ElMessageBox.confirm('2단계 인증은 계정을 보호하는 강력한 수단입니다. 정말 해제하시겠습니까?', '확인').then(() => {
     updateTFA(true)
   }).catch(() => {})
 }

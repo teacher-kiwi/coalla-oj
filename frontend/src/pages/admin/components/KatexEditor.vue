@@ -1,19 +1,16 @@
 <template>
   <el-form>
-    <el-form-item :label="t('m.Input')">
+    <el-form-item label="입력">
       <el-input type="textarea" v-model="input" @change="changeInput" @keyup.enter="changeInput" />
     </el-form-item>
-    <el-form-item :label="t('m.Output')" />
+    <el-form-item label="출력" />
     <div v-html="text"></div>
   </el-form>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import katex from 'katex'
-
-const { t } = useI18n()
 const input = ref('c = \\pm\\sqrt{a^2 + b^2}')
 const text = ref('')
 

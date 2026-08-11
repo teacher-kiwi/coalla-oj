@@ -80,10 +80,10 @@ class SPJCompiler(DispatcherBase):
     def compile_spj(self):
         with ChooseJudgeServer() as server:
             if not server:
-                return "No available judge_server"
+                return "사용 가능한 채점 서버가 없습니다"
             result = self._request(urljoin(server.service_url, "compile_spj"), data=self.data)
             if not result:
-                return "Failed to call judge server"
+                return "채점 서버 호출에 실패했습니다"
             if result["err"]:
                 return result["data"]
 
@@ -133,7 +133,7 @@ class JudgeDispatcher(DispatcherBase):
             # 제출은 영원히 Pending 으로 남으므로 상태를 명시적으로 정리한다.
             logger.error(f"Language {language} is not configured, submission id: {self.submission.id}")
             self.submission.result = JudgeStatus.SYSTEM_ERROR
-            self.submission.statistic_info["err_info"] = f"Language {language} is not configured"
+            self.submission.statistic_info["err_info"] = f"언어 {language} 의 설정이 없습니다"
             self.submission.statistic_info["score"] = 0
             self.submission.save()
             return

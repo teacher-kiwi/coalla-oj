@@ -112,7 +112,7 @@ class UserLoginAPITest(APITestCase):
     def test_login_with_wrong_info(self):
         response = self.client.post(self.login_url,
                                     data={"username": self.username, "password": "invalid_password"})
-        self.assertDictEqual(response.data, {"error": "error", "data": "Invalid username or password"})
+        self.assertDictEqual(response.data, {"error": "error", "data": "사용자명 또는 비밀번호가 올바르지 않습니다"})
 
         user = auth.get_user(self.client)
         self.assertFalse(user.is_authenticated)
@@ -137,7 +137,7 @@ class UserLoginAPITest(APITestCase):
                                     data={"username": self.username,
                                           "password": self.password,
                                           "tfa_code": "qqqqqq"})
-        self.assertDictEqual(response.data, {"error": "error", "data": "Invalid two factor verification code"})
+        self.assertDictEqual(response.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
 
         user = auth.get_user(self.client)
         self.assertFalse(user.is_authenticated)
@@ -157,7 +157,7 @@ class UserLoginAPITest(APITestCase):
         self.user.save()
         resp = self.client.post(self.login_url, data={"username": self.username,
                                                       "password": self.password})
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Your account has been disabled"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "비활성화된 계정입니다"})
 
 
 class CaptchaTest(APITestCase):
@@ -182,12 +182,12 @@ class UserRegisterAPITest(CaptchaTest):
     def test_website_config_limit(self):
         SysOptions.allow_register = False
         resp = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Register function has been disabled by admin"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "관리자가 회원가입을 막아두었습니다"})
 
     def test_invalid_captcha(self):
         self.data["captcha"] = "****"
         response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "Invalid captcha"})
+        self.assertDictEqual(response.data, {"error": "error", "data": "보안 문자가 올바르지 않습니다"})
 
         self.data.pop("captcha")
         response = self.client.post(self.register_url, data=self.data)
@@ -203,7 +203,7 @@ class UserRegisterAPITest(CaptchaTest):
         self.data["captcha"] = self._set_captcha(self.client.session)
         self.data["email"] = "test1@qduoj.com"
         response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "Username already exists"})
+        self.assertDictEqual(response.data, {"error": "error", "data": "이미 사용 중인 사용자명입니다"})
 
     def test_email_already_exists(self):
         self.test_register_with_correct_info()
@@ -211,7 +211,7 @@ class UserRegisterAPITest(CaptchaTest):
         self.data["captcha"] = self._set_captcha(self.client.session)
         self.data["username"] = "test_user1"
         response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "Email already exists"})
+        self.assertDictEqual(response.data, {"error": "error", "data": "이미 사용 중인 이메일입니다"})
 
 
 class SessionManagementAPITest(APITestCase):
@@ -234,7 +234,7 @@ class SessionManagementAPITest(APITestCase):
 
     def test_delete_session_with_invalid_key(self):
         resp = self.client.delete(self.url + "?session_key=aaaaaaaaaa")
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Invalid session_key"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "session_key가 올바르지 않습니다"})
 
 
 class UserProfileAPITest(APITestCase):
@@ -280,7 +280,7 @@ class TwoFactorAuthAPITest(APITestCase):
     def test_open_tfa_with_invalid_code(self):
         self.test_get_image()
         resp = self.client.post(self.url, data={"code": "000000"})
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Invalid code"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
 
     def test_open_tfa_with_correct_code(self):
         self.test_get_image()
@@ -293,7 +293,7 @@ class TwoFactorAuthAPITest(APITestCase):
     def test_close_tfa_with_invalid_code(self):
         self.test_open_tfa_with_correct_code()
         resp = self.client.post(self.url, data={"code": "000000"})
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Invalid code"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
 
     def test_close_tfa_with_correct_code(self):
         self.test_open_tfa_with_correct_code()
@@ -327,7 +327,7 @@ class ApplyResetPasswordAPITest(CaptchaTest):
         send_email_send.reset_mock()
         self._refresh_captcha()
         resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "You can only reset password once per 20 minutes"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "비밀번호 재설정은 20분에 한 번만 요청할 수 있습니다"})
         send_email_send.assert_not_called()
 
     def test_apply_reset_password_again_after_20_mins(self, send_email_send):
@@ -359,14 +359,14 @@ class ResetPasswordAPITest(CaptchaTest):
     def test_reset_password_with_invalid_token(self):
         self.data["token"] = "aaaaaaaaaaa"
         resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Token does not exist"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "토큰이 존재하지 않습니다"})
 
     def test_reset_password_with_expired_token(self):
         user = User.objects.first()
         user.reset_password_token_expire_time = now() - timedelta(seconds=30)
         user.save()
         resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Token has expired"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "토큰이 만료되었습니다"})
 
 
 class UserChangeEmailAPITest(APITestCase):
@@ -383,14 +383,14 @@ class UserChangeEmailAPITest(APITestCase):
     def test_wrong_password(self):
         self.data["password"] = "aaaa"
         resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Wrong password"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "비밀번호가 올바르지 않습니다"})
 
     def test_duplicate_email(self):
         u = self.create_user("aa", "bb", login=False)
         u.email = self.new_mail
         u.save()
         resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "The email is owned by other account"})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "다른 계정이 사용 중인 이메일입니다"})
 
 
 class UserChangePasswordAPITest(APITestCase):
@@ -414,7 +414,7 @@ class UserChangePasswordAPITest(APITestCase):
 
     def test_login_required(self):
         response = self.client.post(self.url, data=self.data)
-        self.assertEqual(response.data, {"error": "permission-denied", "data": "Please login first"})
+        self.assertEqual(response.data, {"error": "permission-denied", "data": "먼저 로그인하세요"})
 
     def test_valid_ola_password(self):
         self.assertTrue(self.client.login(username=self.username, password=self.old_password))
@@ -426,7 +426,7 @@ class UserChangePasswordAPITest(APITestCase):
         self.assertTrue(self.client.login(username=self.username, password=self.old_password))
         self.data["old_password"] = "invalid"
         response = self.client.post(self.url, data=self.data)
-        self.assertEqual(response.data, {"error": "error", "data": "Invalid old password"})
+        self.assertEqual(response.data, {"error": "error", "data": "기존 비밀번호가 올바르지 않습니다"})
 
     def test_tfa_code_required(self):
         self.user.two_factor_auth = True
@@ -435,7 +435,7 @@ class UserChangePasswordAPITest(APITestCase):
         self.assertTrue(self.client.login(username=self.username, password=self.old_password))
         self.data["tfa_code"] = rand_str(6)
         resp = self.client.post(self.url, data=self.data)
-        self.assertEqual(resp.data, {"error": "error", "data": "Invalid two factor verification code"})
+        self.assertEqual(resp.data, {"error": "error", "data": "인증 코드가 올바르지 않습니다"})
 
         self.data["tfa_code"] = self._get_tfa_code()
         resp = self.client.post(self.url, data=self.data)
@@ -616,12 +616,12 @@ class GenerateUserAPITest(APITestCase):
         data["prefix"] = "t" * 16
         data["suffix"] = "s" * 14
         resp = self.client.post(self.url, data=data)
-        self.assertEqual(resp.data["data"], "Username should not more than 32 characters")
+        self.assertEqual(resp.data["data"], "사용자명은 32자를 넘을 수 없습니다")
 
         data2 = deepcopy(self.data)
         data2["number_from"] = 106
         resp = self.client.post(self.url, data=data2)
-        self.assertEqual(resp.data["data"], "Start number must be lower than end number")
+        self.assertEqual(resp.data["data"], "시작 번호는 끝 번호보다 작아야 합니다")
 
     @mock.patch("account.views.admin.xlsxwriter.Workbook")
     def test_generate_user_success(self, mock_workbook):

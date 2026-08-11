@@ -91,7 +91,7 @@ class APIView(View):
     def extract_errors(self, errors, key="field"):
         if isinstance(errors, dict):
             if not errors:
-                return key, "Invalid field"
+                return key, "입력값이 올바르지 않습니다"
             key = list(errors.keys())[0]
             return self.extract_errors(errors.pop(key), key)
         elif isinstance(errors, list):

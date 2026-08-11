@@ -1,15 +1,15 @@
 <template>
   <el-form :model="ruleForm" :rules="rules" ref="formRef" label-position="left" label-width="0px"
            class="demo-ruleForm login-container">
-    <h3 class="title">{{ t('m.Welcome_to_Login') }}</h3>
+    <h3 class="title">로그인 환영합니다</h3>
     <el-form-item prop="account">
-      <el-input v-model="ruleForm.account" :placeholder="t('m.username')" @keyup.enter="handleLogin" />
+      <el-input v-model="ruleForm.account" placeholder="사용자명" @keyup.enter="handleLogin" />
     </el-form-item>
     <el-form-item prop="password">
-      <el-input type="password" v-model="ruleForm.password" :placeholder="t('m.password')" @keyup.enter="handleLogin" />
+      <el-input type="password" v-model="ruleForm.password" placeholder="비밀번호" @keyup.enter="handleLogin" />
     </el-form-item>
     <el-form-item class="login-item">
-      <el-button type="primary" class="login-btn" @click="handleLogin" :loading="logining">{{ t('m.GO') }}</el-button>
+      <el-button type="primary" class="login-btn" @click="handleLogin" :loading="logining">이동</el-button>
     </el-form-item>
   </el-form>
 </template>
@@ -17,11 +17,8 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import api from '../../api'
-
-const { t } = useI18n()
 const router = useRouter()
 
 const formRef = ref(null)
@@ -43,7 +40,7 @@ function handleLogin () {
         logining.value = false
       })
     } else {
-      ElMessage.error('Please check the error fields')
+      ElMessage.error('입력값을 확인해주세요')
     }
   })
 }

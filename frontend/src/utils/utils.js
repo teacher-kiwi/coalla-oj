@@ -50,7 +50,7 @@ function downloadFile (url) {
           if (data.error) {
             ElMessage.error(data.data)
           } else {
-            ElMessage.error('Invalid file format')
+            ElMessage.error('파일 형식이 올바르지 않습니다')
           }
         }
         let b = new window.Blob([resp.data], { type: 'application/json' })

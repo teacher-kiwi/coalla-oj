@@ -3,17 +3,17 @@
     <el-col :span="20" id="status">
       <el-alert :type="statusInfo.type === 'danger' ? 'error' : statusInfo.type" show-icon :closable="false">
         <template #title>
-          <span class="title">{{ t('m.' + statusInfo.statusName.replace(/ /g, '_')) }}</span>
+          <span class="title">{{ statusInfo.label }}</span>
         </template>
         <div class="content">
           <template v-if="isCE">
             <pre>{{ submission.statistic_info.err_info }}</pre>
           </template>
           <template v-else>
-            <span>{{ t('m.Time') }}: {{ submissionTimeFormat(submission.statistic_info.time_cost) }}</span>
-            <span>{{ t('m.Memory') }}: {{ submissionMemoryFormat(submission.statistic_info.memory_cost) }}</span>
-            <span>{{ t('m.Lang') }}: {{ submission.language }}</span>
-            <span>{{ t('m.Author') }}: {{ submission.username }}</span>
+            <span>시간: {{ submissionTimeFormat(submission.statistic_info.time_cost) }}</span>
+            <span>메모리: {{ submissionMemoryFormat(submission.statistic_info.memory_cost) }}</span>
+            <span>언어: {{ submission.language }}</span>
+            <span>작성자: {{ submission.username }}</span>
           </template>
         </div>
       </el-alert>
@@ -21,25 +21,25 @@
 
     <el-col v-if="submission.info && !isCE" :span="20">
       <el-table :data="submission.info.data" v-loading="loading" stripe>
-        <el-table-column type="index" :label="t('m.ID')" align="center" />
-        <el-table-column :label="t('m.Status')" align="center">
+        <el-table-column type="index" label="ID" align="center" />
+        <el-table-column label="상태" align="center">
           <template #default="{ row }">
             <el-tag :type="JUDGE_STATUS[row.result].type">
-              {{ t('m.' + JUDGE_STATUS[row.result].name.replace(/ /g, '_')) }}
+              {{ JUDGE_STATUS[row.result].label }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('m.Memory')" align="center">
+        <el-table-column label="메모리" align="center">
           <template #default="{ row }">{{ submissionMemoryFormat(row.memory) }}</template>
         </el-table-column>
-        <el-table-column :label="t('m.Time')" align="center">
+        <el-table-column label="시간" align="center">
           <template #default="{ row }">{{ submissionTimeFormat(row.cpu_time) }}</template>
         </el-table-column>
-        <el-table-column v-if="showScoreColumn" :label="t('m.Score')" align="center" prop="score" />
-        <el-table-column v-if="isAdminRole" :label="t('m.Real_Time')" align="center">
+        <el-table-column v-if="showScoreColumn" label="점수" align="center" prop="score" />
+        <el-table-column v-if="isAdminRole" label="실제 시간" align="center">
           <template #default="{ row }">{{ submissionTimeFormat(row.real_time) }}</template>
         </el-table-column>
-        <el-table-column v-if="isAdminRole" :label="t('m.Signal')" align="center" prop="signal" />
+        <el-table-column v-if="isAdminRole" label="시그널" align="center" prop="signal" />
       </el-table>
     </el-col>
 
@@ -54,10 +54,10 @@
     <el-col v-if="submission.can_unshare" :span="20">
       <div id="share-btn">
         <el-button v-if="submission.shared" type="warning" size="large" @click="shareSubmission(false)">
-          {{ t('m.UnShare') }}
+          공유 해제
         </el-button>
         <el-button v-else type="primary" size="large" @click="shareSubmission(true)">
-          {{ t('m.Share') }}
+          공유
         </el-button>
       </div>
     </el-col>
@@ -67,7 +67,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import api from '@oj/api'
 import { JUDGE_STATUS } from '@/utils/constants'
@@ -77,7 +76,6 @@ import BlocklyViewer from '@oj/components/BlocklyViewer.vue'
 import { useUserStore } from '@/store/user'
 
 const { submissionTimeFormat, submissionMemoryFormat } = utils
-const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 
@@ -93,6 +91,7 @@ const submission = ref({
 const statusInfo = computed(() => ({
   type: JUDGE_STATUS[submission.value.result].type,
   statusName: JUDGE_STATUS[submission.value.result].name,
+  label: JUDGE_STATUS[submission.value.result].label,
   color: JUDGE_STATUS[submission.value.result].color
 }))
 
@@ -122,7 +121,7 @@ function shareSubmission (shared) {
   const data = { id: submission.value.id, shared }
   api.updateSubmission(data).then(() => {
     getSubmission()
-    ElMessage.success(t('m.Succeeded'))
+    ElMessage.success('성공')
   }, () => {})
 }
 

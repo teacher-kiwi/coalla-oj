@@ -3,13 +3,13 @@
     <el-row type="flex" justify="space-between" class="header">
       <el-col :span="12">
         <div>
-          <span>{{ t('m.Language') }}:</span>
-          <el-select :model-value="'Block Coding'" @change="onLangChange" class="adjust">
-            <el-option value="Block Coding" :label="t('m.Block_Coding')" />
+          <span>언어:</span>
+          <el-select model-value="Block Coding" @change="onLangChange" class="adjust">
+            <el-option value="Block Coding" label="블록 코딩" />
             <el-option v-for="item in languages" :key="item" :value="item" :label="item" />
           </el-select>
 
-          <el-tooltip :content="t('m.Show_Generated_Code')" placement="top">
+          <el-tooltip content="생성된 코드 보기" placement="top">
             <el-button :icon="Document" class="action-btn" @click="showCode = !showCode" />
           </el-tooltip>
         </div>
@@ -25,7 +25,7 @@
 
     <div v-if="showCode" class="code-preview">
       <div class="code-header">
-        <span>{{ t('m.Convert_to_Code') }} (Python)</span>
+        <span>코드로 변환 (Python)</span>
       </div>
       <pre>{{ generatedCode }}</pre>
     </div>
@@ -34,7 +34,6 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import { Document, Delete } from '@element-plus/icons-vue'
 import * as Blockly from 'blockly'
@@ -49,7 +48,6 @@ const props = defineProps({
   languages: { type: Array, default: () => [] }
 })
 const emit = defineEmits(['input', 'update:code', 'update:blocks', 'changeLang'])
-const { t } = useI18n()
 
 const blocklyDiv = ref(null)
 const showCode = ref(false)

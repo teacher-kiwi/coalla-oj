@@ -2,20 +2,20 @@
   <el-row>
     <el-col :span="24">
       <Panel id="contest-card" shadow>
-        <template #title>{{ query.rule_type === '' ? t('m.All') : query.rule_type }} {{ t('m.Contests') }}</template>
+        <template #title>{{ query.rule_type === '' ? '전체' : query.rule_type }} 대회</template>
         <template #extra>
           <ul class="filter">
             <li>
               <el-dropdown @command="onRuleChange">
                 <span class="el-dropdown-link">
-                  {{ query.rule_type === '' ? t('m.Rule') : t('m.' + query.rule_type) }}
+                  {{ query.rule_type === '' ? '규칙' : RULE_TYPE_LABEL[query.rule_type] }}
                   <el-icon><ArrowDown /></el-icon>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="">{{ t('m.All') }}</el-dropdown-item>
-                    <el-dropdown-item command="OI">{{ t('m.OI') }}</el-dropdown-item>
-                    <el-dropdown-item command="ACM">{{ t('m.ACM') }}</el-dropdown-item>
+                    <el-dropdown-item command="">전체</el-dropdown-item>
+                    <el-dropdown-item command="OI">OI</el-dropdown-item>
+                    <el-dropdown-item command="ACM">ACM</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -23,27 +23,27 @@
             <li>
               <el-dropdown @command="onStatusChange">
                 <span class="el-dropdown-link">
-                  {{ query.status === '' ? t('m.Status') : t('m.' + CONTEST_STATUS_REVERSE[query.status].name.replace(/ /g, '_')) }}
+                  {{ query.status === '' ? '상태' : CONTEST_STATUS_REVERSE[query.status].label }}
                   <el-icon><ArrowDown /></el-icon>
                 </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="">{{ t('m.All') }}</el-dropdown-item>
-                    <el-dropdown-item command="0">{{ t('m.Underway') }}</el-dropdown-item>
-                    <el-dropdown-item command="1">{{ t('m.Not_Started') }}</el-dropdown-item>
-                    <el-dropdown-item command="-1">{{ t('m.Ended') }}</el-dropdown-item>
+                    <el-dropdown-item command="">전체</el-dropdown-item>
+                    <el-dropdown-item command="0">진행 중</el-dropdown-item>
+                    <el-dropdown-item command="1">시작 전</el-dropdown-item>
+                    <el-dropdown-item command="-1">종료</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
             </li>
             <li>
-              <el-input id="keyword" v-model="query.keyword" placeholder="Keyword" @keyup.enter="changeRoute">
+              <el-input id="keyword" v-model="query.keyword" placeholder="검색어" @keyup.enter="changeRoute">
                 <template #suffix><el-icon><Search /></el-icon></template>
               </el-input>
             </li>
           </ul>
         </template>
-        <p id="no-contest" v-if="contests.length === 0">{{ t('m.No_contest') }}</p>
+        <p id="no-contest" v-if="contests.length === 0">대회 없음</p>
         <ol id="contest-list">
           <li v-for="contest in contests" :key="contest.title">
             <el-row justify="space-between" align="middle">
@@ -73,7 +73,7 @@
               </el-col>
               <el-col :span="4" class="contest-status-col">
                 <el-tag :type="getContestStatusType(contest.status)">
-                  {{ t('m.' + CONTEST_STATUS_REVERSE[contest.status].name.replace(/ /g, '_')) }}
+                  {{ CONTEST_STATUS_REVERSE[contest.status].label }}
                 </el-tag>
               </el-col>
             </el-row>
@@ -90,18 +90,16 @@
 <script setup>
 import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Search, Lock, Calendar, Timer } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
 import Pagination from '@oj/components/Pagination.vue'
-import { CONTEST_STATUS_REVERSE, CONTEST_TYPE } from '@/utils/constants'
+import { CONTEST_STATUS_REVERSE, CONTEST_TYPE, RULE_TYPE_LABEL } from '@/utils/constants'
 import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
 
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -176,7 +174,7 @@ function onPageSizeChange (newSize) {
 
 function goContest (contest) {
   if (contest.contest_type !== CONTEST_TYPE.PUBLIC && !userStore.isAuthenticated) {
-    ElMessage.error(t('m.Please_login_first'))
+    ElMessage.error('먼저 로그인하세요!')
     appStore.changeModalStatus({ visible: true })
   } else {
     router.push({ name: 'contest-details', params: { contestID: contest.id } })

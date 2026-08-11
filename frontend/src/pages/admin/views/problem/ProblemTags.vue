@@ -1,27 +1,27 @@
 <template>
   <div class="view problem-tags">
-    <Panel title="Problem Tags">
+    <Panel title="문제 태그">
       <template #header>
-        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="Keywords" />
+        <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="검색어" />
       </template>
       <el-table v-loading="loading" :data="tagList" class="full-width">
         <el-table-column width="100" prop="id" label="ID" />
-        <el-table-column prop="name" label="Tag Name" />
-        <el-table-column label="Aliases">
+        <el-table-column prop="name" label="태그 이름" />
+        <el-table-column label="별칭">
           <template #default="{ row }">
             <el-tag v-for="alias in row.aliases" :key="alias" class="alias-tag">{{ alias }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="Operation" width="160">
+        <el-table-column fixed="right" label="관리" width="160">
           <template #default="{ row }">
-            <icon-btn name="Edit" icon="Edit" @click="openTagDialog(row)" />
-            <icon-btn name="Delete" icon="Delete" @click="deleteTag(row.id)" />
+            <icon-btn name="수정" icon="Edit" @click="openTagDialog(row)" />
+            <icon-btn name="삭제" icon="Delete" @click="deleteTag(row.id)" />
           </template>
         </el-table-column>
       </el-table>
       <div class="panel-options">
         <el-button type="primary" size="small" @click="openTagDialog(null)" :icon="Plus">
-          Create
+          생성
         </el-button>
         <el-pagination class="page" layout="prev, pager, next" :current-page="currentPage"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
@@ -30,12 +30,12 @@
 
     <el-dialog :title="dialogTitle" v-model="dialogVisible" :close-on-click-modal="false" width="420px">
       <el-form label-position="top">
-        <el-form-item label="Tag Name" required>
-          <el-input v-model="tagName" placeholder="Tag Name" @keyup.enter="submitTag" />
+        <el-form-item label="태그 이름" required>
+          <el-input v-model="tagName" placeholder="태그 이름" @keyup.enter="submitTag" />
         </el-form-item>
-        <el-form-item label="Aliases">
+        <el-form-item label="별칭">
           <el-select v-model="tagAliases" multiple filterable allow-create default-first-option
-                     placeholder="Aliases" class="full-width">
+                     placeholder="별칭" class="full-width">
             <el-option v-for="alias in tagAliases" :key="alias" :label="alias" :value="alias" />
           </el-select>
         </el-form-item>
@@ -94,13 +94,13 @@ function openTagDialog (tag) {
     currentTagId.value = tag.id
     tagName.value = tag.name
     tagAliases.value = [...(tag.aliases || [])]
-    dialogTitle.value = 'Edit Tag'
+    dialogTitle.value = '태그 수정'
   } else {
     mode.value = 'create'
     currentTagId.value = null
     tagName.value = ''
     tagAliases.value = []
-    dialogTitle.value = 'Create Tag'
+    dialogTitle.value = '태그 생성'
   }
   dialogVisible.value = true
 }
@@ -108,7 +108,7 @@ function openTagDialog (tag) {
 function submitTag () {
   const name = tagName.value.trim()
   if (!name) {
-    ElMessage.error('Tag name is required')
+    ElMessage.error('태그 이름을 입력하세요')
     return
   }
   const aliases = tagAliases.value.map(alias => alias.trim()).filter(alias => alias)
@@ -122,9 +122,9 @@ function submitTag () {
 }
 
 function deleteTag (id) {
-  ElMessageBox.confirm('Are you sure you want to delete this tag?', 'Delete Tag', {
-    confirmButtonText: 'Delete',
-    cancelButtonText: 'Cancel',
+  ElMessageBox.confirm('이 태그를 삭제하시겠습니까?', '태그 삭제', {
+    confirmButtonText: '삭제',
+    cancelButtonText: '취소',
     type: 'warning'
   }).then(() => {
     api.deleteProblemTag(id).then(() => getTags(currentPage.value)).catch(() => {})

@@ -144,7 +144,7 @@ class ProblemAdminAPITest(APITestCase):
         self.test_create_problem()
 
         resp = self.client.post(self.url, data=self.data)
-        self.assertFailed(resp, "Display ID already exists")
+        self.assertFailed(resp, "이미 사용 중인 표시 ID입니다")
 
     def test_spj(self):
         data = copy.deepcopy(self.data)
@@ -202,13 +202,13 @@ class ProblemTagAdminAPITest(APITestCase):
     def test_duplicate_tag(self):
         ProblemTag.objects.create(name="math")
         resp = self.client.post(self.url, data={"name": "math"})
-        self.assertFailed(resp, "Tag already exists")
+        self.assertFailed(resp, "이미 존재하는 태그입니다")
 
     def test_delete_used_tag(self):
         ProblemTag.objects.create(name="test")
         problem = ProblemCreateTestBase.add_problem(DEFAULT_PROBLEM_DATA, self.create_admin(login=False))
         resp = self.client.delete(self.url + "?id=" + str(problem.tags.first().id))
-        self.assertFailed(resp, "Tag is used by problems")
+        self.assertFailed(resp, "문제에서 사용 중인 태그입니다")
 
 
 class ProblemAPITest(ProblemCreateTestBase):
@@ -286,7 +286,7 @@ class ContestProblemTest(ProblemCreateTestBase):
     def test_regular_user_get_not_started_contest_problem(self):
         self.create_user("test", "test123")
         resp = self.client.get(self.url + "?contest_id=" + str(self.contest["id"]))
-        self.assertDictEqual(resp.data, {"error": "error", "data": "Contest has not started yet."})
+        self.assertDictEqual(resp.data, {"error": "error", "data": "아직 시작하지 않은 대회입니다."})
 
     def test_reguar_user_get_started_contest_problem(self):
         self.create_user("test", "test123")

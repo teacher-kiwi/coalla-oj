@@ -1,20 +1,20 @@
 <template>
   <Panel :padding="30" class="container">
     <template #title>
-      <div class="center">{{ t('m.Reset_Password') }}</div>
+      <div class="center">비밀번호 찾기</div>
     </template>
     <template v-if="!successApply">
       <el-form ref="formRef" :rules="ruleResetPassword" :model="formResetPassword">
         <el-form-item prop="email">
-          <el-input v-model="formResetPassword.email" :placeholder="t('m.ApplyEmail')" size="large" :prefix-icon="Message" />
+          <el-input v-model="formResetPassword.email" placeholder="이메일 주소" size="large" :prefix-icon="Message" />
         </el-form-item>
         <el-form-item prop="captcha" class="captcha-item">
           <div class="oj-captcha">
             <div class="oj-captcha-code">
-              <el-input v-model="formResetPassword.captcha" :placeholder="t('m.RCaptcha')" size="large" :prefix-icon="Key" />
+              <el-input v-model="formResetPassword.captcha" placeholder="보안 문자" size="large" :prefix-icon="Key" />
             </div>
             <div class="oj-captcha-img">
-              <el-tooltip content="Click to refresh" placement="top">
+              <el-tooltip content="클릭하면 새로고침" placement="top">
                 <img :src="captchaSrc" @click="getCaptchaSrc" />
               </el-tooltip>
             </div>
@@ -22,13 +22,13 @@
         </el-form-item>
       </el-form>
       <el-button type="primary" class="btn" :loading="btnLoading" @click="sendEmail">
-        {{ t('m.Send_Password_Reset_Email') }}
+        비밀번호 재설정 이메일 보내기
       </el-button>
     </template>
     <template v-else>
       <el-alert type="success" show-icon :closable="false">
-        <template #title>{{ t('Success') }}</template>
-        {{ t('Password_reset_mail_sent') }}
+        <template #title>성공</template>
+        비밀번호 재설정 메일이 전송되었습니다
       </el-alert>
     </template>
   </Panel>
@@ -36,12 +36,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { Message, Key } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
 
-const { t } = useI18n()
 const { captchaSrc, validateForm, getCaptchaSrc } = useForm()
 
 const formRef = ref(null)
@@ -52,7 +50,7 @@ const formResetPassword = ref({ email: '', captcha: '' })
 const CheckEmailExist = (rule, value, callback) => {
   if (value !== '') {
     api.checkUsernameOrEmail(undefined, value).then((res) => {
-      if (res.data.data.email === false) callback(new Error(t('m.The_email_doesnt_exist')))
+      if (res.data.data.email === false) callback(new Error('이메일이 존재하지 않습니다'))
       else callback()
     }, () => callback())
   } else {

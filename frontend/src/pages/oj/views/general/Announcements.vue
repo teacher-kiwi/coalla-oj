@@ -2,13 +2,13 @@
   <Panel shadow :padding="10">
     <template #title>{{ title }}</template>
     <template #extra>
-      <el-button v-if="listVisible" type="info" :loading="btnLoading" @click="init">{{ t('m.Refresh') }}</el-button>
-      <el-button v-else :icon="Back" @click="goBack">{{ t('m.Back') }}</el-button>
+      <el-button v-if="listVisible" type="info" :loading="btnLoading" @click="init">새로고침</el-button>
+      <el-button v-else :icon="Back" @click="goBack">뒤로</el-button>
     </template>
 
     <transition-group name="announcement-animate">
       <div v-if="!announcements.length" class="no-announcement" key="no-announcement">
-        <p>{{ t('m.No_Announcements') }}</p>
+        <p>공지 없음</p>
       </div>
       <template v-if="listVisible">
         <ul class="announcements-container" key="list">
@@ -18,7 +18,7 @@
                 <a class="entry" @click="goAnnouncement(a)">{{ a.title }}</a>
               </div>
               <div class="date">{{ localtime(a.create_time) }}</div>
-              <div class="creator"> {{ t('m.By') }} {{ a.created_by.username }}</div>
+              <div class="creator"> 작성자 {{ a.created_by.username }}</div>
             </div>
           </li>
         </ul>
@@ -34,13 +34,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { Back } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import Pagination from '@oj/components/Pagination.vue'
 import time from '@/utils/time'
-
-const { t } = useI18n()
 const route = useRoute()
 
 const limit = 10
@@ -54,7 +51,7 @@ const listVisible = ref(true)
 const isContest = computed(() => !!route.params.contestID)
 const title = computed(() => {
   if (listVisible.value) {
-    return isContest.value ? t('m.Contest_Announcements') : t('m.Announcements')
+    return isContest.value ? '대회 공지' : '공지'
   }
   return announcement.value.title
 })

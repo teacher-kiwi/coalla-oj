@@ -181,13 +181,20 @@ export default {
   }
 }
 
+// 로그인 필요 여부는 미들웨어의 에러 코드로 판정한다. 데코레이터가 내려주는
+// 일반 error 응답도 있어 메시지 접두사를 함께 본다.
+function isLoginRequired (res, detail) {
+  if (res && res.data && res.data.error === 'login-required') return true
+  return typeof detail === 'string' && detail.startsWith('먼저 로그인')
+}
+
 // 에러 본문이 항상 문자열인 건 아니고(직렬화 에러는 객체다), 네트워크 오류면
 // res.data 자체가 없다. 에러 처리 중에 다시 예외가 나지 않도록 문자열로 정규화한다.
 function errorMessage (res) {
   const detail = res && res.data && res.data.data
   if (typeof detail === 'string') return detail
   if (detail) return JSON.stringify(detail)
-  return (res && res.message) || 'Network error'
+  return (res && res.message) || '네트워크 오류가 발생했습니다'
 }
 
 function ajax (url, method, options) {
@@ -202,13 +209,13 @@ function ajax (url, method, options) {
         const detail = errorMessage(res)
         ElMessage.error(detail)
         reject(res)
-        if (detail.startsWith('Please login')) {
+        if (isLoginRequired(res, detail)) {
           window.location.href = '/admin/login'
         }
       } else {
         resolve(res)
         if (method !== 'get') {
-          ElMessage.success('Succeeded')
+          ElMessage.success('완료되었습니다')
         }
       }
     }, res => {

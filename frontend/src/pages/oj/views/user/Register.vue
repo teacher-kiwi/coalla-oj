@@ -2,24 +2,24 @@
   <div>
     <el-form ref="formRef" :model="formRegister" :rules="ruleRegister">
       <el-form-item prop="username">
-        <el-input v-model="formRegister.username" :placeholder="t('m.RegisterUsername')" size="large" :prefix-icon="User" @keyup.enter="handleRegister" />
+        <el-input v-model="formRegister.username" placeholder="사용자명" size="large" :prefix-icon="User" @keyup.enter="handleRegister" />
       </el-form-item>
       <el-form-item prop="email">
-        <el-input v-model="formRegister.email" :placeholder="t('m.Email_Address')" size="large" :prefix-icon="Message" @keyup.enter="handleRegister" />
+        <el-input v-model="formRegister.email" placeholder="이메일 주소" size="large" :prefix-icon="Message" @keyup.enter="handleRegister" />
       </el-form-item>
       <el-form-item prop="password">
-        <el-input type="password" v-model="formRegister.password" :placeholder="t('m.RegisterPassword')" size="large" :prefix-icon="Lock" @keyup.enter="handleRegister" />
+        <el-input type="password" v-model="formRegister.password" placeholder="비밀번호" size="large" :prefix-icon="Lock" @keyup.enter="handleRegister" />
       </el-form-item>
       <el-form-item prop="passwordAgain">
-        <el-input type="password" v-model="formRegister.passwordAgain" :placeholder="t('m.Password_Again')" size="large" :prefix-icon="Lock" @keyup.enter="handleRegister" />
+        <el-input type="password" v-model="formRegister.passwordAgain" placeholder="비밀번호 확인" size="large" :prefix-icon="Lock" @keyup.enter="handleRegister" />
       </el-form-item>
       <el-form-item prop="captcha" class="captcha-item">
         <div class="oj-captcha">
           <div class="oj-captcha-code">
-            <el-input v-model="formRegister.captcha" :placeholder="t('m.Captcha')" size="large" :prefix-icon="Key" @keyup.enter="handleRegister" />
+            <el-input v-model="formRegister.captcha" placeholder="보안 문자" size="large" :prefix-icon="Key" @keyup.enter="handleRegister" />
           </div>
           <div class="oj-captcha-img">
-            <el-tooltip content="Click to refresh" placement="top">
+            <el-tooltip content="클릭하면 새로고침" placement="top">
               <img :src="captchaSrc" @click="getCaptchaSrc" />
             </el-tooltip>
           </div>
@@ -35,10 +35,10 @@
         <span class="required-tag">*</span> 본인은 만 14세 이상입니다.
       </el-checkbox>
       <el-button type="primary" class="btn" :loading="btnRegisterLoading" :disabled="!ageConfirmed" @click="handleRegister">
-        {{ t('m.UserRegister') }}
+        회원가입
       </el-button>
       <el-button class="btn" @click="switchMode('login')">
-        {{ t('m.Already_Registed') }}
+        이미 가입하셨나요? 지금 로그인하세요!
       </el-button>
     </div>
   </div>
@@ -46,14 +46,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Message, Key } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useForm } from '@oj/components/mixins'
 import { useAppStore } from '@/store/app'
-
-const { t } = useI18n()
 const appStore = useAppStore()
 const { captchaSrc, validateForm, getCaptchaSrc } = useForm()
 
@@ -70,13 +67,13 @@ const formRegister = ref({
 
 const CheckUsernameNotExist = (rule, value, callback) => {
   api.checkUsernameOrEmail(value, undefined).then((res) => {
-    if (res.data.data.username === true) callback(new Error(t('m.The_username_already_exists')))
+    if (res.data.data.username === true) callback(new Error('이미 존재하는 사용자명입니다.'))
     else callback()
   }, () => callback())
 }
 const CheckEmailNotExist = (rule, value, callback) => {
   api.checkUsernameOrEmail(undefined, value).then((res) => {
-    if (res.data.data.email === true) callback(new Error(t('m.The_email_already_exists')))
+    if (res.data.data.email === true) callback(new Error('이미 존재하는 이메일입니다'))
     else callback()
   }, () => callback())
 }
@@ -87,7 +84,7 @@ const CheckPassword = (rule, value, callback) => {
   callback()
 }
 const CheckAgainPassword = (rule, value, callback) => {
-  if (value !== formRegister.value.password) callback(new Error(t('m.password_does_not_match')))
+  if (value !== formRegister.value.password) callback(new Error('비밀번호가 일치하지 않습니다'))
   else callback()
 }
 
@@ -126,7 +123,7 @@ async function handleRegister () {
   btnRegisterLoading.value = true
   try {
     await api.register(formData)
-    ElMessage.success(t('m.Thanks_for_registering'))
+    ElMessage.success('가입해 주셔서 감사합니다. 이제 로그인할 수 있습니다')
     switchMode('login')
     btnRegisterLoading.value = false
   } catch (e) {

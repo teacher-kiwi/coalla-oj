@@ -1,13 +1,13 @@
 <template>
   <div>
-    <el-input v-model="keyword" placeholder="Keywords" :prefix-icon="SearchIcon" />
+    <el-input v-model="keyword" placeholder="검색어" :prefix-icon="SearchIcon" />
     <el-table :data="problems" v-loading="loading">
       <el-table-column label="ID" width="100" prop="id" />
-      <el-table-column label="DisplayID" width="200" prop="_id" />
-      <el-table-column label="Title" prop="title" />
-      <el-table-column label="Option" align="center" width="100" fixed="right">
+      <el-table-column label="표시 ID" width="200" prop="_id" />
+      <el-table-column label="제목" prop="title" />
+      <el-table-column label="옵션" align="center" width="100" fixed="right">
         <template #default="{ row }">
-          <icon-btn icon="Plus" name="Add the problem" @click="handleAddProblem(row.id)" />
+          <icon-btn icon="Plus" name="문제 추가" @click="handleAddProblem(row.id)" />
         </template>
       </el-table-column>
     </el-table>
@@ -54,7 +54,7 @@ function getPublicProblem (page = 1) {
 }
 
 function handleAddProblem (problemID) {
-  ElMessageBox.prompt('Please input display id for the contest problem', 'Confirm').then(({ value }) => {
+  ElMessageBox.prompt('대회 문제의 표시 ID를 입력하세요', '확인').then(({ value }) => {
     api.addProblemFromPublic({ problem_id: problemID, contest_id: props.contestID, display_id: value }).then(() => {
       emit('on-change')
     }, () => {})
