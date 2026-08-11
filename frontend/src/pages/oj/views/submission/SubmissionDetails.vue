@@ -65,14 +65,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '@oj/api'
 import { JUDGE_STATUS } from '@/utils/constants'
 import utils from '@/utils/utils'
 import Highlight from '@oj/components/Highlight.vue'
-import BlocklyViewer from '@oj/components/BlocklyViewer.vue'
+// 블록 코딩 제출일 때만 필요하므로 지연 로딩한다
+const BlocklyViewer = defineAsyncComponent(() => import('@oj/components/BlocklyViewer.vue'))
 import { useUserStore } from '@/store/user'
 
 const { submissionTimeFormat, submissionMemoryFormat } = utils

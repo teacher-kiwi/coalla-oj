@@ -2,10 +2,32 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import ko from 'element-plus/es/locale/lang/ko'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+// 아이콘은 1000개 전부가 아니라 전역 해석이 필요한 것만 등록한다.
+// (템플릿에서 태그로 쓰거나, IconBtn/InfoCard 에 문자열 이름으로 넘기는 것들)
+import {
+  ArrowDown, Grid, HomeFilled, InfoFilled, Medal, TrendCharts, Trophy,
+  Key, Lock, Message, User
+} from '@element-plus/icons-vue'
 import VChart from 'vue-echarts'
-import 'echarts'
 import 'element-plus/dist/index.css'
+
+// echarts 는 전체를 불러오지 않고 실제로 쓰는 것만 등록한다.
+// (원형: 문제 통계 / 막대·꺾은선: 순위 · 대회 순위)
+import { use } from 'echarts/core'
+import { PieChart, BarChart, LineChart } from 'echarts/charts'
+import {
+  TooltipComponent, LegendComponent, GridComponent,
+  ToolboxComponent, DataZoomComponent, MarkPointComponent
+} from 'echarts/components'
+import { LabelLayout } from 'echarts/features'
+import { CanvasRenderer } from 'echarts/renderers'
+
+use([
+  PieChart, BarChart, LineChart,
+  TooltipComponent, LegendComponent, GridComponent,
+  ToolboxComponent, DataZoomComponent, MarkPointComponent,
+  LabelLayout, CanvasRenderer
+])
 
 import App from './App.vue'
 import router from './router'
@@ -25,7 +47,10 @@ app.use(ElementPlus, { locale: ko })
 app.use(highlight)
 app.use(katex)
 
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+for (const [key, component] of Object.entries({
+  ArrowDown, Grid, HomeFilled, InfoFilled, Medal, TrendCharts, Trophy,
+  Key, Lock, Message, User
+})) {
   app.component(key, component)
 }
 

@@ -2,7 +2,12 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import ko from 'element-plus/es/locale/lang/ko'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+// 아이콘은 1000개 전부가 아니라 전역 해석이 필요한 것만 등록한다.
+// (템플릿에서 태그로 쓰거나, IconBtn/InfoCard 에 문자열 이름으로 넘기는 것들)
+import {
+  CaretTop, CopyDocument, Delete, Document, Download, Edit, InfoFilled,
+  List, Menu, Odometer, Plus, Trophy, User
+} from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 
 import App from './App.vue'
@@ -23,7 +28,10 @@ app.use(router)
 app.use(ElementPlus, { locale: ko })
 app.use(katex)
 
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+for (const [key, component] of Object.entries({
+  CaretTop, CopyDocument, Delete, Document, Download, Edit, InfoFilled,
+  List, Menu, Odometer, Plus, Trophy, User
+})) {
   app.component(key, component)
 }
 

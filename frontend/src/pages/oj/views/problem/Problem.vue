@@ -202,15 +202,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   DocumentCopy, PictureFilled, ChatDotRound, List, TrendCharts, House,
   InfoFilled, DataAnalysis
 } from '@element-plus/icons-vue'
-import CodeMirror from '@oj/components/CodeMirror.vue'
-import BlocklyEditor from '@oj/components/BlocklyEditor.vue'
+// 두 에디터는 한 번에 하나만 쓰이고 각각 수백 KB 다. 실제로 선택된 쪽만 내려받는다.
+const CodeMirror = defineAsyncComponent(() => import('@oj/components/CodeMirror.vue'))
+const BlocklyEditor = defineAsyncComponent(() => import('@oj/components/BlocklyEditor.vue'))
 import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import storage from '@/utils/storage'
