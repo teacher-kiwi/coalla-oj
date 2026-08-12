@@ -114,6 +114,14 @@ export default {
   deleteProblemSetAssignment (id) {
     return ajax('teacher/problem_set/assignment', 'delete', { params: { id } })
   },
+  getProblemSetProgress (problemSet, classId) {
+    return ajax('teacher/problem_set/progress', 'get', { params: { problem_set: problemSet, class_id: classId } })
+  },
+  getStudentSubmissions (membership, offset, limit, problemId) {
+    const params = { membership, offset, limit }
+    if (problemId) params.problem_id = problemId
+    return ajax('teacher/student/submission', 'get', { params })
+  },
 
   // ---- 학생 문제집 ----
   getMyAssignedProblemSets () {
@@ -227,8 +235,10 @@ export default {
   updateSubmission (data) {
     return ajax('submission', 'put', { data })
   },
-  getUserRank (offset, limit, rule = 'acm') {
-    return ajax('user_rank', 'get', { params: { offset, limit, rule } })
+  getUserRank (offset, limit, rule = 'acm', myStudents = false) {
+    const params = { offset, limit, rule }
+    if (myStudents) params.my_students = 1
+    return ajax('user_rank', 'get', { params })
   },
   getContestRank (params) {
     return ajax('contest_rank', 'get', { params })

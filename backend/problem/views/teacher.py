@@ -3,11 +3,17 @@
 교사는 `is_admin_role()` 에서 제외되어 있어 /api/admin/* 을 쓸 수 없다.
 여기의 모든 조회·수정은 "내가 만든 문제집"과 "내가 담당하는 학급"으로 범위를 좁힌다.
 """
+import io
+from urllib.parse import quote
+
+import xlsxwriter
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
+from django.http import HttpResponse
 
 from account.decorators import teacher_required
 from account.views.teacher import owned_class
+from submission.models import JudgeStatus, Submission
 from utils.api import APIView, validate_serializer
 
 from ..models import Problem, ProblemSet, ProblemSetAssignment, ProblemSetItem
@@ -200,3 +206,104 @@ class ProblemSetAssignmentAPI(APIView):
         if not assignment or not owned_problem_set(user, assignment.problem_set_id):
             return None
         return assignment
+
+
+class ProblemSetProgressAPI(APIView):
+    """학급 × 문제집 진도표.
+
+    셀 하나는 "학생이 그 문제를 풀었는지 / 몇 번 시도했는지"다. 진도는
+    UserProfile 의 상태값 대신 제출 테이블을 직접 집계한다. 시도 횟수는
+    프로필에 없고, "풀지는 못했지만 붙들고 있는 문제"가 교사에게 가장 필요한 정보다.
+    """
+    @teacher_required
+    def get(self, request):
+        problem_set = owned_problem_set(request.user, request.GET.get("problem_set"))
+        if not problem_set:
+            return self.error("문제집이 존재하지 않습니다")
+        school_class = owned_class(request.user, request.GET.get("class_id"))
+        if not school_class:
+            return self.error("학급이 존재하지 않습니다")
+
+        problems = [item.problem for item in problem_set.items.select_related("problem")]
+        memberships = list(school_class.memberships.select_related("student"))
+        cells = self._submission_cells([m.student_id for m in memberships],
+                                       [p.id for p in problems])
+
+        students = []
+        for membership in memberships:
+            row = [cells.get((membership.student_id, p.id), _EMPTY_CELL) for p in problems]
+            students.append({
+                "membership": membership.id,
+                "number": membership.number,
+                "solved_count": sum(1 for cell in row if cell["solved"]),
+                "cells": row,
+            })
+
+        totals = [{
+            "solved": sum(1 for s in students if s["cells"][index]["solved"]),
+            "tried": sum(1 for s in students if s["cells"][index]["attempts"]),
+        } for index in range(len(problems))]
+
+        data = {
+            "problem_set": {"id": problem_set.id, "title": problem_set.title},
+            "school_class": {"id": school_class.id, "name": str(school_class)},
+            "problems": [{"id": p.id, "_id": p._id, "title": p.title} for p in problems],
+            "students": students,
+            "totals": totals,
+        }
+        if request.GET.get("download") == "1":
+            return _progress_xlsx(data)
+        return self.success(data)
+
+    @staticmethod
+    def _submission_cells(student_ids, problem_ids):
+        """(학생, 문제) -> {시도 횟수, 정답 여부}. 한 번의 집계 쿼리로 끝낸다."""
+        if not student_ids or not problem_ids:
+            return {}
+        rows = (Submission.objects
+                .filter(contest_id__isnull=True, user_id__in=student_ids,
+                        problem_id__in=problem_ids)
+                .values("user_id", "problem_id")
+                .annotate(attempts=Count("id"),
+                          accepted=Count("id", filter=Q(result=JudgeStatus.ACCEPTED))))
+        return {(row["user_id"], row["problem_id"]):
+                {"attempts": row["attempts"], "solved": row["accepted"] > 0}
+                for row in rows}
+
+
+_EMPTY_CELL = {"attempts": 0, "solved": False}
+
+
+def _progress_xlsx(data):
+    """진도표 내려받기.
+
+    csv 는 한글 인코딩 때문에 엑셀에서 깨지기 쉬워 xlsx 로 준다.
+    학생 계정 배부용 파일과 달리 개인정보(PIN)가 없어 메모리에서 바로 흘려보낸다.
+    """
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+    worksheet = workbook.add_worksheet()
+    worksheet.set_column("A:A", 8)
+    worksheet.write(0, 0, "번호")
+    for index, problem in enumerate(data["problems"]):
+        worksheet.write(0, 1 + index, f"{problem['_id']} {problem['title']}")
+    worksheet.write(0, 1 + len(data["problems"]), "해결")
+
+    for row, student in enumerate(data["students"], start=1):
+        worksheet.write_number(row, 0, student["number"])
+        for index, cell in enumerate(student["cells"]):
+            if cell["solved"]:
+                worksheet.write_string(row, 1 + index, "O")
+            elif cell["attempts"]:
+                worksheet.write_string(row, 1 + index, f"△({cell['attempts']})")
+            else:
+                worksheet.write_string(row, 1 + index, "")
+        worksheet.write_string(row, 1 + len(data["problems"]),
+                               f"{student['solved_count']}/{len(data['problems'])}")
+    workbook.close()
+
+    response = HttpResponse(output.getvalue())
+    filename = quote(f"{data['school_class']['name']} {data['problem_set']['title']}.xlsx")
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{filename}"
+    response["Content-Type"] = "application/xlsx"
+    return response

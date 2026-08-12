@@ -27,6 +27,12 @@
                 <template #inactive-action><span class="switch-label">전체</span></template>
               </el-switch>
             </li>
+            <li v-if="userStore.isTeacher && !contestID">
+              <el-switch v-model="formFilter.myStudents" @change="handleQueryChange">
+                <template #active-action><span class="switch-label">내 학생</span></template>
+                <template #inactive-action><span class="switch-label">전체</span></template>
+              </el-switch>
+            </li>
             <li>
               <el-input v-model="formFilter.username" placeholder="작성자 검색" @keyup.enter="handleQueryChange" />
             </li>
@@ -107,7 +113,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const formFilter = reactive({ myself: false, result: '', username: '' })
+const formFilter = reactive({ myself: false, myStudents: false, result: '', username: '' })
 const loadingTable = ref(false)
 const submissions = ref([])
 const total = ref(30)
@@ -146,6 +152,7 @@ function localtime (val) {
 function buildQuery () {
   return {
     myself: formFilter.myself === true ? '1' : '0',
+    my_students: formFilter.myStudents === true ? '1' : '0',
     result: formFilter.result,
     username: formFilter.username,
     page: page.value
@@ -157,6 +164,7 @@ function init () {
   const query = route.query
   problemID.value = query.problemID || ''
   formFilter.myself = query.myself === '1'
+  formFilter.myStudents = query.my_students === '1'
   formFilter.result = query.result || ''
   formFilter.username = query.username || ''
   page.value = parseInt(query.page) || 1

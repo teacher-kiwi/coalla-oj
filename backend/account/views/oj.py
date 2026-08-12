@@ -16,8 +16,8 @@ from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.captcha import Captcha
 from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
-from ..models import (display_name_prefetch, has_public_profile, User, UserProfile,
-                      AdminType)
+from ..models import (display_name_prefetch, has_public_profile, my_student_ids,
+                      User, UserProfile, AdminType)
 from ..serializers import (ApplyResetPasswordSerializer, ResetPasswordSerializer,
                            UserChangePasswordSerializer, UserLoginSerializer,
                            UsernameOrEmailCheckSerializer,
@@ -294,6 +294,11 @@ class UserRankAPI(APIView):
         profiles = UserProfile.objects.filter(user__admin_type=AdminType.REGULAR_USER, user__is_disabled=False) \
             .select_related("user") \
             .prefetch_related(display_name_prefetch("user"))
+        # 교사가 자기 학생들끼리의 순위를 볼 수 있게 한다. 학생은 같은 학교 학생끼리
+        # 서로 구분되지 않으므로(표시 이름이 학교명뿐) 공개 순위는 그대로 둔다.
+        if request.GET.get("my_students") == "1" and request.user.is_authenticated \
+                and request.user.is_teacher():
+            profiles = profiles.filter(user_id__in=my_student_ids(request.user))
         if rule_type == ContestRuleType.ACM:
             profiles = profiles.filter(submission_number__gt=0).order_by("-accepted_number", "submission_number")
         else:

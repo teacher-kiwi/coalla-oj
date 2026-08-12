@@ -327,6 +327,63 @@ class PublicDisplayNameTest(SchoolClassTestBase):
         self.assertSuccess(resp)
 
 
+class MyStudentsFilterTest(SchoolClassTestBase):
+    """교사의 "내 학생만 보기". 다른 교사의 학생은 걸러져야 한다."""
+    def setUp(self):
+        super().setUp()
+        class_id = self._create_class()
+        self._create_students(class_id, 1, 1)
+        self.student = ClassMembership.objects.get(number=1).student
+
+        # 다른 교사와 그 학생
+        self.client.logout()
+        self.other_teacher = self.create_teacher(username="박선생")
+        other_class = self._create_class(grade=5, class_no=1)
+        self._create_students(other_class, 1, 1)
+        self.other_student = ClassMembership.objects.get(
+            school_class_id=other_class, number=1).student
+
+        from problem.models import Problem
+        from submission.models import Submission
+        problem = Problem.objects.create(
+            _id="P1", title="t", description="d", input_description="i",
+            output_description="o", samples=[], test_case_id="x", test_case_score=[],
+            hint="", languages=["Python3"], template={}, time_limit=1000,
+            memory_limit=256, spj=False, rule_type="ACM", visible=True,
+            difficulty="Low", source="", created_by=self.teacher)
+        for user in (self.student, self.other_student):
+            Submission.objects.create(problem=problem, user=user, code="print(1)",
+                                      language="Python3", result=0)
+            user.userprofile.accepted_number = 1
+            user.userprofile.submission_number = 1
+            user.userprofile.save()
+
+    def _create_class(self, grade=3, class_no=2):
+        return super()._create_class(grade=grade, class_no=class_no).data["data"]["id"]
+
+    def test_submission_list_filter(self):
+        url = self.reverse("submission_list_api") + "?limit=10&my_students=1"
+        self.assertEqual(len(self.client.get(url).data["data"]["results"]), 1)
+
+        self.client.logout()
+        self.client.login(username="김선생", password="teacher")
+        self.assertEqual(len(self.client.get(url).data["data"]["results"]), 1)
+
+    def test_rank_filter(self):
+        url = self.reverse("user_rank_api") + "?offset=0&limit=10&my_students=1"
+        self.assertEqual(self.client.get(url).data["data"]["total"], 1)
+        # 필터를 빼면 둘 다 보인다
+        self.assertEqual(self.client.get(
+            self.reverse("user_rank_api") + "?offset=0&limit=10").data["data"]["total"], 2)
+
+    def test_non_teacher_flag_is_ignored(self):
+        """교사가 아닌 사용자가 넣으면 무시한다(전체 목록이 그대로 나온다)"""
+        self.client.logout()
+        self.create_user("개인학생", "pass123")
+        url = self.reverse("user_rank_api") + "?offset=0&limit=10&my_students=1"
+        self.assertEqual(self.client.get(url).data["data"]["total"], 2)
+
+
 class NeisSyncTest(APITestCase):
     """나이스 응답을 흉내 내어 적재 로직을 검증한다(실제 API 는 호출하지 않는다)."""
 

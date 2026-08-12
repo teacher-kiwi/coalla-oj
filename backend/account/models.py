@@ -242,6 +242,15 @@ def public_display_name(user):
     return user.username
 
 
+def my_student_ids(teacher):
+    """교사가 담당하는 학급에 속한 학생 id.
+
+    "내 학생만 보기" 필터와 교사 권한 검사가 같은 기준을 쓰도록 한 곳에 둔다.
+    """
+    return ClassMembership.objects.filter(school_class__teacher=teacher) \
+                                  .values_list("student_id", flat=True)
+
+
 def has_public_profile(user):
     """사용자 홈(공개 프로필)을 열 수 있는 계정인지.
 

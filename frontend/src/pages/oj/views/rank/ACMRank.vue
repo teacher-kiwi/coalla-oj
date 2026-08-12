@@ -2,12 +2,19 @@
   <el-row justify="space-around">
     <el-col :span="22">
       <Panel :padding="10">
-        <template #title>ACM 순위</template>
+        <template #title>문제 해결 순위</template>
+        <template #extra>
+          <!-- 공개 순위에서는 같은 학교 학생이 모두 "○○학교 학생"이라 구분되지 않는다.
+               교사에게만 자기 학생끼리의 순위를 볼 수단을 준다. -->
+          <el-switch v-if="userStore.isTeacher" v-model="myStudents" active-text="내 학생만"
+                     @change="onFilterChange" />
+        </template>
         <div class="echarts">
           <VChart ref="chart" :option="options" autoresize />
         </div>
       </Panel>
-      <el-table :data="dataRank" v-loading="loadingTable" size="large" stripe>
+      <el-table :data="dataRank" v-loading="loadingTable" size="large" stripe
+                :row-class-name="rowClassName">
         <el-table-column align="center" width="60">
           <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
         </el-table-column>
@@ -42,7 +49,10 @@ import api from '@oj/api'
 import Pagination from '@oj/components/Pagination.vue'
 import utils from '@/utils/utils'
 import { RULE_TYPE } from '@/utils/constants'
+import { useUserStore } from '@/store/user'
 const router = useRouter()
+const userStore = useUserStore()
+const myStudents = ref(false)
 
 const page = ref(1)
 const limit = ref(30)
@@ -86,7 +96,7 @@ function getACRate (ac, total) {
 function getRankData (p) {
   const offset = (p - 1) * limit.value
   loadingTable.value = true
-  api.getUserRank(offset, limit.value, RULE_TYPE.ACM).then(res => {
+  api.getUserRank(offset, limit.value, RULE_TYPE.ACM, myStudents.value).then(res => {
     loadingTable.value = false
     if (p === 1) changeCharts(res.data.data.results.slice(0, 10))
     total.value = res.data.data.total
@@ -107,6 +117,16 @@ function changeCharts (rankData) {
   options.value.series[0].data = acData
   options.value.series[1].data = totalData
   options.value = { ...options.value }
+}
+
+// 같은 학교 학생이 여럿이면 이름만으로는 자기 줄을 못 찾는다
+function rowClassName ({ row }) {
+  return row.user.id === userStore.user.id ? 'my-row' : ''
+}
+
+function onFilterChange () {
+  page.value = 1
+  getRankData(1)
 }
 
 function onPageChange (newPage) {
@@ -138,5 +158,9 @@ onMounted(() => {
   .truncate {
     display: inline-block;
     max-width: 200px;
+  }
+  :deep(.my-row) {
+    background-color: #fdf6ec;
+    font-weight: 600;
   }
 </style>

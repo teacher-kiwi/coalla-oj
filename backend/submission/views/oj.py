@@ -10,7 +10,7 @@ from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.captcha import Captcha
 from utils.throttling import TokenBucket
-from account.models import display_name_prefetch
+from account.models import display_name_prefetch, my_student_ids
 from ..models import Submission
 from ..serializers import (CreateSubmissionSerializer, SubmissionModelSerializer,
                            ShareSubmissionSerializer)
@@ -148,6 +148,10 @@ class SubmissionListAPI(APIView):
             submissions = submissions.filter(problem=problem)
         if (myself and myself == "1") or not SysOptions.submission_list_show_all:
             submissions = submissions.filter(user_id=request.user.id)
+        elif request.GET.get("my_students") == "1" and request.user.is_authenticated \
+                and request.user.is_teacher():
+            # 교사에게만 의미가 있다. 다른 사용자가 넣어도 조용히 무시한다.
+            submissions = submissions.filter(user_id__in=my_student_ids(request.user))
         elif username:
             submissions = submissions.filter(user__username__icontains=username)
         if result:

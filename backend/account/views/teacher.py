@@ -13,6 +13,8 @@ from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
 
 from options.options import SysOptions
+from submission.models import Submission
+from submission.serializers import TeacherStudentSubmissionSerializer
 from utils.api import APIView, validate_serializer
 from utils.shortcuts import rand_str
 from ..decorators import teacher_required
@@ -226,6 +228,32 @@ class StudentAPI(APIView):
             return self.error("학생이 존재하지 않습니다")
         membership.student.delete()   # 소속과 제출 기록도 함께 삭제된다
         return self.success()
+
+
+class StudentSubmissionAPI(APIView):
+    """담당 학생 한 명의 제출 이력.
+
+    코드 열람은 기존 제출 상세 API(`/api/submission?id=`)로 한다.
+    `Submission.check_user_permission` 이 담당 교사를 통과시킨다.
+    """
+    @teacher_required
+    def get(self, request):
+        membership_id = request.GET.get("membership")
+        if not membership_id or not membership_id.isdigit():
+            return self.error("잘못된 요청입니다. membership이 필요합니다")
+        membership = ClassMembership.objects.select_related("school_class").filter(
+            id=int(membership_id)).first()
+        if not membership or not owned_class(request.user, membership.school_class_id):
+            return self.error("학생이 존재하지 않습니다")
+
+        submissions = Submission.objects.filter(user_id=membership.student_id,
+                                                contest_id__isnull=True) \
+                                        .select_related("problem")
+        problem_id = request.GET.get("problem_id")
+        if problem_id and problem_id.isdigit():
+            submissions = submissions.filter(problem_id=int(problem_id))
+        return self.success(self.paginate_data(request, submissions,
+                                               TeacherStudentSubmissionSerializer))
 
 
 def _write_student_xlsx(school_class, created):

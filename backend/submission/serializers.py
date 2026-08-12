@@ -76,3 +76,21 @@ class SubmissionListSerializer(serializers.ModelSerializer):
         if self.user is None or not self.user.is_authenticated:
             return False
         return obj.check_user_permission(self.user)
+
+
+class TeacherStudentSubmissionSerializer(serializers.ModelSerializer):
+    """교사가 담당 학생 한 명의 제출 이력을 볼 때 쓴다.
+
+    표시 이름이 필요 없다(누구인지 이미 알고 연 화면이다). 코드는 목록에 싣지 않고
+    기존 제출 상세 API 로 연다.
+    """
+    problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
+    problem_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Submission
+        fields = ("id", "problem", "problem_title", "result", "language",
+                  "create_time", "statistic_info")
+
+    def get_problem_title(self, obj):
+        return obj.problem.title

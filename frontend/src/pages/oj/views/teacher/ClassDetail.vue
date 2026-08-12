@@ -23,8 +23,9 @@
       <el-table-column label="마지막 로그인">
         <template #default="{ row }">{{ row.last_login ? localtime(row.last_login) : '접속 기록 없음' }}</template>
       </el-table-column>
-      <el-table-column label="관리" width="240">
+      <el-table-column label="관리" width="330">
         <template #default="{ row }">
+          <el-button size="small" type="primary" @click="goSubmissions(row)">제출 기록</el-button>
           <el-button size="small" @click="resetPassword(row)">비밀번호 초기화</el-button>
           <el-button size="small" type="danger" @click="removeStudent(row)">삭제</el-button>
         </template>
@@ -81,6 +82,11 @@ const form = reactive({ number_from: 1, number_to: 20 })
 
 function goList () {
   router.push({ name: 'teacher-class-list' })
+}
+
+function goSubmissions (row) {
+  router.push({ name: 'teacher-student-detail', params: { membershipId: row.id },
+                query: { number: row.number } })
 }
 
 function localtime (val) {

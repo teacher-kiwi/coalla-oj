@@ -31,20 +31,18 @@
         </template>
         <el-menu-item index="/teacher/class">내 학급</el-menu-item>
         <el-menu-item index="/teacher/problem-set">문제집</el-menu-item>
+        <el-menu-item index="/teacher/progress">학습 현황</el-menu-item>
       </el-sub-menu>
       <!-- 수업용 학생만 보인다. 개인 학생(구글 가입)은 배포받을 학급이 없다. -->
       <el-menu-item v-if="isStudent" index="/problem-set">
         <el-icon><Notebook /></el-icon>
         문제집
       </el-menu-item>
-      <el-sub-menu index="rank">
-        <template #title>
-          <el-icon><Medal /></el-icon>
-          순위
-        </template>
-        <el-menu-item index="/acm-rank">ACM 순위</el-menu-item>
-        <el-menu-item index="/oi-rank">OI 순위</el-menu-item>
-      </el-sub-menu>
+      <!-- OI 순위(/oi-rank)는 대회를 쓰기 시작하면 되살릴 수 있게 라우트만 남기고 메뉴에서 내렸다 -->
+      <el-menu-item index="/acm-rank">
+        <el-icon><Medal /></el-icon>
+        순위
+      </el-menu-item>
       <el-sub-menu index="about">
         <template #title>
           <el-icon><InfoFilled /></el-icon>

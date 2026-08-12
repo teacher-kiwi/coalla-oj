@@ -29,6 +29,8 @@ const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.v
 const TeacherClassList = () => import('@oj/views/teacher/ClassList.vue')
 const TeacherClassDetail = () => import('@oj/views/teacher/ClassDetail.vue')
 const TeacherProblemSetList = () => import('@oj/views/teacher/ProblemSetList.vue')
+const TeacherProgressBoard = () => import('@oj/views/teacher/ProgressBoard.vue')
+const TeacherStudentDetail = () => import('@oj/views/teacher/StudentDetail.vue')
 const TeacherProblemSetDetail = () => import('@oj/views/teacher/ProblemSetDetail.vue')
 const ProblemSetList = () => import('@oj/views/problem/ProblemSetList.vue')
 const ProblemSetDetail = () => import('@oj/views/problem/ProblemSetDetail.vue')
@@ -131,7 +133,7 @@ export default [
   {
     name: 'acm-rank',
     path: '/acm-rank',
-    meta: { title: 'ACM 순위' },
+    meta: { title: '문제 해결 순위' },
     component: ACMRank
   },
   {
@@ -215,6 +217,18 @@ export default [
     name: 'teacher-problem-set-detail',
     meta: { requiresAuth: true, title: '문제집' },
     component: TeacherProblemSetDetail
+  },
+  {
+    path: '/teacher/progress',
+    name: 'teacher-progress',
+    meta: { requiresAuth: true, title: '학습 현황' },
+    component: TeacherProgressBoard
+  },
+  {
+    path: '/teacher/student/:membershipId',
+    name: 'teacher-student-detail',
+    meta: { requiresAuth: true, title: '학생 제출 기록' },
+    component: TeacherStudentDetail
   },
   {
     path: '/problem-set',

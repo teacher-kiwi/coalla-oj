@@ -9,6 +9,7 @@ from django.utils.timezone import now
 
 from account.models import ClassMembership, School
 from contest.models import Contest, ContestRuleType
+from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 
 from .models import Problem, ProblemSetAssignment, ProblemSetItem
@@ -277,3 +278,94 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         resp = self.client.get(self.detail_url + f"?id={self.set_id}")
         self.assertSuccess(resp)
         self.assertIsNone(resp.data["data"]["due_at"])
+
+
+class ProblemSetProgressTest(ProblemSetTestBase):
+    """진도표. 교사는 자기 학급 × 자기 문제집만 볼 수 있다."""
+    def setUp(self):
+        super().setUp()
+        self.set_id = self._create_set()
+        self._add_problems(self.set_id, [self.problem.id, self.problem2.id])
+        self.class_id = self._create_class()
+        self._create_students(self.class_id, 1, 2)
+        self._assign(self.set_id, self.class_id)
+        self.students = {m.number: m for m in ClassMembership.objects.filter(
+            school_class_id=self.class_id)}
+        self.progress_url = self.reverse("teacher_problem_set_progress_api")
+
+    def _url(self, extra=""):
+        return f"{self.progress_url}?problem_set={self.set_id}&class_id={self.class_id}{extra}"
+
+    def _submit(self, number, problem, result):
+        return Submission.objects.create(problem=problem, user=self.students[number].student,
+                                         code="print(1)", language="Python3", result=result)
+
+    def test_counts_attempts_and_solves(self):
+        self._submit(1, self.problem, JudgeStatus.ACCEPTED)
+        self._submit(1, self.problem2, JudgeStatus.WRONG_ANSWER)
+        self._submit(1, self.problem2, JudgeStatus.WRONG_ANSWER)
+
+        resp = self.client.get(self._url())
+        self.assertSuccess(resp)
+        data = resp.data["data"]
+        self.assertEqual([p["_id"] for p in data["problems"]], ["P1", "P2"])
+
+        first, second = data["students"]
+        self.assertEqual(first["number"], 1)
+        self.assertEqual(first["solved_count"], 1)
+        self.assertEqual(first["cells"][0], {"attempts": 1, "solved": True})
+        # 못 풀었어도 붙들고 있는 문제가 드러나야 한다
+        self.assertEqual(first["cells"][1], {"attempts": 2, "solved": False})
+        self.assertEqual(second["cells"][0], {"attempts": 0, "solved": False})
+        self.assertEqual(data["totals"], [{"solved": 1, "tried": 1}, {"solved": 0, "tried": 1}])
+
+    def test_download(self):
+        resp = self.client.get(self._url("&download=1"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/xlsx")
+
+    def test_other_teacher_denied(self):
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        self.assertFailed(self.client.get(self._url()))
+
+    def test_class_and_set_must_both_be_mine(self):
+        """내 문제집이어도 남의 학급 진도는 볼 수 없다"""
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        other_set = self._create_set("남의 반 훔쳐보기")
+        self.assertFailed(self.client.get(
+            f"{self.progress_url}?problem_set={other_set}&class_id={self.class_id}"))
+
+
+class TeacherStudentSubmissionTest(ProblemSetTestBase):
+    """교사는 담당 학생의 제출 이력과 코드를 볼 수 있다."""
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class()
+        self._create_students(self.class_id, 1, 1)
+        self.membership = ClassMembership.objects.get(school_class_id=self.class_id, number=1)
+        self.submission = Submission.objects.create(
+            problem=self.problem, user=self.membership.student,
+            code="print('비밀')", language="Python3", result=JudgeStatus.ACCEPTED)
+        self.url = self.reverse("teacher_student_submission_api")
+
+    def test_list(self):
+        resp = self.client.get(self.url + f"?membership={self.membership.id}&limit=10")
+        self.assertSuccess(resp)
+        results = resp.data["data"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["problem"], "P1")
+        self.assertNotIn("code", results[0])   # 목록에는 코드를 싣지 않는다
+
+    def test_can_read_code(self):
+        resp = self.client.get(self.reverse("submission_api") + f"?id={self.submission.id}")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["code"], "print('비밀')")
+
+    def test_other_teacher_cannot_list_or_read(self):
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        self.assertFailed(self.client.get(self.url + f"?membership={self.membership.id}&limit=10"))
+        self.assertFailed(self.client.get(
+            self.reverse("submission_api") + f"?id={self.submission.id}"))
