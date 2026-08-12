@@ -10,6 +10,8 @@ backend/static/
 backend/media/
 backend/dist/
 backend/.env
+# docker compose 가 읽는 환경변수 파일 (실제 비밀값)
+.env
 data/
 data/*
 

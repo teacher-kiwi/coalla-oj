@@ -4,24 +4,23 @@ services:
     container_name: redis
     restart: unless-stopped
     volumes:
-      - ./data/redis:/data
+      - ${DATA_DIR:-./data}/redis:/data
 
   postgres:
     image: postgres:16-alpine
     container_name: postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=onlinejudge
-      - POSTGRES_USER=onlinejudge
-      - POSTGRES_PASSWORD=onlinejudge
+      - POSTGRES_DB=${POSTGRES_DB:-onlinejudge}
+      - POSTGRES_USER=${POSTGRES_USER:-onlinejudge}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 를 .env 에 설정하세요}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
 
   judge:
     build:
       context: ./judge
       dockerfile: Dockerfile
-    image: kimoo1/oj-judge:v1
     container_name: judge
     restart: unless-stopped
     read_only: true
@@ -35,19 +34,18 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - ./data/backend/test_case:/test_case:ro
-      - ./data/judge_server/log:/log
-      - ./data/judge_server/run:/judger
+      - ${DATA_DIR:-./data}/backend/test_case:/test_case:ro
+      - ${DATA_DIR:-./data}/judge_server/log:/log
+      - ${DATA_DIR:-./data}/judge_server/run:/judger
     environment:
       - SERVICE_URL=http://judge:8080
       - BACKEND_URL=http://backend:8000/api/judge_server_heartbeat/
-      - TOKEN=CHANGE_THIS
+      - TOKEN=${JUDGE_SERVER_TOKEN:?JUDGE_SERVER_TOKEN 을 .env 에 설정하세요}
 
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: kimoo1/oj-backend:v1
     container_name: backend
     restart: unless-stopped
     depends_on:
@@ -55,18 +53,18 @@ services:
       - postgres
       - judge
     volumes:
-      - ./data/backend:/data
+      - ${DATA_DIR:-./data}/backend:/data
       - ./backend:/app
     environment:
-      - POSTGRES_DB=onlinejudge
-      - POSTGRES_USER=onlinejudge
-      - POSTGRES_PASSWORD=onlinejudge
-      - JUDGE_SERVER_TOKEN=CHANGE_THIS
-      # 최초 기동 시 root 계정 비밀번호. 반드시 변경할 것
-      - ADMIN_PASSWORD=CHANGE_THIS_TOO
+      - POSTGRES_DB=${POSTGRES_DB:-onlinejudge}
+      - POSTGRES_USER=${POSTGRES_USER:-onlinejudge}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 를 .env 에 설정하세요}
+      - JUDGE_SERVER_TOKEN=${JUDGE_SERVER_TOKEN:?JUDGE_SERVER_TOKEN 을 .env 에 설정하세요}
+      # 최초 기동 시 root 계정 비밀번호
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD 를 .env 에 설정하세요}
       - OJ_ENV=dev
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
 
   frontend-dev:
     build:
@@ -76,10 +74,11 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:8080"
+      - "${FRONTEND_DEV_PORT:-8080}:8080"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - TARGET=http://backend:8000
+      - VITE_VERSION=${VITE_VERSION:-coalla-oj-dev}
     command: sh -c "npm run dev -- --host 0.0.0.0 --port 8080"

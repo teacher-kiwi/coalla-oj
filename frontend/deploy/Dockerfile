@@ -4,6 +4,11 @@ RUN apk add --no-cache git
 COPY package*.json ./
 RUN npm install
 COPY . .
+
+# 루트 .env 의 값을 compose 가 빌드 인자로 넘겨준다.
+# vite 는 VITE_ 접두사가 붙은 환경변수를 번들에 포함시킨다.
+ARG VITE_VERSION=""
+ENV VITE_VERSION=$VITE_VERSION
 RUN npm run build
 
 FROM nginx:stable-alpine
