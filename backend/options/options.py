@@ -106,6 +106,8 @@ class OptionKeys:
     # 교육용: 구글 로그인 클라이언트 ID, 교사 1인당 학생 계정 상한
     google_client_id = "google_client_id"
     max_students_per_teacher = "max_students_per_teacher"
+    neis_api_key = "neis_api_key"
+    school_sync_status = "school_sync_status"
 
 
 class OptionDefaultValue:
@@ -122,6 +124,8 @@ class OptionDefaultValue:
     languages = languages
     google_client_id = ""
     max_students_per_teacher = 500
+    neis_api_key = ""
+    school_sync_status = {}
 
 
 class _SysOptionsMeta(type):
@@ -293,6 +297,22 @@ class _SysOptionsMeta(type):
     @max_students_per_teacher.setter
     def max_students_per_teacher(cls, value):
         cls._set_option(OptionKeys.max_students_per_teacher, value)
+
+    @my_property(ttl=DEFAULT_SHORT_TTL)
+    def neis_api_key(cls):
+        return cls._get_option(OptionKeys.neis_api_key)
+
+    @neis_api_key.setter
+    def neis_api_key(cls, value):
+        cls._set_option(OptionKeys.neis_api_key, value)
+
+    @my_property
+    def school_sync_status(cls):
+        return cls._get_option(OptionKeys.school_sync_status)
+
+    @school_sync_status.setter
+    def school_sync_status(cls, value):
+        cls._set_option(OptionKeys.school_sync_status, value)
 
     def reset_languages(cls):
         cls.languages = languages

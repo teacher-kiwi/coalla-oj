@@ -13,8 +13,9 @@ from options.options import SysOptions
 from utils.api import APIView, validate_serializer
 from utils.shortcuts import rand_str
 from ..decorators import login_required, super_admin_required
-from ..models import (AdminType, ProblemPermission, TeacherApplication,
-                      TeacherApplicationStatus, User, UserProfile)
+from ..models import (AdminType, ProblemPermission, STUDENT_USERNAME_RE,
+                      TeacherApplication, TeacherApplicationStatus, User,
+                      UserProfile)
 from ..serializers import (GoogleLoginSerializer, ReviewTeacherApplicationSerializer,
                            TeacherApplicationSerializer)
 
@@ -29,6 +30,9 @@ def validate_nickname(nickname):
     nickname = (nickname or "").strip()
     if not NICKNAME_RE.match(nickname):
         return None, "닉네임은 2~20자의 한글·영문·숫자로 입력해주세요"
+    if STUDENT_USERNAME_RE.match(nickname):
+        # 학생 계정 아이디 형태(c12-01)를 선점하면 이후 학생 계정과 충돌한다
+        return None, "사용할 수 없는 닉네임입니다"
     if User.objects.filter(username__iexact=nickname).exists():
         return None, "이미 사용 중인 닉네임입니다"
     return nickname, None
@@ -173,3 +177,27 @@ class TeacherApplicationAdminAPI(APIView):
             user.save(update_fields=["admin_type", "problem_permission"])
 
         return self.success(TeacherApplicationSerializer(application).data)
+
+
+class SchoolSyncAPI(APIView):
+    """나이스에서 학교 목록을 적재한다. 최고관리자 전용."""
+    @super_admin_required
+    def get(self, request):
+        from ..models import School
+        status = dict(SysOptions.school_sync_status or {})
+        status["school_count"] = School.objects.count()
+        status["api_key_set"] = bool(SysOptions.neis_api_key)
+        return self.success(status)
+
+    @super_admin_required
+    def post(self, request):
+        from ..tasks import sync_schools_async
+        if not SysOptions.neis_api_key:
+            return self.error("먼저 나이스 API 키를 저장하세요")
+        from ..neis import is_running, set_status
+        if is_running():
+            return self.error("이미 적재가 진행 중입니다")
+
+        set_status(state="running", processed=0, total=0, message="", finished_at=None)
+        sync_schools_async.send()
+        return self.success({"state": "running"})

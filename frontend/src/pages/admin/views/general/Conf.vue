@@ -54,6 +54,25 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
+            <el-form-item label="나이스 학교정보 API 키">
+              <el-input v-model="websiteConfig.neis_api_key" type="password" show-password
+                        :placeholder="websiteConfig.neis_api_key_set ? '설정되어 있습니다 (바꿀 때만 입력)' : '나이스 오픈API 인증키'" />
+              <div class="field-help">
+                open.neis.go.kr 에서 발급합니다. 학생이 로그인할 때 학교를 고를 수 있도록
+                전국 학교 목록을 내려받는 데 씁니다. 보안을 위해 저장된 키는 화면에 표시하지 않습니다.
+              </div>
+              <div class="sync-box">
+                <el-button type="primary" size="small" :loading="syncing"
+                           :disabled="!websiteConfig.neis_api_key_set || sync.state === 'running'"
+                           @click="startSync">학교 정보 불러오기</el-button>
+                <span class="sync-status">{{ syncText }}</span>
+                <span v-if="!websiteConfig.neis_api_key_set" class="sync-status">
+                  — 키를 입력하고 아래 <b>저장</b>을 먼저 눌러주세요
+                </span>
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
             <el-form-item label="구글 로그인 클라이언트 ID">
               <el-input v-model="websiteConfig.google_client_id"
                         placeholder="000000000000-xxxxxxxx.apps.googleusercontent.com" />
@@ -72,8 +91,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessageBox, ElNotification } from 'element-plus'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import api from '../../api.js'
 
 const isInit = ref(false)
@@ -81,6 +100,43 @@ const saved = ref(false)
 const loadingBtnTest = ref(false)
 const smtp = reactive({ server: 'smtp.example.com', port: 25, password: '', email: 'email@example.com', tls: true })
 const websiteConfig = ref({})
+const sync = ref({})
+const syncing = ref(false)
+let syncTimer = null
+
+const syncText = computed(() => {
+  const st = sync.value
+  if (st.state === 'running') {
+    return st.total ? `불러오는 중… ${st.processed}/${st.total}` : '불러오는 중…'
+  }
+  if (st.state === 'failed') return `실패: ${st.message || '알 수 없는 오류'}`
+  if (st.state === 'done') return `완료 · 현재 ${st.school_count ?? 0}개 학교 등록됨`
+  return st.school_count ? `현재 ${st.school_count}개 학교 등록됨` : '아직 불러오지 않았습니다'
+})
+
+function loadSyncStatus () {
+  return api.getSchoolSyncStatus().then(res => {
+    sync.value = res.data.data
+    websiteConfig.value.neis_api_key_set = res.data.data.api_key_set
+    // 진행 중이면 주기적으로 다시 확인한다
+    clearTimeout(syncTimer)
+    if (sync.value.state === 'running') {
+      syncTimer = setTimeout(loadSyncStatus, 3000)
+    } else {
+      syncing.value = false
+    }
+  }, () => {})
+}
+
+function startSync () {
+  syncing.value = true
+  api.startSchoolSync().then(() => {
+    ElMessage.success('학교 정보를 불러오는 중입니다. 몇 분 걸릴 수 있습니다')
+    loadSyncStatus()
+  }, () => {
+    syncing.value = false
+  })
+}
 
 onMounted(() => {
   api.getSMTPConfig().then(res => {
@@ -93,8 +149,13 @@ onMounted(() => {
   })
   api.getWebsiteConfig().then(res => {
     websiteConfig.value = res.data.data
+    // 저장된 키는 화면에 내려주지 않으므로 입력란은 항상 비워둔다
+    websiteConfig.value.neis_api_key = ''
+    loadSyncStatus()
   }).catch(() => {})
 })
+
+onBeforeUnmount(() => clearTimeout(syncTimer))
 
 function saveSMTPConfig () {
   if (!isInit.value) {
@@ -115,11 +176,30 @@ function testSMTPConfig () {
 }
 
 function saveWebsiteConfig () {
-  api.editWebsiteConfig(websiteConfig.value).then(() => {}).catch(() => {})
+  // 서버가 모르는 표시용 필드는 빼고 보낸다
+  const { neis_api_key_set: _ignored, ...payload } = websiteConfig.value
+  api.editWebsiteConfig(payload).then(() => {
+    // 나이스 키를 방금 저장했다면 입력란을 비우고 설정 여부를 다시 읽는다
+    // (그래야 "학교 정보 불러오기" 버튼이 새로고침 없이 활성화된다)
+    websiteConfig.value.neis_api_key = ''
+    loadSyncStatus()
+  }).catch(() => {})
 }
 </script>
 
 <style scoped>
+.sync-box {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-status {
+  font-size: 12px;
+  color: #606266;
+}
+
 .field-help {
   font-size: 12px;
   color: #909399;

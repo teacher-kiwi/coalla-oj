@@ -78,18 +78,10 @@ class SchoolClassAPI(APIView):
         except School.DoesNotExist:
             return self.error("학교가 존재하지 않습니다")
 
-        prefix = data["username_prefix"]
-        # 접두사는 학생 아이디의 앞부분이 된다. 전역 유일해야 하므로 미리 검사한다.
-        # (bulk_create 로 만들다 하나만 충돌해도 전체가 실패하기 때문)
-        if SchoolClass.objects.filter(username_prefix=prefix).exists():
-            return self.error("이미 사용 중인 접두사입니다")
-        if User.objects.filter(username__istartswith=f"{prefix}-").exists():
-            return self.error("이미 사용 중인 접두사입니다")
-
         try:
             school_class = SchoolClass.objects.create(
                 school=school, teacher=request.user, year=data["year"],
-                grade=data["grade"], class_no=data["class_no"], username_prefix=prefix)
+                grade=data["grade"], class_no=data["class_no"])
         except IntegrityError:
             return self.error("같은 학급이 이미 등록되어 있습니다")
         return self.success(SchoolClassSerializer(school_class).data)
@@ -187,7 +179,7 @@ class StudentAPI(APIView):
             for number in numbers:
                 pin = generate_pin()
                 student = User.objects.create(
-                    username=f"{school_class.username_prefix}-{number:02d}",
+                    username=school_class.student_username(number),
                     admin_type=AdminType.REGULAR_USER,
                     created_by=school_class.teacher,
                     password=make_password(pin))

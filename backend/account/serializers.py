@@ -175,7 +175,7 @@ class SchoolClassSerializer(serializers.ModelSerializer):
     class Meta:
         model = SchoolClass
         fields = ["id", "school", "school_name", "teacher_name", "year", "grade",
-                  "class_no", "display_name", "username_prefix", "student_count",
+                  "class_no", "display_name", "student_count",
                   "is_archived", "created_at"]
 
     def get_student_count(self, obj):
@@ -187,8 +187,6 @@ class CreateSchoolClassSerializer(serializers.Serializer):
     year = serializers.IntegerField(min_value=2000, max_value=2100)
     grade = serializers.IntegerField(min_value=1, max_value=6)
     class_no = serializers.IntegerField(min_value=1, max_value=99)
-    # 학생 계정 아이디 접두사. 전역 유일해야 한다.
-    username_prefix = serializers.RegexField(r"^[a-z][a-z0-9-]{2,19}$")
 
 
 class EditSchoolClassSerializer(serializers.Serializer):

@@ -56,6 +56,12 @@ export default {
   reviewTeacherApplication (data) {
     return ajax('admin/teacher_application', 'put', { data })
   },
+  getSchoolSyncStatus () {
+    return ajax('admin/school_sync', 'get')
+  },
+  startSchoolSync () {
+    return ajax('admin/school_sync', 'post')
+  },
   getLanguages () {
     return ajax('languages', 'get')
   },

@@ -538,6 +538,13 @@ class GoogleLoginAPITest(APITestCase):
         resp = self.client.post(self.url, data={"credential": "x", "nickname": "코딩선생"})
         self.assertFailed(resp, "이미 사용 중인 닉네임입니다")
 
+    def test_student_username_pattern_reserved(self, verify):
+        """학생 계정 아이디 형태(c12-01)는 닉네임으로 선점할 수 없다"""
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        resp = self.client.post(self.url, data={"credential": "x", "nickname": "c12-01"})
+        self.assertFailed(resp, "사용할 수 없는 닉네임입니다")
+
     def test_invalid_nickname_rejected(self, verify):
         verify.return_value = self._claims()
         self.client.post(self.url, data={"credential": "x"})

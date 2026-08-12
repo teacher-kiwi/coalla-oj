@@ -1,12 +1,20 @@
+from unittest import mock
+
 from django.contrib import auth
 
 from options.options import SysOptions
 from utils.api.tests import APITestCase
-from .login_throttle import MAX_FAILURES
+from .login_throttle import MAX_FAILURES, clear_login_failures
 from .models import ClassMembership, School, SchoolClass, User
 
 
 class SchoolClassTestBase(APITestCase):
+    def _clear_throttle(self, class_id, upto=100):
+        """로그인 실패 카운터는 Redis 에 있어 테스트 롤백으로 지워지지 않는다.
+        테스트 간 상태가 새지 않도록 명시적으로 비운다."""
+        for number in range(1, upto + 1):
+            clear_login_failures(class_id, number)
+
     def setUp(self):
         self.school = School.objects.create(code="S001", name="코알라초등학교",
                                             kind="초등학교", office="전라남도교육청")
@@ -14,10 +22,13 @@ class SchoolClassTestBase(APITestCase):
         self.class_url = self.reverse("teacher_class_api")
         self.student_url = self.reverse("teacher_student_api")
 
-    def _create_class(self, prefix="kim3", grade=3, class_no=2):
-        return self.client.post(self.class_url, data={
+    def _create_class(self, grade=3, class_no=2):
+        resp = self.client.post(self.class_url, data={
             "school": self.school.id, "year": 2026, "grade": grade,
-            "class_no": class_no, "username_prefix": prefix})
+            "class_no": class_no})
+        if resp.data.get("error") is None:
+            self._clear_throttle(resp.data["data"]["id"])
+        return resp
 
     def _create_students(self, class_id, a=1, b=3):
         return self.client.post(self.student_url, data={
@@ -36,19 +47,16 @@ class SchoolClassAPITest(SchoolClassTestBase):
         self.assertEqual(resp.data["data"]["display_name"], "2026학년도 3학년 2반")
         self.assertEqual(resp.data["data"]["school_name"], "코알라초등학교")
 
-    def test_duplicate_prefix_rejected(self):
-        self._create_class(prefix="kim3")
-        resp = self._create_class(prefix="kim3", class_no=3)
-        self.assertFailed(resp, "이미 사용 중인 접두사입니다")
+    def test_username_is_generated(self):
+        """아이디는 교사가 정하지 않고 학급 id 로 자동 생성된다"""
+        class_id = self._create_class().data["data"]["id"]
+        self._create_students(class_id, 1, 1)
+        self.assertTrue(User.objects.filter(username=f"c{class_id}-01").exists())
 
     def test_duplicate_class_rejected(self):
-        self._create_class(prefix="kim3")
-        resp = self._create_class(prefix="kim4")
+        self._create_class()
+        resp = self._create_class()
         self.assertFailed(resp, "같은 학급이 이미 등록되어 있습니다")
-
-    def test_invalid_prefix_rejected(self):
-        self.assertFailed(self._create_class(prefix="AB"))       # 대문자·너무 짧음
-        self.assertFailed(self._create_class(prefix="한글반"))    # 한글 불가
 
     def test_other_teacher_cannot_see_or_edit(self):
         class_id = self._create_class().data["data"]["id"]
@@ -84,7 +92,7 @@ class StudentAccountAPITest(SchoolClassTestBase):
 
         self.assertEqual(ClassMembership.objects.count(), 3)
         student = ClassMembership.objects.get(number=1).student
-        self.assertEqual(student.username, "kim3-01")
+        self.assertEqual(student.username, f"c{self.class_id}-01")
         self.assertEqual(student.created_by, self.teacher)
 
     def test_duplicate_number_rejected(self):
@@ -111,7 +119,7 @@ class StudentAccountAPITest(SchoolClassTestBase):
         self.assertSuccess(resp)
         pin = resp.data["data"]["password"]
         self.assertRegex(pin, r"^\d{4}$")
-        self.assertIsNotNone(auth.authenticate(username="kim3-01", password=pin))
+        self.assertIsNotNone(auth.authenticate(username=f"c{self.class_id}-01", password=pin))
 
     def test_other_teacher_cannot_reset(self):
         self._create_students(self.class_id, 1, 1)
@@ -225,7 +233,7 @@ class StudentChangePasswordTest(SchoolClassTestBase):
         resp = self.client.post(self.url, data={"old_password": self.pin,
                                                 "new_password": new_pin})
         self.assertSuccess(resp)
-        self.assertIsNotNone(auth.authenticate(username="kim3-01", password=new_pin))
+        self.assertIsNotNone(auth.authenticate(username=f"c{self.class_id}-01", password=new_pin))
 
     def test_wrong_old_password(self):
         wrong = "0000" if self.pin != "0000" else "1111"
@@ -255,7 +263,7 @@ class PublicDisplayNameTest(SchoolClassTestBase):
     def test_student_shows_school_only(self):
         from .models import public_display_name
         self.assertEqual(public_display_name(self.student), "코알라초등학교 학생")
-        self.assertNotIn("kim3", public_display_name(self.student))
+        self.assertNotIn(self.student.username, public_display_name(self.student))
 
     def test_google_user_shows_nickname(self):
         from .models import public_display_name
@@ -280,11 +288,133 @@ class PublicDisplayNameTest(SchoolClassTestBase):
         self.assertSuccess(resp)
         names = [r["username"] for r in resp.data["data"]["results"]]
         self.assertIn("코알라초등학교 학생", names)
-        self.assertNotIn("kim3-01", names)
+        self.assertNotIn(self.student.username, names)
 
     def test_rank_api_hides_internal_username(self):
         self.client.logout()
         resp = self.client.get(self.reverse("user_rank_api") + "?offset=0&limit=10")
         self.assertSuccess(resp)
         for row in resp.data["data"]["results"]:
-            self.assertNotIn("kim3", row["user"]["username"])
+            self.assertNotIn(self.student.username, row["user"]["username"])
+
+
+class NeisSyncTest(APITestCase):
+    """나이스 응답을 흉내 내어 적재 로직을 검증한다(실제 API 는 호출하지 않는다)."""
+
+    def _body(self, rows, total=None):
+        return {
+            "schoolInfo": [
+                {"head": [{"list_total_count": total if total is not None else len(rows)},
+                          {"RESULT": {"CODE": "INFO-000", "MESSAGE": "정상 처리되었습니다."}}]},
+                {"row": rows},
+            ]
+        }
+
+    def _row(self, code, name, kind="초등학교"):
+        return {"SD_SCHUL_CODE": code, "SCHUL_NM": name, "SCHUL_KND_SC_NM": kind,
+                "ATPT_OFCDC_SC_NM": "전라남도교육청", "ORG_RDNMA": "전남 어딘가"}
+
+    @mock.patch("account.neis.requests.get")
+    def test_sync_saves_schools(self, get):
+        from .neis import sync_schools
+        get.return_value = mock.Mock(status_code=200,
+                                     json=lambda: self._body([self._row("A1", "가초등학교"),
+                                                              self._row("A2", "나중학교", "중학교")]))
+        saved = sync_schools("dummy-key")
+        self.assertEqual(saved, 2)
+        self.assertEqual(School.objects.count(), 2)
+        self.assertEqual(School.objects.get(code="A1").name, "가초등학교")
+
+    @mock.patch("account.neis.requests.get")
+    def test_sync_is_idempotent_and_updates(self, get):
+        from .neis import sync_schools
+        get.return_value = mock.Mock(status_code=200,
+                                     json=lambda: self._body([self._row("A1", "옛이름")]))
+        sync_schools("dummy-key")
+        get.return_value = mock.Mock(status_code=200,
+                                     json=lambda: self._body([self._row("A1", "새이름")]))
+        sync_schools("dummy-key")
+        self.assertEqual(School.objects.count(), 1)
+        self.assertEqual(School.objects.get(code="A1").name, "새이름")
+
+    @mock.patch("account.neis.requests.get")
+    def test_skips_unwanted_kinds(self, get):
+        from .neis import sync_schools
+        get.return_value = mock.Mock(status_code=200,
+                                     json=lambda: self._body([self._row("A1", "가유치원", "유치원")]))
+        self.assertEqual(sync_schools("dummy-key"), 0)
+        self.assertEqual(School.objects.count(), 0)
+
+    @mock.patch("account.neis.requests.get")
+    def test_skips_blank_school_code(self, get):
+        """개교 예정 "(가칭)" 학교는 학교코드가 공백으로 온다.
+
+        걸러내지 않으면 한 배치에 빈 코드가 여러 개 들어가
+        ON CONFLICT 가 같은 행을 두 번 갱신하려다 실패한다.
+        """
+        from .neis import sync_schools
+        rows = [self._row("   ", "(가칭)에코1초등학교"),
+                self._row("", "(가칭)에코3중학교", "중학교"),
+                self._row("A1", "진짜초등학교")]
+        get.return_value = mock.Mock(status_code=200, json=lambda: self._body(rows))
+        self.assertEqual(sync_schools("dummy-key"), 1)
+        self.assertEqual(School.objects.count(), 1)
+        self.assertEqual(School.objects.get().code, "A1")
+
+    @mock.patch("account.neis.requests.get")
+    def test_deduplicates_within_page(self, get):
+        """같은 페이지에 같은 코드가 두 번 와도 실패하지 않는다"""
+        from .neis import sync_schools
+        rows = [self._row("A1", "먼저"), self._row("A1", "나중")]
+        get.return_value = mock.Mock(status_code=200, json=lambda: self._body(rows))
+        self.assertEqual(sync_schools("dummy-key"), 1)
+        self.assertEqual(School.objects.get(code="A1").name, "나중")
+
+    @mock.patch("account.neis.requests.get")
+    def test_api_error_raises(self, get):
+        from .neis import NeisError, sync_schools
+        get.return_value = mock.Mock(
+            status_code=200,
+            json=lambda: {"RESULT": {"CODE": "INFO-300", "MESSAGE": "인증키가 유효하지 않습니다."}})
+        with self.assertRaises(NeisError):
+            sync_schools("bad-key")
+
+    @mock.patch("account.neis.requests.get")
+    def test_no_data_is_not_an_error(self, get):
+        from .neis import sync_schools
+        get.return_value = mock.Mock(
+            status_code=200,
+            json=lambda: {"RESULT": {"CODE": "INFO-200", "MESSAGE": "해당하는 데이터가 없습니다."}})
+        self.assertEqual(sync_schools("dummy-key"), 0)
+
+    def test_missing_key_raises(self):
+        from .neis import NeisError, sync_schools
+        with self.assertRaises(NeisError):
+            sync_schools("")
+
+    def test_sync_api_requires_super_admin(self):
+        self.create_teacher()
+        self.assertFailed(self.client.post(self.reverse("school_sync_api"), data={}))
+
+    def test_stale_running_can_be_restarted(self):
+        """워커가 죽어 running 인 채 멈춘 작업은 다시 시작할 수 있어야 한다"""
+        from datetime import timedelta
+        from django.utils.timezone import now
+        from .neis import is_running
+        SysOptions.school_sync_status = {
+            "state": "running",
+            "updated_at": (now() - timedelta(minutes=30)).isoformat(),
+        }
+        self.assertFalse(is_running())
+
+        SysOptions.school_sync_status = {
+            "state": "running", "updated_at": now().isoformat(),
+        }
+        self.assertTrue(is_running())
+        SysOptions.school_sync_status = {}
+
+    def test_sync_api_requires_key(self):
+        self.create_super_admin()
+        SysOptions.neis_api_key = ""
+        self.assertFailed(self.client.post(self.reverse("school_sync_api"), data={}),
+                          "먼저 나이스 API 키를 저장하세요")

@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import AbstractBaseUser
 from django.conf import settings
 from django.db import models
@@ -146,6 +148,12 @@ class TeacherApplication(models.Model):
         ordering = ["-applied_at"]
 
 
+# 학생 계정 아이디는 "c{학급id}-{번호}" 형태다. 구글 가입자가 이 형태의 닉네임을
+# 선점하면 이후 학생 계정과 충돌하므로 닉네임에서 예약어로 막는다.
+STUDENT_USERNAME_PREFIX = "c"
+STUDENT_USERNAME_RE = re.compile(rf"^{STUDENT_USERNAME_PREFIX}\d+-\d+$")
+
+
 class School(models.Model):
     """나이스(NEIS) 학교 기본정보에서 적재한다.
 
@@ -176,8 +184,6 @@ class SchoolClass(models.Model):
     year = models.IntegerField()        # 학년도
     grade = models.IntegerField()       # 학년
     class_no = models.IntegerField()    # 반
-    # 학생 계정 아이디 접두사. 전역 유일해야 하므로 생성 시 충돌을 검사한다.
-    username_prefix = models.TextField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_archived = models.BooleanField(default=False)
 
@@ -189,6 +195,14 @@ class SchoolClass(models.Model):
     @property
     def display_name(self):
         return f"{self.year}학년도 {self.grade}학년 {self.class_no}반"
+
+    def student_username(self, number):
+        """학생 계정 아이디. 학급 id 로 만들어 전역에서 유일하다.
+
+        교사도 학생도 이 값을 입력하지 않는다(학생은 학교·반·번호로 로그인).
+        내부 식별용이므로 사람이 정하게 하지 않는다.
+        """
+        return f"{STUDENT_USERNAME_PREFIX}{self.id}-{number:02d}"
 
     def __str__(self):
         return f"{self.school.name} {self.display_name}"

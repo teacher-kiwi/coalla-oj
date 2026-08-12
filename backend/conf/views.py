@@ -92,6 +92,8 @@ class WebsiteConfigAPI(APIView):
                ["website_base_url", "website_name", "website_name_shortcut",
                 "website_footer", "allow_register", "submission_list_show_all",
                 "google_client_id"]}
+        # 키 자체는 노출하지 않고 설정 여부만 알린다
+        ret["neis_api_key_set"] = bool(SysOptions.neis_api_key)
         return self.success(ret)
 
     @super_admin_required
@@ -101,6 +103,10 @@ class WebsiteConfigAPI(APIView):
             if k == "website_footer":
                 with XSSHtml() as parser:
                     v = parser.clean(v)
+            # 비밀 키는 빈 값으로 덮어쓰지 않는다(화면에 값을 내려주지 않으므로
+            # 다른 설정만 바꿔 저장할 때 지워지면 안 된다)
+            if k == "neis_api_key" and not v:
+                continue
             setattr(SysOptions, k, v)
         return self.success()
 

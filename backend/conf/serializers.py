@@ -28,6 +28,8 @@ class CreateEditWebsiteConfigSerializer(serializers.Serializer):
     submission_list_show_all = serializers.BooleanField()
     # 구글 로그인 클라이언트 ID. 비밀이 아니며 브라우저에 노출되는 값이다.
     google_client_id = serializers.CharField(max_length=256, allow_blank=True, required=False)
+    # 나이스 API 키는 비밀이다. 빈 값이면 기존 값을 유지한다(GET 으로 내려주지 않음).
+    neis_api_key = serializers.CharField(max_length=256, allow_blank=True, required=False)
 
 
 class JudgeServerSerializer(serializers.ModelSerializer):
