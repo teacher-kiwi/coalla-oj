@@ -35,6 +35,52 @@ export default {
   applyForTeacher () {
     return ajax('teacher_application', 'post')
   },
+
+  // ---- 학생 로그인 (로그인 전 호출) ----
+  searchStudentSchool (keyword) {
+    return ajax('student/school', 'get', { params: { keyword } })
+  },
+  getStudentClasses (schoolId) {
+    return ajax('student/class', 'get', { params: { school_id: schoolId } })
+  },
+  studentLogin (data) {
+    return ajax('student/login', 'post', { data })
+  },
+  studentChangePassword (data) {
+    return ajax('student/change_password', 'post', { data })
+  },
+
+  // ---- 교사 ----
+  searchSchool (keyword) {
+    return ajax('teacher/school', 'get', { params: { keyword, paging: true, offset: 0, limit: 20 } })
+  },
+  getMyClasses (archived = false) {
+    return ajax('teacher/class', 'get', { params: archived ? { archived: 'true' } : {} })
+  },
+  getClass (id) {
+    return ajax('teacher/class', 'get', { params: { id } })
+  },
+  createClass (data) {
+    return ajax('teacher/class', 'post', { data })
+  },
+  editClass (data) {
+    return ajax('teacher/class', 'put', { data })
+  },
+  deleteClass (id) {
+    return ajax('teacher/class', 'delete', { params: { id } })
+  },
+  getClassStudents (classId) {
+    return ajax('teacher/student', 'get', { params: { class_id: classId } })
+  },
+  createStudents (data) {
+    return ajax('teacher/student', 'post', { data })
+  },
+  resetStudentPassword (membership) {
+    return ajax('teacher/student', 'put', { data: { membership } })
+  },
+  deleteStudent (id) {
+    return ajax('teacher/student', 'delete', { params: { id } })
+  },
   getCaptcha () {
     return ajax('captcha', 'get')
   },

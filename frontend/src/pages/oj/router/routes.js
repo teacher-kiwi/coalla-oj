@@ -26,6 +26,9 @@ const Settings = () => import('@oj/views/setting/Settings.vue')
 const ProfileSetting = () => import('@oj/views/setting/children/ProfileSetting.vue')
 const SecuritySetting = () => import('@oj/views/setting/children/SecuritySetting.vue')
 const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.vue')
+const TeacherClassList = () => import('@oj/views/teacher/ClassList.vue')
+const TeacherClassDetail = () => import('@oj/views/teacher/ClassDetail.vue')
+const StudentPasswordSetting = () => import('@oj/views/setting/children/StudentPasswordSetting.vue')
 const AccountSetting = () => import('@oj/views/setting/children/AccountSetting.vue')
 
 export default [
@@ -168,12 +171,34 @@ export default [
         component: SecuritySetting
       },
       {
+        name: 'student-password-setting',
+        path: 'password',
+        meta: { requiresAuth: true, title: '비밀번호 변경' },
+        component: StudentPasswordSetting
+      },
+      {
         name: 'teacher-setting',
         path: 'teacher',
         meta: { requiresAuth: true, title: '교사 인증' },
         component: TeacherSetting
       }
     ]
+  },
+  {
+    path: '/teacher',
+    redirect: { name: 'teacher-class-list' }
+  },
+  {
+    path: '/teacher/class',
+    name: 'teacher-class-list',
+    meta: { requiresAuth: true, title: '내 학급' },
+    component: TeacherClassList
+  },
+  {
+    path: '/teacher/class/:classId',
+    name: 'teacher-class-detail',
+    meta: { requiresAuth: true, title: '학급 학생' },
+    component: TeacherClassDetail
   },
   {
     path: '/about',

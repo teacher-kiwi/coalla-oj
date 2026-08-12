@@ -196,8 +196,12 @@ class StudentAPI(APIView):
                                                student=student, number=number)
                 created.append((number, pin))
 
-        return self.success({"file_id": _write_student_xlsx(school_class, created),
-                             "created": len(created)})
+        # 초기 PIN 은 해시로 저장되어 다시 조회할 수 없다. 교사가 배부해야 하므로
+        # 생성 직후 이 응답에서만 평문으로 돌려준다.
+        return self.success({
+            "file_id": _write_student_xlsx(school_class, created),
+            "students": [{"number": n, "password": p} for n, p in created],
+        })
 
     @validate_serializer(ResetStudentPasswordSerializer)
     @teacher_required

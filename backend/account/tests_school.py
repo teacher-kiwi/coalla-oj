@@ -75,7 +75,12 @@ class StudentAccountAPITest(SchoolClassTestBase):
     def test_create_students(self):
         resp = self._create_students(self.class_id, 1, 3)
         self.assertSuccess(resp)
-        self.assertEqual(resp.data["data"]["created"], 3)
+        issued = resp.data["data"]["students"]
+        self.assertEqual(len(issued), 3)
+        # 초기 PIN 은 해시로 저장되므로 생성 직후 응답에서만 평문으로 받는다
+        self.assertEqual([s["number"] for s in issued], [1, 2, 3])
+        for item in issued:
+            self.assertRegex(item["password"], r"^\d{4}$")
 
         self.assertEqual(ClassMembership.objects.count(), 3)
         student = ClassMembership.objects.get(number=1).student

@@ -61,6 +61,7 @@ services:
       - JUDGE_SERVER_TOKEN=${JUDGE_SERVER_TOKEN:?JUDGE_SERVER_TOKEN 을 .env 에 설정하세요}
       # 최초 기동 시 root 계정 비밀번호
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD 를 .env 에 설정하세요}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
       - OJ_ENV=prod
     ports:
       - "${BACKEND_PORT:-8000}:8000"

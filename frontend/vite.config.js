@@ -30,13 +30,16 @@ export default defineConfig({
   server: {
     port: 8080,
     proxy: {
+      // changeOrigin 을 켜면 Host 헤더가 backend:8000 으로 바뀌는데,
+      // 브라우저가 보낸 Origin(localhost:8080)과 달라져 Django 4 의 CSRF Origin
+      // 검사에서 모든 POST 가 403 이 된다. Host 를 그대로 넘겨야 한다.
       '/api': {
         target: proxyTarget,
-        changeOrigin: true
+        changeOrigin: false
       },
       '/public': {
         target: proxyTarget,
-        changeOrigin: true
+        changeOrigin: false
       }
     }
   },

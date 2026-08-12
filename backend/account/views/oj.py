@@ -19,7 +19,7 @@ from ..decorators import login_required
 from ..models import display_name_prefetch, User, UserProfile, AdminType
 from ..serializers import (ApplyResetPasswordSerializer, ResetPasswordSerializer,
                            UserChangePasswordSerializer, UserLoginSerializer,
-                           UserRegisterSerializer, UsernameOrEmailCheckSerializer,
+                           UsernameOrEmailCheckSerializer,
                            RankInfoSerializer, UserChangeEmailSerializer, SSOSerializer)
 from ..serializers import (UserProfileSerializer,
                            EditUserProfileSerializer, ImageUploadForm)
@@ -130,29 +130,14 @@ class UsernameOrEmailCheck(APIView):
 
 
 class UserRegisterAPI(APIView):
-    @validate_serializer(UserRegisterSerializer)
-    def post(self, request):
-        """
-        User register api
-        """
-        if not SysOptions.allow_register:
-            return self.error("관리자가 회원가입을 막아두었습니다")
+    """옛 아이디/비밀번호 회원가입. 더 이상 사용하지 않는다.
 
-        data = request.data
-        data["username"] = data["username"].lower()
-        data["email"] = data["email"].lower()
-        captcha = Captcha(request)
-        if not captcha.check(data["captcha"]):
-            return self.error("보안 문자가 올바르지 않습니다")
-        if User.objects.filter(username=data["username"]).exists():
-            return self.error("이미 사용 중인 사용자명입니다")
-        if User.objects.filter(email=data["email"]).exists():
-            return self.error("이미 사용 중인 이메일입니다")
-        user = User.objects.create(username=data["username"], email=data["email"])
-        user.set_password(data["password"])
-        user.save()
-        UserProfile.objects.create(user=user)
-        return self.success("Succeeded")
+    일반 회원(교사·개인학생)은 구글로만 가입하고(GoogleLoginAPI),
+    수업용 학생 계정은 교사가 만들어 준다.
+    이 경로를 열어두면 닉네임 정책과 구글 연동을 우회하는 두 번째 통로가 된다.
+    """
+    def post(self, request):
+        return self.error("구글 계정으로 가입해주세요")
 
 
 class UserChangeEmailAPI(APIView):
@@ -263,12 +248,19 @@ class SessionManagementAPI(APIView):
                 modified = True
                 continue
 
+            # 현재 세션은 저장소보다 request.session 이 최신이다.
+            # 미들웨어가 방금 넣은 ip/user_agent 는 응답 시점에야 저장되기 때문에,
+            # 로그인 직후 첫 요청에서는 저장소 사본에 아직 없을 수 있다.
+            is_current = current_session == key
+            source = request.session if is_current else session
+
             s = {}
-            if current_session == key:
+            if is_current:
                 s["current_session"] = True
-            s["ip"] = session["ip"]
-            s["user_agent"] = session["user_agent"]
-            s["last_activity"] = datetime2str(session["last_activity"])
+            s["ip"] = source.get("ip", "")
+            s["user_agent"] = source.get("user_agent", "")
+            last_activity = source.get("last_activity")
+            s["last_activity"] = datetime2str(last_activity) if last_activity else None
             s["session_key"] = key
             result.append(s)
         if modified:

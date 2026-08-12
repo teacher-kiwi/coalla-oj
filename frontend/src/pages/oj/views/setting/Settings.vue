@@ -18,9 +18,12 @@
               </div>
             </div>
 
-            <el-menu-item index="/setting/profile">프로필</el-menu-item>
-            <el-menu-item index="/setting/account">계정</el-menu-item>
-            <el-menu-item index="/setting/security">보안</el-menu-item>
+            <el-menu-item v-if="isStudent" index="/setting/password">비밀번호 변경</el-menu-item>
+            <template v-else>
+              <el-menu-item index="/setting/profile">프로필</el-menu-item>
+              <el-menu-item index="/setting/account">계정</el-menu-item>
+              <el-menu-item index="/setting/security">보안</el-menu-item>
+            </template>
             <el-menu-item v-if="showTeacherMenu" index="/setting/teacher">교사 인증</el-menu-item>
           </el-menu>
         </div>
@@ -47,7 +50,9 @@ const userStore = useUserStore()
 
 const activeName = computed(() => route.path)
 // 학교에서 발급받은 학생 계정에는 교사 신청을 노출하지 않는다
-const showTeacherMenu = computed(() => !userStore.user.created_by)
+// 학교에서 발급받은 계정(학생)은 이메일·구글 연동이 없어 다른 설정이 의미 없다
+const isStudent = computed(() => !!userStore.user.created_by)
+const showTeacherMenu = computed(() => !isStudent.value)
 
 function goRoute (path) {
   router.push(path)

@@ -24,6 +24,10 @@
         <el-icon><TrendCharts /></el-icon>
         채점
       </el-menu-item>
+      <el-menu-item v-if="userStore.isTeacher" index="/teacher">
+        <el-icon><School /></el-icon>
+        학급
+      </el-menu-item>
       <el-sub-menu index="rank">
         <template #title>
           <el-icon><Medal /></el-icon>
@@ -45,14 +49,6 @@
 
       <div v-if="!userStore.isAuthenticated" class="btn-menu">
         <el-button round @click="handleBtnClick('login')">로그인</el-button>
-        <el-button
-          v-if="appStore.website.allow_register"
-          round
-          @click="handleBtnClick('register')"
-          class="btn-register"
-        >
-          회원가입
-        </el-button>
       </div>
       <el-dropdown v-else class="drop-menu" trigger="click" @command="handleRoute">
         <el-button text class="drop-menu-title">
@@ -84,9 +80,9 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store/app'
+import { School } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import Login from '@oj/views/user/Login.vue'
-import Register from '@oj/views/user/Register.vue'
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
@@ -103,9 +99,8 @@ const modalVisible = computed({
   set: (value) => appStore.changeModalStatus({ visible: value })
 })
 
-const currentModal = computed(() => {
-  return appStore.modalStatus.mode === 'register' ? Register : Login
-})
+// 가입은 구글 로그인 안에서 처리하므로 모달은 로그인 하나뿐이다
+const currentModal = computed(() => Login)
 
 function handleRoute (target) {
   if (!target) return

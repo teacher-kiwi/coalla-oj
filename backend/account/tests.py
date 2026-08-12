@@ -109,52 +109,17 @@ class CaptchaTest(APITestCase):
         return captcha
 
 
-class UserRegisterAPITest(CaptchaTest):
+class UserRegisterAPITest(APITestCase):
+    """옛 회원가입 경로는 닫혀 있어야 한다. 가입은 구글로만 받는다."""
     def setUp(self):
-        self.client = APIClient()
         self.register_url = self.reverse("user_register_api")
-        self.captcha = rand_str(4)
-        # 교육용 전환으로 공개 가입은 기본 차단이다.
-        # 이 클래스는 가입 API 자체의 동작을 검증하므로 명시적으로 열어둔다.
-        SysOptions.allow_register = True
 
-        self.data = {"username": "test_user", "password": "testuserpassword",
-                     "real_name": "real_name", "email": "test@qduoj.com",
-                     "captcha": self._set_captcha(self.client.session)}
-
-    def test_website_config_limit(self):
-        SysOptions.allow_register = False
-        resp = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "관리자가 회원가입을 막아두었습니다"})
-
-    def test_invalid_captcha(self):
-        self.data["captcha"] = "****"
-        response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "보안 문자가 올바르지 않습니다"})
-
-        self.data.pop("captcha")
-        response = self.client.post(self.register_url, data=self.data)
-        self.assertTrue(response.data["error"] is not None)
-
-    def test_register_with_correct_info(self):
-        response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": None, "data": "Succeeded"})
-
-    def test_username_already_exists(self):
-        self.test_register_with_correct_info()
-
-        self.data["captcha"] = self._set_captcha(self.client.session)
-        self.data["email"] = "test1@qduoj.com"
-        response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "이미 사용 중인 사용자명입니다"})
-
-    def test_email_already_exists(self):
-        self.test_register_with_correct_info()
-
-        self.data["captcha"] = self._set_captcha(self.client.session)
-        self.data["username"] = "test_user1"
-        response = self.client.post(self.register_url, data=self.data)
-        self.assertDictEqual(response.data, {"error": "error", "data": "이미 사용 중인 이메일입니다"})
+    def test_register_is_closed(self):
+        resp = self.client.post(self.register_url, data={
+            "username": "test_user", "password": "testuserpassword",
+            "email": "test@qduoj.com", "captcha": "1234"})
+        self.assertFailed(resp, "구글 계정으로 가입해주세요")
+        self.assertFalse(User.objects.filter(username="test_user").exists())
 
 
 class SessionManagementAPITest(APITestCase):
@@ -178,6 +143,31 @@ class SessionManagementAPITest(APITestCase):
     def test_delete_session_with_invalid_key(self):
         resp = self.client.delete(self.url + "?session_key=aaaaaaaaaa")
         self.assertDictEqual(resp.data, {"error": "error", "data": "session_key가 올바르지 않습니다"})
+
+
+class SessionListRobustnessTest(APITestCase):
+    """세션에 ip 등이 아직 저장되지 않아도 목록 조회가 실패하면 안 된다.
+
+    미들웨어는 응답 시점에 세션을 저장하므로, 로그인 직후 첫 요청에서는
+    저장소 사본에 ip 가 없을 수 있다(원본 qduoj 는 여기서 KeyError 로 죽었다).
+    """
+    def test_session_without_ip(self):
+        user = self.create_user("test", "test123")
+        resp = self.client.get(self.reverse("session_management_api"))
+        self.assertSuccess(resp)
+
+        # 저장소에 ip 가 없는 세션 키를 억지로 끼워 넣어도 살아남아야 한다
+        from django.contrib.sessions.backends.cache import SessionStore
+        orphan = SessionStore()
+        orphan["_auth_user_id"] = str(user.id)
+        orphan.save()
+        user.session_keys.append(orphan.session_key)
+        user.save()
+
+        resp = self.client.get(self.reverse("session_management_api"))
+        self.assertSuccess(resp)
+        self.assertTrue(any(s["session_key"] == orphan.session_key
+                            for s in resp.data["data"]))
 
 
 class UserProfileAPITest(APITestCase):
