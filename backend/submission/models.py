@@ -2,6 +2,7 @@ from django.db import models
 
 from utils.constants import ContestStatus
 from utils.models import JSONField
+from account.models import User
 from problem.models import Problem
 from contest.models import Contest
 
@@ -27,8 +28,10 @@ class Submission(models.Model):
     contest = models.ForeignKey(Contest, null=True, on_delete=models.CASCADE)
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
     create_time = models.DateTimeField(auto_now_add=True)
-    user_id = models.IntegerField(db_index=True)
-    username = models.TextField()
+    # FK 로 두어 닉네임 변경이 모든 화면에 즉시 반영되게 한다.
+    # (원본은 IntegerField + username 복사본이었다)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True,
+                             related_name="submissions")
     code = models.TextField()
     result = models.IntegerField(db_index=True, default=JudgeStatus.PENDING)
     # 从JudgeServer返回的判题详情

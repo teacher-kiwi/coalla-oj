@@ -10,6 +10,7 @@ from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.captcha import Captcha
 from utils.throttling import TokenBucket
+from account.models import display_name_prefetch
 from ..models import Submission
 from ..serializers import (CreateSubmissionSerializer, SubmissionModelSerializer,
                            ShareSubmissionSerializer)
@@ -72,7 +73,6 @@ class SubmissionAPI(APIView):
             return self.error(f"{data['language']} 언어는 이 문제에서 사용할 수 없습니다")
         
         submission = Submission.objects.create(user_id=request.user.id,
-                                               username=request.user.username,
                                                language=data["language"],
                                                code=data["code"],
                                                problem_id=problem.id,
@@ -133,7 +133,9 @@ class SubmissionListAPI(APIView):
         if request.GET.get("contest_id"):
             return self.error("잘못된 요청입니다")
 
-        submissions = Submission.objects.filter(contest_id__isnull=True).select_related("problem__created_by")
+        submissions = Submission.objects.filter(contest_id__isnull=True)\
+            .select_related("problem__created_by", "user")\
+            .prefetch_related(display_name_prefetch("user"))
         problem_id = request.GET.get("problem_id")
         myself = request.GET.get("myself")
         result = request.GET.get("result")
@@ -147,7 +149,7 @@ class SubmissionListAPI(APIView):
         if (myself and myself == "1") or not SysOptions.submission_list_show_all:
             submissions = submissions.filter(user_id=request.user.id)
         elif username:
-            submissions = submissions.filter(username__icontains=username)
+            submissions = submissions.filter(user__username__icontains=username)
         if result:
             submissions = submissions.filter(result=result)
         data = self.paginate_data(request, submissions)
@@ -162,7 +164,9 @@ class ContestSubmissionListAPI(APIView):
             return self.error("limit 값이 필요합니다")
 
         contest = self.contest
-        submissions = Submission.objects.filter(contest_id=contest.id).select_related("problem__created_by")
+        submissions = Submission.objects.filter(contest_id=contest.id)\
+            .select_related("problem__created_by", "user")\
+            .prefetch_related(display_name_prefetch("user"))
         problem_id = request.GET.get("problem_id")
         myself = request.GET.get("myself")
         result = request.GET.get("result")
@@ -177,7 +181,7 @@ class ContestSubmissionListAPI(APIView):
         if myself and myself == "1":
             submissions = submissions.filter(user_id=request.user.id)
         elif username:
-            submissions = submissions.filter(username__icontains=username)
+            submissions = submissions.filter(user__username__icontains=username)
         if result:
             submissions = submissions.filter(result=result)
 

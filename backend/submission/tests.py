@@ -17,8 +17,6 @@ DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test
 
 DEFAULT_SUBMISSION_DATA = {
     "problem_id": "1",
-    "user_id": 1,
-    "username": "test",
     "code": "xxxxxxxxxxxxxx",
     "result": -2,
     "info": {},
@@ -43,6 +41,7 @@ class SubmissionPrepare(APITestCase):
         self.problem.save()
         self.submission_data = deepcopy(DEFAULT_SUBMISSION_DATA)
         self.submission_data["problem_id"] = self.problem.id
+        self.submission_data["user_id"] = user.id
         self.submission = Submission.objects.create(**self.submission_data)
 
 

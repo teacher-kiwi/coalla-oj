@@ -144,3 +144,93 @@ class TeacherApplication(models.Model):
     class Meta:
         db_table = "teacher_application"
         ordering = ["-applied_at"]
+
+
+class School(models.Model):
+    """나이스(NEIS) 학교 기본정보에서 적재한다.
+
+    학교명을 자유 입력으로 두면 표기가 흔들려("서울초" vs "서울초등학교")
+    학생이 자기 학급을 찾지 못한다. 목록에서 고르게 하기 위한 모델이다.
+    """
+    code = models.TextField(unique=True)            # 나이스 SD_SCHUL_CODE
+    name = models.TextField(db_index=True)
+    kind = models.TextField(blank=True, default="")     # 초등학교 / 중학교 / 고등학교
+    office = models.TextField(blank=True, default="")   # 시도교육청
+    address = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "school"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class SchoolClass(models.Model):
+    """학급. 학생 로그인의 진입점이자 문제집 배포 단위다.
+
+    같은 학교·학년·반을 여러 교사가 맡을 수 있어(담임/교과) teacher 까지 포함해 유일하다.
+    """
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="classes")
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name="classes")
+    year = models.IntegerField()        # 학년도
+    grade = models.IntegerField()       # 학년
+    class_no = models.IntegerField()    # 반
+    # 학생 계정 아이디 접두사. 전역 유일해야 하므로 생성 시 충돌을 검사한다.
+    username_prefix = models.TextField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_archived = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "school_class"
+        unique_together = (("school", "teacher", "year", "grade", "class_no"),)
+        ordering = ["-year", "grade", "class_no"]
+
+    @property
+    def display_name(self):
+        return f"{self.year}학년도 {self.grade}학년 {self.class_no}반"
+
+    def __str__(self):
+        return f"{self.school.name} {self.display_name}"
+
+
+class ClassMembership(models.Model):
+    """학급 소속. 학생은 학급 안에서 번호로 식별된다."""
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name="memberships")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="class_memberships")
+    number = models.IntegerField()
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "class_membership"
+        unique_together = (("school_class", "number"), ("school_class", "student"))
+        ordering = ["number"]
+
+
+def public_display_name(user):
+    """공개 화면(순위·제출 목록)에 표시할 이름.
+
+    - 구글 가입자(교사·개인학생): 본인이 정한 닉네임
+    - 수업용 학생: 학교명까지만. 학년·반·번호는 노출하지 않는다.
+      같은 학교 학생이 여럿이면 서로 구분되지 않는데, 그것이 의도다.
+    """
+    if user is None:
+        return "(삭제된 사용자)"
+    membership = next(iter(user.class_memberships.all()), None)
+    if membership is not None:
+        return f"{membership.school_class.school.name} 학생"
+    return user.username
+
+
+# 표시 이름 계산 시 N+1 을 막기 위한 prefetch 경로 (User 기준)
+_DISPLAY_NAME_PATH = "class_memberships__school_class__school"
+
+
+def display_name_prefetch(user_path=""):
+    """표시 이름 계산용 prefetch 경로를 만든다.
+
+    경로가 User 기준이라 어디서 출발하는지 호출부에서 명시해야 한다.
+        User 쿼리셋        -> display_name_prefetch()
+        Submission 쿼리셋  -> display_name_prefetch("user")
+    """
+    return f"{user_path}__{_DISPLAY_NAME_PATH}" if user_path else _DISPLAY_NAME_PATH

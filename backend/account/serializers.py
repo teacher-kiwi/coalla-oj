@@ -2,8 +2,9 @@ from django import forms
 
 from utils.api import serializers, UsernameSerializer
 
-from .models import (AdminType, ProblemPermission, TeacherApplication,
-                     TeacherApplicationStatus, User, UserProfile)
+from .models import (AdminType, ClassMembership, ProblemPermission, School,
+                     SchoolClass, TeacherApplication, TeacherApplicationStatus,
+                     User, UserProfile)
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -162,3 +163,75 @@ class RankInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = "__all__"
+
+
+# ---------------- 학교 / 학급 / 학생 ----------------
+
+class SchoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = School
+        fields = ["id", "code", "name", "kind", "office"]
+
+
+class SchoolClassSerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(source="school.name", read_only=True)
+    teacher_name = serializers.CharField(source="teacher.username", read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SchoolClass
+        fields = ["id", "school", "school_name", "teacher_name", "year", "grade",
+                  "class_no", "display_name", "username_prefix", "student_count",
+                  "is_archived", "created_at"]
+
+    def get_student_count(self, obj):
+        return obj.memberships.count()
+
+
+class CreateSchoolClassSerializer(serializers.Serializer):
+    school = serializers.IntegerField()
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
+    grade = serializers.IntegerField(min_value=1, max_value=6)
+    class_no = serializers.IntegerField(min_value=1, max_value=99)
+    # 학생 계정 아이디 접두사. 전역 유일해야 한다.
+    username_prefix = serializers.RegexField(r"^[a-z][a-z0-9-]{2,19}$")
+
+
+class EditSchoolClassSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    year = serializers.IntegerField(min_value=2000, max_value=2100, required=False)
+    grade = serializers.IntegerField(min_value=1, max_value=6, required=False)
+    class_no = serializers.IntegerField(min_value=1, max_value=99, required=False)
+    is_archived = serializers.BooleanField(required=False)
+
+
+class CreateStudentsSerializer(serializers.Serializer):
+    school_class = serializers.IntegerField()
+    number_from = serializers.IntegerField(min_value=1, max_value=99)
+    number_to = serializers.IntegerField(min_value=1, max_value=99)
+
+
+class ClassMembershipSerializer(serializers.ModelSerializer):
+    student_id = serializers.IntegerField(source="student.id", read_only=True)
+    is_disabled = serializers.BooleanField(source="student.is_disabled", read_only=True)
+    last_login = serializers.DateTimeField(source="student.last_login", read_only=True)
+
+    class Meta:
+        model = ClassMembership
+        fields = ["id", "number", "student_id", "is_disabled", "last_login", "joined_at"]
+
+
+class ResetStudentPasswordSerializer(serializers.Serializer):
+    membership = serializers.IntegerField()
+
+
+class StudentLoginSerializer(serializers.Serializer):
+    school_class = serializers.IntegerField()
+    number = serializers.IntegerField(min_value=1, max_value=99)
+    password = serializers.RegexField(r"^\d{4}$")
+
+
+class StudentChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.RegexField(r"^\d{4}$")
+    new_password = serializers.RegexField(r"^\d{4}$")
