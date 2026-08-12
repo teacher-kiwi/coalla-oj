@@ -103,6 +103,9 @@ class OptionKeys:
     judge_server_token = "judge_server_token"
     throttling = "throttling"
     languages = "languages"
+    # 교육용: 구글 로그인 클라이언트 ID, 교사 1인당 학생 계정 상한
+    google_client_id = "google_client_id"
+    max_students_per_teacher = "max_students_per_teacher"
 
 
 class OptionDefaultValue:
@@ -110,13 +113,15 @@ class OptionDefaultValue:
     website_name = "Online Judge"
     website_name_shortcut = "oj"
     website_footer = "Online Judge Footer"
-    allow_register = True
+    allow_register = False
     submission_list_show_all = True
     smtp_config = {}
     judge_server_token = default_token
     throttling = {"ip": {"capacity": 100, "fill_rate": 0.1, "default_capacity": 50},
                   "user": {"capacity": 20, "fill_rate": 0.03, "default_capacity": 10}}
     languages = languages
+    google_client_id = ""
+    max_students_per_teacher = 500
 
 
 class _SysOptionsMeta(type):
@@ -272,6 +277,22 @@ class _SysOptionsMeta(type):
     @my_property(ttl=DEFAULT_SHORT_TTL)
     def spj_language_names(cls):
         return [item["name"] for item in cls.languages if "spj" in item]
+
+    @my_property(ttl=DEFAULT_SHORT_TTL)
+    def google_client_id(cls):
+        return cls._get_option(OptionKeys.google_client_id)
+
+    @google_client_id.setter
+    def google_client_id(cls, value):
+        cls._set_option(OptionKeys.google_client_id, value)
+
+    @my_property(ttl=DEFAULT_SHORT_TTL)
+    def max_students_per_teacher(cls):
+        return cls._get_option(OptionKeys.max_students_per_teacher)
+
+    @max_students_per_teacher.setter
+    def max_students_per_teacher(cls, value):
+        cls._set_option(OptionKeys.max_students_per_teacher, value)
 
     def reset_languages(cls):
         cls.languages = languages

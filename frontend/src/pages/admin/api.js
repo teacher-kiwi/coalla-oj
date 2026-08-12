@@ -48,6 +48,14 @@ export default {
   generateUser (data) {
     return ajax('admin/generate_user', 'post', { data })
   },
+  getTeacherApplicationList (offset, limit, status) {
+    const params = { paging: true, offset, limit }
+    if (status) params.status = status
+    return ajax('admin/teacher_application', 'get', { params })
+  },
+  reviewTeacherApplication (data) {
+    return ajax('admin/teacher_application', 'put', { data })
+  },
   getLanguages () {
     return ajax('languages', 'get')
   },

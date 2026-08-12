@@ -11,7 +11,7 @@ from utils.api.tests import APIClient, APITestCase
 from utils.shortcuts import rand_str
 from options.options import SysOptions
 
-from .models import AdminType, ProblemPermission, User
+from .models import AdminType, ProblemPermission, TeacherApplication, User
 from utils.constants import ContestRuleType
 
 
@@ -114,6 +114,9 @@ class UserRegisterAPITest(CaptchaTest):
         self.client = APIClient()
         self.register_url = self.reverse("user_register_api")
         self.captcha = rand_str(4)
+        # 교육용 전환으로 공개 가입은 기본 차단이다.
+        # 이 클래스는 가입 API 자체의 동작을 검증하므로 명시적으로 열어둔다.
+        SysOptions.allow_register = True
 
         self.data = {"username": "test_user", "password": "testuserpassword",
                      "real_name": "real_name", "email": "test@qduoj.com",
@@ -466,3 +469,157 @@ class GenerateUserAPITest(APITestCase):
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         mock_workbook.assert_called()
+
+
+@mock.patch("account.views.google.verify_google_token")
+class GoogleLoginAPITest(APITestCase):
+    def setUp(self):
+        self.url = self.reverse("google_login_api")
+        SysOptions.google_client_id = "test-client-id.apps.googleusercontent.com"
+
+    def _claims(self, **kwargs):
+        data = {"sub": "google-sub-1", "email": "teacher@school.kr",
+                "email_verified": True, "name": "김교사"}
+        data.update(kwargs)
+        return data
+
+    def test_client_id_not_configured(self, verify):
+        SysOptions.google_client_id = ""
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertFailed(resp)
+        verify.assert_not_called()
+
+    def test_invalid_token(self, verify):
+        verify.return_value = None
+        resp = self.client.post(self.url, data={"credential": "bad"})
+        self.assertFailed(resp, "구글 인증에 실패했습니다. 다시 시도해주세요")
+
+    def test_email_not_verified(self, verify):
+        verify.return_value = self._claims(email_verified=False)
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertFailed(resp)
+
+    def test_first_login_creates_pending_application(self, verify):
+        verify.return_value = self._claims()
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["status"], "pending")
+
+        user = User.objects.get(google_sub="google-sub-1")
+        self.assertEqual(user.email, "teacher@school.kr")
+        self.assertEqual(user.admin_type, AdminType.REGULAR_USER)
+        self.assertEqual(user.teacher_application.status, "pending")
+        # 승인 전에는 로그인되지 않는다
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+
+    def test_second_login_does_not_duplicate(self, verify):
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        self.client.post(self.url, data={"credential": "x"})
+        self.assertEqual(User.objects.filter(google_sub="google-sub-1").count(), 1)
+        self.assertEqual(TeacherApplication.objects.count(), 1)
+
+    def test_approved_teacher_logs_in(self, verify):
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        user = User.objects.get(google_sub="google-sub-1")
+        user.admin_type = AdminType.TEACHER
+        user.save()
+
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["status"], "logged_in")
+        self.assertTrue(auth.get_user(self.client).is_authenticated)
+
+    def test_rejected_user_cannot_login(self, verify):
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        application = TeacherApplication.objects.get()
+        application.status = "rejected"
+        application.save()
+
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertFailed(resp)
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+
+    def test_links_existing_account_by_email(self, verify):
+        existing = self.create_user("existing", "pass123", login=False)
+        existing.email = "teacher@school.kr"
+        existing.save()
+
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        existing.refresh_from_db()
+        self.assertEqual(existing.google_sub, "google-sub-1")
+        self.assertEqual(User.objects.filter(email="teacher@school.kr").count(), 1)
+
+    def test_disabled_user_rejected(self, verify):
+        verify.return_value = self._claims()
+        self.client.post(self.url, data={"credential": "x"})
+        user = User.objects.get(google_sub="google-sub-1")
+        user.is_disabled = True
+        user.save()
+
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertFailed(resp, "비활성화된 계정입니다")
+
+    def test_username_collision_is_resolved(self, verify):
+        self.create_user("teacher", "pass123", login=False)
+        verify.return_value = self._claims(email="teacher@other.kr", sub="google-sub-2")
+        resp = self.client.post(self.url, data={"credential": "x"})
+        self.assertSuccess(resp)
+        created = User.objects.get(google_sub="google-sub-2")
+        self.assertNotEqual(created.username, "teacher")
+        self.assertTrue(created.username.startswith("teacher"))
+
+
+class TeacherApplicationAdminAPITest(APITestCase):
+    def setUp(self):
+        self.applicant = self.create_user("applicant", "pass123", login=False)
+        self.application = TeacherApplication.objects.create(user=self.applicant)
+        self.url = self.reverse("teacher_application_admin_api")
+
+    def test_regular_user_denied(self):
+        self.create_user("someone", "pass123")
+        self.assertFailed(self.client.get(self.url))
+
+    def test_approve(self):
+        self.create_super_admin()
+        resp = self.client.put(self.url, data={"id": self.application.id, "status": "approved"})
+        self.assertSuccess(resp)
+
+        self.applicant.refresh_from_db()
+        self.assertEqual(self.applicant.admin_type, AdminType.TEACHER)
+        self.assertEqual(self.applicant.problem_permission, ProblemPermission.OWN)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, "approved")
+        self.assertIsNotNone(self.application.reviewed_at)
+
+    def test_reject_does_not_grant_permission(self):
+        self.create_super_admin()
+        resp = self.client.put(self.url, data={"id": self.application.id, "status": "rejected"})
+        self.assertSuccess(resp)
+        self.applicant.refresh_from_db()
+        self.assertEqual(self.applicant.admin_type, AdminType.REGULAR_USER)
+
+    def test_cannot_review_twice(self):
+        self.create_super_admin()
+        self.client.put(self.url, data={"id": self.application.id, "status": "approved"})
+        resp = self.client.put(self.url, data={"id": self.application.id, "status": "rejected"})
+        self.assertFailed(resp, "이미 처리된 신청입니다")
+
+    def test_list_filtered_by_status(self):
+        self.create_super_admin()
+        resp = self.client.get(self.url + "?paging=true&offset=0&limit=10&status=pending")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["total"], 1)
+
+
+class TeacherRoleTest(APITestCase):
+    def test_teacher_is_not_admin_role(self):
+        """교사가 /api/admin/* 전체를 통과하면 안 된다"""
+        teacher = self.create_teacher()
+        self.assertFalse(teacher.is_admin_role())
+        self.assertTrue(teacher.is_teacher())
+        # 최고관리자 전용 API 접근 차단 확인
+        self.assertFailed(self.client.get(self.reverse("user_admin_api")))

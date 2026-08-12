@@ -5,9 +5,8 @@ import re
 import shutil
 import smtplib
 import time
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 
-import pytz
 import requests
 from django.conf import settings
 from django.utils import timezone
@@ -91,7 +90,8 @@ class WebsiteConfigAPI(APIView):
     def get(self, request):
         ret = {key: getattr(SysOptions, key) for key in
                ["website_base_url", "website_name", "website_name_shortcut",
-                "website_footer", "allow_register", "submission_list_show_all"]}
+                "website_footer", "allow_register", "submission_list_show_all",
+                "google_client_id"]}
         return self.success(ret)
 
     @super_admin_required
@@ -226,7 +226,7 @@ class DashboardInfoAPI(APIView):
     def get(self, request):
         today = datetime.today()
         today_submission_count = Submission.objects.filter(
-            create_time__gte=datetime(today.year, today.month, today.day, 0, 0, tzinfo=pytz.UTC)).count()
+            create_time__gte=datetime(today.year, today.month, today.day, 0, 0, tzinfo=dt_timezone.utc)).count()
         recent_contest_count = Contest.objects.exclude(end_time__lt=timezone.now()).count()
         judge_server_count = len(list(filter(lambda x: x.status == "normal", JudgeServer.objects.all())))
         return self.success({

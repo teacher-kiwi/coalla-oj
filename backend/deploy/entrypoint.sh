@@ -28,11 +28,21 @@ fi
 
 cd $APP
 
+# 최초 기동 시 마이그레이션 파일이 없으면 모델에서 생성한다.
+# (마이그레이션을 리셋했으므로 이미지에 0001_initial 이 없을 수 있다)
+python manage.py makemigrations account announcement conf contest options problem submission --no-input
+
+if [ -z "$ADMIN_PASSWORD" ]; then
+    ADMIN_PASSWORD=rootroot
+    echo "!! ADMIN_PASSWORD 가 설정되지 않아 기본값을 사용합니다. 반드시 변경하세요 !!"
+fi
+
 n=0
 while [ $n -lt 5 ]
 do
     python manage.py migrate --no-input &&
-    python manage.py inituser --username=root --password=rootroot --action=create_super_admin &&
+    python manage.py inituser --username=root --password="$ADMIN_PASSWORD" --action=create_super_admin &&
+    python manage.py seed_problem_tags &&
     echo "from options.options import SysOptions; SysOptions.judge_server_token='$JUDGE_SERVER_TOKEN'" | python manage.py shell &&
     echo "from conf.models import JudgeServer; JudgeServer.objects.update(task_number=0)" | python manage.py shell &&
     break

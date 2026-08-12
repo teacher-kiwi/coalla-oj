@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import {
   Announcement, Conf, Contest, ContestList, Home, JudgeServer, Login,
-  Problem, ProblemList, ProblemTags, User, PruneTestCase, Dashboard, ProblemImportOrExport
+  Problem, ProblemList, ProblemTags, User, PruneTestCase, Dashboard, ProblemImportOrExport,
+  TeacherApplication
 } from './views'
 
 const router = createRouter({
@@ -20,6 +21,7 @@ const router = createRouter({
         { path: '', name: 'dashboard', component: Dashboard },
         { path: '/announcement', name: 'announcement', component: Announcement },
         { path: '/user', name: 'user', component: User },
+        { path: '/teacher-application', name: 'teacher-application', component: TeacherApplication },
         { path: '/conf', name: 'conf', component: Conf },
         { path: '/judge-server', name: 'judge-server', component: JudgeServer },
         { path: '/prune-test-case', name: 'prune-test-case', component: PruneTestCase },

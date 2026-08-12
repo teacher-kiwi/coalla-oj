@@ -2,7 +2,8 @@ from django import forms
 
 from utils.api import serializers, UsernameSerializer
 
-from .models import AdminType, ProblemPermission, User, UserProfile
+from .models import (AdminType, ProblemPermission, TeacherApplication,
+                     TeacherApplicationStatus, User, UserProfile)
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -116,6 +117,33 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 class SSOSerializer(serializers.Serializer):
     token = serializers.CharField()
+
+
+class GoogleLoginSerializer(serializers.Serializer):
+    credential = serializers.CharField(max_length=4096)
+
+
+class TeacherApplicationSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.CharField(source="user.email", read_only=True)
+    real_name = serializers.SerializerMethodField()
+    reviewed_by = serializers.CharField(source="reviewed_by.username", read_only=True, default=None)
+
+    class Meta:
+        model = TeacherApplication
+        fields = ["id", "username", "email", "real_name", "status",
+                  "applied_at", "reviewed_at", "reviewed_by", "note"]
+
+    def get_real_name(self, obj):
+        profile = UserProfile.objects.filter(user=obj.user).first()
+        return profile.real_name if profile else None
+
+
+class ReviewTeacherApplicationSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=(TeacherApplicationStatus.APPROVED,
+                                              TeacherApplicationStatus.REJECTED))
+    note = serializers.CharField(max_length=256, allow_blank=True, required=False)
 
 
 class ImageUploadForm(forms.Form):

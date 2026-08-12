@@ -13,6 +13,7 @@
         일반
       </template>
       <el-menu-item index="/user">사용자</el-menu-item>
+      <el-menu-item index="/teacher-application">교사 가입 신청</el-menu-item>
       <el-menu-item index="/announcement">공지사항</el-menu-item>
       <el-menu-item index="/conf">시스템 설정</el-menu-item>
       <el-menu-item index="/judge-server">채점 서버</el-menu-item>

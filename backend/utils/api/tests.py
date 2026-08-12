@@ -18,6 +18,11 @@ class APITestCase(TestCase):
             self.client.login(username=username, password=password)
         return user
 
+    def create_teacher(self, username="teacher", password="teacher", login=True):
+        return self.create_user(username=username, password=password, login=login,
+                                admin_type=AdminType.TEACHER,
+                                problem_permission=ProblemPermission.OWN)
+
     def create_admin(self, username="admin", password="admin", login=True):
         return self.create_user(username=username, password=password, admin_type=AdminType.ADMIN,
                                 problem_permission=ProblemPermission.OWN,

@@ -1,13 +1,13 @@
 services:
   redis:
-    image: redis:4.0-alpine
+    image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
     volumes:
       - ./data/redis:/data
 
   postgres:
-    image: postgres:10-alpine
+    image: postgres:16-alpine
     container_name: postgres
     restart: unless-stopped
     environment:
@@ -61,6 +61,8 @@ services:
       - POSTGRES_USER=onlinejudge
       - POSTGRES_PASSWORD=onlinejudge
       - JUDGE_SERVER_TOKEN=CHANGE_THIS
+      # 최초 기동 시 root 계정 비밀번호. 반드시 변경할 것
+      - ADMIN_PASSWORD=CHANGE_THIS_TOO
       - OJ_ENV=prod
     ports:
       - "8000:8000"

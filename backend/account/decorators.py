@@ -50,6 +50,13 @@ class admin_role_required(BasePermissionDecorator):
         return user.is_authenticated and user.is_admin_role()
 
 
+class teacher_required(BasePermissionDecorator):
+    """교사 전용. 최고관리자는 운영·점검을 위해 함께 통과시킨다."""
+    def check_permission(self):
+        user = self.request.user
+        return user.is_authenticated and (user.is_teacher() or user.is_super_admin())
+
+
 class problem_permission_required(admin_role_required):
     def check_permission(self):
         if not super(problem_permission_required, self).check_permission():

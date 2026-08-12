@@ -18,6 +18,9 @@ export const useUserStore = defineStore('user', {
     isSuperAdmin () {
       return this.user.admin_type === USER_TYPE.SUPER_ADMIN
     },
+    isTeacher () {
+      return this.user.admin_type === USER_TYPE.TEACHER
+    },
     hasProblemPermission () {
       return this.user.problem_permission !== PROBLEM_PERMISSION.NONE
     }

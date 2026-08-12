@@ -1,20 +1,61 @@
-coverage==6.5.0
-django-cas-ng==5.0.1
-django-dbconn-retry==0.1.7
-django-dramatiq==0.11.6
+# 간접 의존성까지 전부 고정한다.
+#
+# 이유: 간접 의존성을 비워두면 재빌드 시점에 따라 설치 버전이 달라진다.
+# 실제로 아래 세 가지가 그렇게 깨졌다.
+#   - requests : django-cas-ng 을 제거하자 함께 사라짐 (코드는 직접 사용 중)
+#   - redis    : 재빌드 때 최신 버전이 깔려 Redis 4 서버와 RESP3 협상 실패
+#   - pytz     : Django 4 가 더는 의존하지 않아 사라짐 (코드는 직접 사용 중)
+#
+# 갱신 방법: 컨테이너에서 `pip freeze` 한 결과로 이 파일을 다시 만든다.
+
+# --- 프레임워크 ---
+Django==4.2.20
+djangorestframework==3.15.2
+asgiref==3.12.1
+sqlparse==0.5.5
+
+# --- 데이터베이스 / 캐시 ---
+psycopg2==2.9.9
 django-redis==5.4.0
-Django==3.2.25
-djangorestframework==3.14.0
+redis==5.2.1
+django-dbconn-retry==0.1.7
+
+# --- 비동기 작업 (채점 큐) ---
 dramatiq==1.16.0
-entrypoints==0.4
+django-dramatiq==0.11.6
+prometheus_client==0.26.0
+
+# --- 웹 서버 ---
+gunicorn==21.2.0
+packaging==26.3
+
+# --- 구글 로그인 ---
+google-auth==2.35.0
+cachetools==5.5.2
+pyasn1==0.6.4
+pyasn1_modules==0.4.2
+rsa==4.9.1
+
+# --- HTTP 클라이언트 (채점 서버 호출, 추후 나이스 API) ---
+requests==2.32.3
+certifi==2026.7.22
+charset-normalizer==3.4.9
+idna==3.18
+urllib3==2.7.0
+
+# --- 기타 유틸 ---
+pillow==10.2.0
+python-dateutil==2.8.2
+six==1.17.0
+XlsxWriter==3.1.9
 Envelopes==0.4
+entrypoints==0.4
+
+# --- 개발/테스트 도구 (run_test.py 가 컨테이너 안에서 사용) ---
+coverage==6.5.0
+flake8==7.0.0
 flake8-coding==1.3.2
 flake8-quotes==3.3.2
-flake8==7.0.0
-gunicorn==21.2.0
-jsonfield==3.1.0
-pillow==10.2.0
-psycopg2==2.9.9
-python-dateutil==2.8.2
-raven==6.10.0
-XlsxWriter==3.1.9
+mccabe==0.7.0
+pycodestyle==2.11.1
+pyflakes==3.2.0

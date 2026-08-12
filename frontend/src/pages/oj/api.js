@@ -24,6 +24,12 @@ export default {
   logout () {
     return ajax('logout', 'get')
   },
+  googleLogin (credential) {
+    return ajax('google_login', 'post', { data: { credential } })
+  },
+  getMyTeacherApplication () {
+    return ajax('teacher_application', 'get')
+  },
   getCaptcha () {
     return ajax('captcha', 'get')
   },
