@@ -221,6 +221,12 @@ class ClassMembership(models.Model):
         ordering = ["number"]
 
 
+def _first_membership(user):
+    # 학급 소속은 표시 이름과 프로필 공개 여부를 함께 가르는 기준이라 한 곳에서 읽는다.
+    # prefetch(display_name_prefetch)가 걸려 있으면 추가 쿼리가 나가지 않는다.
+    return next(iter(user.class_memberships.all()), None)
+
+
 def public_display_name(user):
     """공개 화면(순위·제출 목록)에 표시할 이름.
 
@@ -230,10 +236,22 @@ def public_display_name(user):
     """
     if user is None:
         return "(삭제된 사용자)"
-    membership = next(iter(user.class_memberships.all()), None)
+    membership = _first_membership(user)
     if membership is not None:
         return f"{membership.school_class.school.name} 학생"
     return user.username
+
+
+def has_public_profile(user):
+    """사용자 홈(공개 프로필)을 열 수 있는 계정인지.
+
+    수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 될 수 없고
+    (링크를 걸면 "사용자가 존재하지 않습니다"로 끝난다), 실제 아이디를 키로 쓰면
+    학교·학년·반·번호가 드러난다. 아동 프로필은 공개하지 않는 것이 맞다.
+    """
+    if user is None:
+        return False
+    return _first_membership(user) is None
 
 
 # 표시 이름 계산 시 N+1 을 막기 위한 prefetch 경로 (User 기준)

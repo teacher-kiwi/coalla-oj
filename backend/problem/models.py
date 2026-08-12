@@ -1,7 +1,7 @@
 from django.db import models
 from utils.models import JSONField
 
-from account.models import User
+from account.models import SchoolClass, User
 from contest.models import Contest
 from utils.models import RichTextField
 from utils.constants import Choices
@@ -95,3 +95,52 @@ class Problem(models.Model):
     def add_ac_number(self):
         self.accepted_number = models.F("accepted_number") + 1
         self.save(update_fields=["accepted_number"])
+
+
+class ProblemSet(models.Model):
+    """교사가 공개 문제를 묶어 학급에 배포하는 단위.
+
+    대회(Contest)와 달리 순위·시간 제한이 없다. 수업에서 "이번 주에 풀 문제"를
+    지정하는 용도이므로 배포(assignment)와 마감일만 갖는다.
+    """
+    title = models.TextField()
+    description = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="problem_sets")
+    create_time = models.DateTimeField(auto_now_add=True)
+    last_update_time = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "problem_set"
+        ordering = ("-create_time",)
+
+
+class ProblemSetItem(models.Model):
+    """문제집에 담긴 문제. order 로 교사가 정한 순서를 유지한다."""
+    problem_set = models.ForeignKey(ProblemSet, on_delete=models.CASCADE, related_name="items")
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name="problem_set_items")
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "problem_set_item"
+        unique_together = (("problem_set", "problem"),)
+        ordering = ("order", "id")
+
+
+class ProblemSetAssignment(models.Model):
+    """문제집을 학급에 배포한 기록.
+
+    같은 문제집을 여러 학급에 배포할 수 있고 학급마다 마감일이 다를 수 있어
+    문제집이 아니라 이 관계에 마감일을 둔다.
+    """
+    problem_set = models.ForeignKey(ProblemSet, on_delete=models.CASCADE, related_name="assignments")
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name="assignments")
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    due_at = models.DateTimeField(null=True, blank=True)
+    # 배포를 잠시 내릴 때 쓴다. 삭제하면 학생 화면에서 사라지지만 다시 배포하려면
+    # 마감일을 다시 입력해야 하므로 켜고 끄는 수단을 따로 둔다.
+    is_open = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "problem_set_assignment"
+        unique_together = (("problem_set", "school_class"),)
+        ordering = ("-assigned_at",)

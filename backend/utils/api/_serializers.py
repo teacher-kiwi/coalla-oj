@@ -11,6 +11,8 @@ class UsernameSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     username = serializers.SerializerMethodField()
     real_name = serializers.SerializerMethodField()
+    # 표시 이름이 조회 키가 아닌 계정(수업용 학생)에는 화면에서 링크를 걸지 않는다
+    profile_visible = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         self.need_real_name = kwargs.pop("need_real_name", False)
@@ -20,6 +22,10 @@ class UsernameSerializer(serializers.Serializer):
         # 순환 임포트를 피하려고 지역 임포트한다
         from account.models import public_display_name
         return public_display_name(obj)
+
+    def get_profile_visible(self, obj):
+        from account.models import has_public_profile
+        return has_public_profile(obj)
 
     def get_real_name(self, obj):
         return obj.userprofile.real_name if self.need_real_name else None

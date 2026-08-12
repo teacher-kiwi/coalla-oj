@@ -445,8 +445,12 @@ function submitCode () {
     problem_id: problem.value.id,
     language: language.value,
     code: code.value,
-    contest_id: contestID.value,
     blockly_state: language.value === 'Block Coding' ? blocklyWorkspace.value : ''
+  }
+  // 대회 문제가 아니면 키 자체를 넣지 않는다. 빈 문자열을 보내면
+  // IntegerField(required=False) 가 "A valid integer is required" 로 거절한다.
+  if (contestID.value) {
+    data.contest_id = contestID.value
   }
   if (captchaRequired.value) {
     data.captcha = captchaCode.value

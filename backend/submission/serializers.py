@@ -1,4 +1,4 @@
-from account.models import public_display_name
+from account.models import has_public_profile, public_display_name
 from .models import Submission
 from utils.api import serializers
 from utils.serializers import LanguageNameChoiceField
@@ -21,6 +21,7 @@ class ShareSubmissionSerializer(serializers.Serializer):
 
 class SubmissionModelSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
+    profile_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -29,11 +30,15 @@ class SubmissionModelSerializer(serializers.ModelSerializer):
     def get_username(self, obj):
         return public_display_name(obj.user)
 
+    def get_profile_visible(self, obj):
+        return has_public_profile(obj.user)
+
 
 # 不显示submission info的serializer, 用于ACM rule_type
 class SubmissionSafeModelSerializer(serializers.ModelSerializer):
     problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
     username = serializers.SerializerMethodField()
+    profile_visible = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -42,11 +47,15 @@ class SubmissionSafeModelSerializer(serializers.ModelSerializer):
     def get_username(self, obj):
         return public_display_name(obj.user)
 
+    def get_profile_visible(self, obj):
+        return has_public_profile(obj.user)
+
 
 class SubmissionListSerializer(serializers.ModelSerializer):
     problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
     show_link = serializers.SerializerMethodField()
     username = serializers.SerializerMethodField()
+    profile_visible = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
@@ -58,6 +67,9 @@ class SubmissionListSerializer(serializers.ModelSerializer):
 
     def get_username(self, obj):
         return public_display_name(obj.user)
+
+    def get_profile_visible(self, obj):
+        return has_public_profile(obj.user)
 
     def get_show_link(self, obj):
         # 没传user或为匿名user

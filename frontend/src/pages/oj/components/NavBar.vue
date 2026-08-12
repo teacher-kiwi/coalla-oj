@@ -24,9 +24,18 @@
         <el-icon><TrendCharts /></el-icon>
         채점
       </el-menu-item>
-      <el-menu-item v-if="userStore.isTeacher" index="/teacher">
-        <el-icon><School /></el-icon>
-        학급
+      <el-sub-menu v-if="userStore.isTeacher" index="teacher">
+        <template #title>
+          <el-icon><School /></el-icon>
+          수업
+        </template>
+        <el-menu-item index="/teacher/class">내 학급</el-menu-item>
+        <el-menu-item index="/teacher/problem-set">문제집</el-menu-item>
+      </el-sub-menu>
+      <!-- 수업용 학생만 보인다. 개인 학생(구글 가입)은 배포받을 학급이 없다. -->
+      <el-menu-item v-if="isStudent" index="/problem-set">
+        <el-icon><Notebook /></el-icon>
+        문제집
       </el-menu-item>
       <el-sub-menu index="rank">
         <template #title>
@@ -80,7 +89,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store/app'
-import { School } from '@element-plus/icons-vue'
+import { Notebook, School } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import Login from '@oj/views/user/Login.vue'
 const route = useRoute()
@@ -92,7 +101,14 @@ onMounted(() => {
   userStore.getProfile()
 })
 
-const activeMenu = computed(() => '/' + route.path.split('/')[1])
+const activeMenu = computed(() => {
+  // 교사 메뉴는 하위 항목(/teacher/class, /teacher/problem-set)이 각각 활성화되어야 한다
+  const [, first, second] = route.path.split('/')
+  return first === 'teacher' ? `/teacher/${second || 'class'}` : '/' + first
+})
+
+// 학급 소속 여부는 프로필에 없지만, 수업용 학생은 교사가 만든 계정이라 created_by 가 있다
+const isStudent = computed(() => !!userStore.user.created_by)
 
 const modalVisible = computed({
   get: () => appStore.modalStatus.visible,

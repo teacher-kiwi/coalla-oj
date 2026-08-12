@@ -101,4 +101,7 @@ class StudentChangePasswordAPI(APIView):
 
         user.set_password(data["new_password"])
         user.save(update_fields=["password"])
+        # 비밀번호가 바뀌면 세션 해시가 어긋나 어차피 로그인이 풀린다. 다음 요청에서
+        # 조용히 튕기는 대신 여기서 끊고, 화면에서 새 비밀번호로 다시 로그인하게 안내한다.
+        auth.logout(request)
         return self.success("Succeeded")

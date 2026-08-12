@@ -29,9 +29,15 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@oj/api'
+import { useAppStore } from '@/store/app'
+import { useUserStore } from '@/store/user'
 
+const router = useRouter()
+const appStore = useAppStore()
+const userStore = useUserStore()
 const loading = ref(false)
 const form = reactive({ old_password: '', new_password: '', again: '' })
 
@@ -51,10 +57,20 @@ function submit () {
   }).then(() => {
     loading.value = false
     form.old_password = form.new_password = form.again = ''
-    ElMessage.success('비밀번호를 바꿨습니다')
+    // 비밀번호를 바꾸면 서버 세션이 끊긴다. 그대로 두면 다른 화면으로 옮길 때
+    // 갑자기 로그인이 풀린 것처럼 보이므로, 바로 안내하고 로그인 화면으로 보낸다.
+    userStore.clearProfile()
+    ElMessageBox.alert('새로 정한 비밀번호로 다시 로그인해주세요.', '비밀번호를 바꿨습니다', {
+      confirmButtonText: '로그인하러 가기'
+    }).then(goLogin).catch(goLogin)
   }, () => {
     loading.value = false
   })
+}
+
+function goLogin () {
+  router.push({ name: 'home' })
+  appStore.changeModalStatus({ mode: 'login', visible: true })
 }
 </script>
 

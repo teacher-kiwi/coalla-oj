@@ -16,7 +16,8 @@ from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.captcha import Captcha
 from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
-from ..models import display_name_prefetch, User, UserProfile, AdminType
+from ..models import (display_name_prefetch, has_public_profile, User, UserProfile,
+                      AdminType)
 from ..serializers import (ApplyResetPasswordSerializer, ResetPasswordSerializer,
                            UserChangePasswordSerializer, UserLoginSerializer,
                            UsernameOrEmailCheckSerializer,
@@ -40,6 +41,10 @@ class UserProfileAPI(APIView):
         try:
             if username:
                 user = User.objects.get(username=username, is_disabled=False)
+                # 수업용 학생의 프로필은 남에게 열지 않는다. 표시 이름("○○학교 학생")으로는
+                # 애초에 찾을 수 없고, 내부 아이디를 알아내 조회하면 학교·반·번호가 드러난다.
+                if not has_public_profile(user) and user.id != request.user.id:
+                    return self.error("사용자가 존재하지 않습니다")
             else:
                 user = request.user
                 # api返回的是自己的信息，可以返real_name

@@ -234,6 +234,9 @@ class StudentChangePasswordTest(SchoolClassTestBase):
                                                 "new_password": new_pin})
         self.assertSuccess(resp)
         self.assertIsNotNone(auth.authenticate(username=f"c{self.class_id}-01", password=new_pin))
+        # 세션을 끊어 화면이 "다시 로그인" 안내를 띄울 수 있게 한다
+        self.assertFailed(self.client.post(self.url, data={"old_password": new_pin,
+                                                           "new_password": self.pin}))
 
     def test_wrong_old_password(self):
         wrong = "0000" if self.pin != "0000" else "1111"
@@ -286,9 +289,12 @@ class PublicDisplayNameTest(SchoolClassTestBase):
         self.client.logout()
         resp = self.client.get(self.reverse("submission_list_api") + "?limit=10")
         self.assertSuccess(resp)
-        names = [r["username"] for r in resp.data["data"]["results"]]
+        rows = resp.data["data"]["results"]
+        names = [r["username"] for r in rows]
         self.assertIn("코알라초등학교 학생", names)
         self.assertNotIn(self.student.username, names)
+        # 표시 이름으로는 프로필을 찾을 수 없으므로 화면에서 링크를 걸면 안 된다
+        self.assertFalse(rows[0]["profile_visible"])
 
     def test_rank_api_hides_internal_username(self):
         self.client.logout()
@@ -296,6 +302,29 @@ class PublicDisplayNameTest(SchoolClassTestBase):
         self.assertSuccess(resp)
         for row in resp.data["data"]["results"]:
             self.assertNotIn(self.student.username, row["user"]["username"])
+            self.assertFalse(row["user"]["profile_visible"])
+
+    def test_profile_link_allowed_for_google_user(self):
+        learner = self.create_user("코딩왕", "pass123")
+        resp = self.client.get(self.reverse("user_profile_api") + "?username=코딩왕")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["user"]["username"], learner.username)
+
+    def test_student_profile_not_readable_by_others(self):
+        """내부 아이디를 알아내도 남의 학생 프로필은 열리지 않는다"""
+        self.create_user("코딩왕", "pass123")
+        resp = self.client.get(self.reverse("user_profile_api")
+                               + f"?username={self.student.username}")
+        self.assertFailed(resp, "사용자가 존재하지 않습니다")
+
+    def test_student_can_read_own_profile(self):
+        self.student.set_password("1234")
+        self.student.save(update_fields=["password"])
+        self.client.logout()
+        self.client.login(username=self.student.username, password="1234")
+        resp = self.client.get(self.reverse("user_profile_api")
+                               + f"?username={self.student.username}")
+        self.assertSuccess(resp)
 
 
 class NeisSyncTest(APITestCase):

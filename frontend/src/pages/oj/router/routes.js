@@ -28,6 +28,10 @@ const SecuritySetting = () => import('@oj/views/setting/children/SecuritySetting
 const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.vue')
 const TeacherClassList = () => import('@oj/views/teacher/ClassList.vue')
 const TeacherClassDetail = () => import('@oj/views/teacher/ClassDetail.vue')
+const TeacherProblemSetList = () => import('@oj/views/teacher/ProblemSetList.vue')
+const TeacherProblemSetDetail = () => import('@oj/views/teacher/ProblemSetDetail.vue')
+const ProblemSetList = () => import('@oj/views/problem/ProblemSetList.vue')
+const ProblemSetDetail = () => import('@oj/views/problem/ProblemSetDetail.vue')
 const StudentPasswordSetting = () => import('@oj/views/setting/children/StudentPasswordSetting.vue')
 const AccountSetting = () => import('@oj/views/setting/children/AccountSetting.vue')
 
@@ -199,6 +203,30 @@ export default [
     name: 'teacher-class-detail',
     meta: { requiresAuth: true, title: '학급 학생' },
     component: TeacherClassDetail
+  },
+  {
+    path: '/teacher/problem-set',
+    name: 'teacher-problem-set-list',
+    meta: { requiresAuth: true, title: '문제집 관리' },
+    component: TeacherProblemSetList
+  },
+  {
+    path: '/teacher/problem-set/:setId',
+    name: 'teacher-problem-set-detail',
+    meta: { requiresAuth: true, title: '문제집' },
+    component: TeacherProblemSetDetail
+  },
+  {
+    path: '/problem-set',
+    name: 'problem-set-list',
+    meta: { requiresAuth: true, title: '내 문제집' },
+    component: ProblemSetList
+  },
+  {
+    path: '/problem-set/:setId',
+    name: 'problem-set-detail',
+    meta: { requiresAuth: true, title: '문제집' },
+    component: ProblemSetDetail
   },
   {
     path: '/about',

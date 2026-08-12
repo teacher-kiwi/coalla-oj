@@ -81,6 +81,47 @@ export default {
   deleteStudent (id) {
     return ajax('teacher/student', 'delete', { params: { id } })
   },
+  getMyProblemSets () {
+    return ajax('teacher/problem_set', 'get')
+  },
+  getProblemSetForTeacher (id) {
+    return ajax('teacher/problem_set', 'get', { params: { id } })
+  },
+  createProblemSet (data) {
+    return ajax('teacher/problem_set', 'post', { data })
+  },
+  editProblemSet (data) {
+    return ajax('teacher/problem_set', 'put', { data })
+  },
+  deleteProblemSet (id) {
+    return ajax('teacher/problem_set', 'delete', { params: { id } })
+  },
+  addProblemSetProblems (problemSet, problems) {
+    return ajax('teacher/problem_set/problem', 'post', { data: { problem_set: problemSet, problems } })
+  },
+  reorderProblemSetItems (problemSet, items) {
+    return ajax('teacher/problem_set/problem', 'put', { data: { problem_set: problemSet, items } })
+  },
+  deleteProblemSetItem (id) {
+    return ajax('teacher/problem_set/problem', 'delete', { params: { id } })
+  },
+  assignProblemSet (data) {
+    return ajax('teacher/problem_set/assignment', 'post', { data })
+  },
+  editProblemSetAssignment (data) {
+    return ajax('teacher/problem_set/assignment', 'put', { data })
+  },
+  deleteProblemSetAssignment (id) {
+    return ajax('teacher/problem_set/assignment', 'delete', { params: { id } })
+  },
+
+  // ---- 학생 문제집 ----
+  getMyAssignedProblemSets () {
+    return ajax('problem_sets', 'get')
+  },
+  getAssignedProblemSet (id) {
+    return ajax('problem_set', 'get', { params: { id } })
+  },
   getCaptcha () {
     return ajax('captcha', 'get')
   },

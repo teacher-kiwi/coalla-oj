@@ -7,7 +7,8 @@ from utils.api import UsernameSerializer, serializers
 from utils.constants import Difficulty
 from utils.serializers import LanguageNameMultiChoiceField, SPJLanguageNameChoiceField, LanguageNameChoiceField
 
-from .models import Problem, ProblemRuleType, ProblemTag, ProblemIOMode
+from .models import (Problem, ProblemIOMode, ProblemRuleType, ProblemSet,
+                     ProblemSetAssignment, ProblemSetItem, ProblemTag)
 from .utils import parse_problem_template
 
 
@@ -284,3 +285,93 @@ class FPSProblemSerializer(serializers.Serializer):
     template = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
     append = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
     prepend = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
+
+
+# ---- 문제집 ----
+
+class ProblemBriefSerializer(serializers.ModelSerializer):
+    """문제집 화면용 요약. 본문·테스트케이스는 기존 문제 상세 API 에서 받는다."""
+    class Meta:
+        model = Problem
+        fields = ("id", "_id", "title", "difficulty", "submission_number", "accepted_number")
+
+
+class ProblemSetItemSerializer(serializers.ModelSerializer):
+    problem = ProblemBriefSerializer()
+
+    class Meta:
+        model = ProblemSetItem
+        fields = ("id", "order", "problem")
+
+
+class ProblemSetAssignmentSerializer(serializers.ModelSerializer):
+    class_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProblemSetAssignment
+        fields = ("id", "school_class", "class_name", "assigned_at", "due_at", "is_open")
+
+    def get_class_name(self, obj):
+        return f"{obj.school_class.school.name} {obj.school_class.display_name}"
+
+
+class ProblemSetSerializer(serializers.ModelSerializer):
+    # 목록은 annotate 로 미리 세어 N+1 을 피하고, 생성·수정 응답처럼
+    # annotate 가 없는 단건에서는 그때 센다.
+    problem_count = serializers.SerializerMethodField()
+    assignment_count = serializers.SerializerMethodField()
+
+    def get_problem_count(self, obj):
+        count = getattr(obj, "problem_count", None)
+        return obj.items.count() if count is None else count
+
+    def get_assignment_count(self, obj):
+        count = getattr(obj, "assignment_count", None)
+        return obj.assignments.count() if count is None else count
+
+    class Meta:
+        model = ProblemSet
+        fields = ("id", "title", "description", "create_time", "last_update_time",
+                  "problem_count", "assignment_count")
+
+
+class ProblemSetDetailSerializer(serializers.ModelSerializer):
+    items = ProblemSetItemSerializer(many=True)
+    assignments = ProblemSetAssignmentSerializer(many=True)
+
+    class Meta:
+        model = ProblemSet
+        fields = ("id", "title", "description", "create_time", "last_update_time",
+                  "items", "assignments")
+
+
+class CreateProblemSetSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=128)
+    description = serializers.CharField(max_length=1024, allow_blank=True, required=False, default="")
+
+
+class EditProblemSetSerializer(CreateProblemSetSerializer):
+    id = serializers.IntegerField()
+
+
+class ProblemSetProblemSerializer(serializers.Serializer):
+    problem_set = serializers.IntegerField()
+    problems = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+
+
+class ProblemSetItemOrderSerializer(serializers.Serializer):
+    problem_set = serializers.IntegerField()
+    items = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+
+
+class CreateProblemSetAssignmentSerializer(serializers.Serializer):
+    problem_set = serializers.IntegerField()
+    school_class = serializers.IntegerField()
+    due_at = serializers.DateTimeField(allow_null=True, required=False, default=None)
+    is_open = serializers.BooleanField(required=False, default=True)
+
+
+class EditProblemSetAssignmentSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    due_at = serializers.DateTimeField(allow_null=True, required=False)
+    is_open = serializers.BooleanField(required=False)

@@ -13,10 +13,12 @@
         </el-table-column>
         <el-table-column label="사용자" align="center">
           <template #default="{ row }">
-            <a class="link-text truncate"
+            <!-- 수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 아니다. 링크를 걸지 않는다. -->
+            <a v-if="row.user.profile_visible" class="link-text truncate"
                @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
               {{ row.user.username }}
             </a>
+            <span v-else class="truncate">{{ row.user.username }}</span>
           </template>
         </el-table-column>
         <el-table-column label="기분" align="center" prop="mood" />

@@ -226,6 +226,7 @@ const formRef = ref(null)
 const rules = {
   _id: { required: true, message: '표시 ID를 입력하세요', trigger: 'blur' },
   title: { required: true, message: '제목을 입력하세요', trigger: 'blur' },
+  description: { required: true, message: '설명을 입력하세요', trigger: 'blur' },
   input_description: { required: true, message: '입력 설명을 입력하세요', trigger: 'blur' },
   output_description: { required: true, message: '출력 설명을 입력하세요', trigger: 'blur' }
 }
@@ -400,7 +401,11 @@ function compileSPJ () {
   })
 }
 
-function submit () {
+async function submit () {
+  // 규칙을 정의해 두고도 검사하지 않아, 비어 있는 항목이 서버의 영문 에러
+  // ("This field may not be blank")로만 드러나고 어느 칸인지 알 수 없었다.
+  const valid = await formRef.value.validate().then(() => true, () => false)
+  if (!valid) { ElMessage.error('비어 있는 필수 항목이 있습니다'); return }
   if (!problem.value.samples.length) { ElMessage.error('예제를 입력하세요'); return }
   for (const sample of problem.value.samples) {
     if (!sample.input || !sample.output) { ElMessage.error('예제 입력과 출력을 모두 입력하세요'); return }
