@@ -17,11 +17,17 @@
     </div>
 
     <template v-if="appStore.website.google_client_id">
-      <el-divider class="divider">선생님이신가요?</el-divider>
-      <el-alert v-if="pendingApproval" type="info" show-icon :closable="false" class="notice">
-        가입 신청이 접수되었습니다. 관리자 승인 후 이용할 수 있습니다.
-      </el-alert>
-      <div v-show="!pendingApproval" ref="googleBtnRef" class="google-btn" />
+      <el-divider class="divider">또는</el-divider>
+
+      <template v-if="needNickname">
+        <p class="nickname-guide">처음 오셨네요. 사용하실 닉네임을 정해주세요.</p>
+        <el-input v-model="nickname" placeholder="닉네임 (2~20자)" maxlength="20"
+                  size="large" @keyup.enter="submitNickname" />
+        <el-button type="primary" class="btn nickname-btn" :loading="btnLoginLoading"
+                   @click="submitNickname">가입 완료</el-button>
+      </template>
+
+      <div v-show="!needNickname" ref="googleBtnRef" class="google-btn" />
     </template>
   </div>
 </template>
@@ -41,7 +47,9 @@ const userStore = useUserStore()
 const { validateForm } = useForm()
 
 const googleBtnRef = ref(null)
-const pendingApproval = ref(false)
+const needNickname = ref(false)
+const nickname = ref('')
+let pendingCredential = null
 const formRef = ref(null)
 const btnLoginLoading = ref(false)
 const formLogin = ref({ username: '', password: '' })
@@ -75,19 +83,36 @@ function loadGsi () {
   })
 }
 
-async function handleGoogleCredential (response) {
+async function googleLogin (credential, nick) {
   try {
-    const res = await api.googleLogin(response.credential)
-    if (res.data.data?.status === 'pending') {
-      pendingApproval.value = true
+    const res = await api.googleLogin(credential, nick)
+    if (res.data.data?.status === 'nickname_required') {
+      // 최초 가입이다. 닉네임을 받아 다시 보낸다.
+      pendingCredential = credential
+      needNickname.value = true
       return
     }
     appStore.changeModalStatus({ visible: false })
+    needNickname.value = false
     userStore.getProfile()
     ElMessage.success('환영합니다')
   } catch (e) {
     // 에러 메시지는 api 인터셉터가 표시한다
   }
+}
+
+function handleGoogleCredential (response) {
+  googleLogin(response.credential)
+}
+
+async function submitNickname () {
+  if (!nickname.value.trim()) {
+    ElMessage.error('닉네임을 입력해주세요')
+    return
+  }
+  btnLoginLoading.value = true
+  await googleLogin(pendingCredential, nickname.value.trim())
+  btnLoginLoading.value = false
 }
 
 async function initGoogleButton () {
@@ -157,6 +182,17 @@ function goResetPassword () {
   .google-btn {
     display: flex;
     justify-content: center;
+  }
+
+  .nickname-guide {
+    font-size: 13px;
+    color: #606266;
+    margin-bottom: 10px;
+  }
+
+  .nickname-btn {
+    margin-top: 10px;
+    width: 100%;
   }
 
   .notice {

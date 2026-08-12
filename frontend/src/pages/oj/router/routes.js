@@ -25,6 +25,7 @@ const ACMContestHelper = () => import('@oj/views/contest/children/ACMHelper.vue'
 const Settings = () => import('@oj/views/setting/Settings.vue')
 const ProfileSetting = () => import('@oj/views/setting/children/ProfileSetting.vue')
 const SecuritySetting = () => import('@oj/views/setting/children/SecuritySetting.vue')
+const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.vue')
 const AccountSetting = () => import('@oj/views/setting/children/AccountSetting.vue')
 
 export default [
@@ -165,6 +166,12 @@ export default [
         path: 'security',
         meta: { requiresAuth: true, title: '보안 설정' },
         component: SecuritySetting
+      },
+      {
+        name: 'teacher-setting',
+        path: 'teacher',
+        meta: { requiresAuth: true, title: '교사 인증' },
+        component: TeacherSetting
       }
     ]
   },

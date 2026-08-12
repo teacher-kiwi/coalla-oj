@@ -73,6 +73,16 @@ class WebsiteConfigAPITest(APITestCase):
         self.assertSuccess(resp)
         self.assertEqual(SysOptions.website_footer, '<img src="#" />')
 
+    def test_set_google_client_id(self):
+        self.create_super_admin()
+        url = self.reverse("website_config_api")
+        data = {"website_base_url": "http://test.com", "website_name": "test name",
+                "website_name_shortcut": "test oj", "website_footer": "footer",
+                "allow_register": False, "submission_list_show_all": False,
+                "google_client_id": "abc.apps.googleusercontent.com"}
+        self.assertSuccess(self.client.post(url, data=data))
+        self.assertEqual(SysOptions.google_client_id, "abc.apps.googleusercontent.com")
+
     def test_get_website_config(self):
         # do not need to login
         url = self.reverse("website_info_api")

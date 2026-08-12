@@ -24,11 +24,16 @@ export default {
   logout () {
     return ajax('logout', 'get')
   },
-  googleLogin (credential) {
-    return ajax('google_login', 'post', { data: { credential } })
+  googleLogin (credential, nickname) {
+    const data = { credential }
+    if (nickname) data.nickname = nickname
+    return ajax('google_login', 'post', { data })
   },
   getMyTeacherApplication () {
     return ajax('teacher_application', 'get')
+  },
+  applyForTeacher () {
+    return ajax('teacher_application', 'post')
   },
   getCaptcha () {
     return ajax('captcha', 'get')

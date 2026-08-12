@@ -4,6 +4,7 @@
 학생은 교사가 만들어준 아이디/비밀번호로 로그인하므로 이 경로를 쓰지 않는다.
 """
 import logging
+import re
 
 from django.contrib import auth
 from django.utils.timezone import now
@@ -20,13 +21,17 @@ from ..serializers import (GoogleLoginSerializer, ReviewTeacherApplicationSerial
 logger = logging.getLogger(__name__)
 
 
-def _unique_username(base):
-    """구글 이메일 앞부분으로 아이디를 만들되, 중복이면 접미사를 붙인다."""
-    base = "".join(c for c in (base or "").lower() if c.isalnum() or c in "._-")[:24] or "teacher"
-    candidate = base
-    while User.objects.filter(username=candidate).exists():
-        candidate = f"{base}-{rand_str(4)}"
-    return candidate
+NICKNAME_RE = re.compile(r"^[\w가-힣][\w가-힣 ._-]{1,19}$")
+
+
+def validate_nickname(nickname):
+    """닉네임은 곧 계정 식별자이자 공개 표시 이름이다. 실패 시 사유를 돌려준다."""
+    nickname = (nickname or "").strip()
+    if not NICKNAME_RE.match(nickname):
+        return None, "닉네임은 2~20자의 한글·영문·숫자로 입력해주세요"
+    if User.objects.filter(username__iexact=nickname).exists():
+        return None, "이미 사용 중인 닉네임입니다"
+    return nickname, None
 
 
 def verify_google_token(credential, client_id):
@@ -67,34 +72,43 @@ class GoogleLoginAPI(APIView):
         user = User.objects.filter(google_sub=sub).first()
 
         if user is None:
-            # 같은 이메일로 만들어 둔 기존 계정이 있으면 구글 계정을 연결한다.
-            user = User.objects.filter(email=email).first() if email else None
-            if user is not None:
-                user.google_sub = sub
-                user.save(update_fields=["google_sub"])
+            # 같은 이메일의 기존 계정이 있으면 구글 계정을 연결한다.
+            # 단, 교사가 만들어 준 학생 계정은 아이디/PIN 으로만 로그인한다.
+            existing = User.objects.filter(email=email).first() if email else None
+            if existing is not None:
+                if existing.created_by_id is not None:
+                    return self.error("학교에서 발급받은 계정입니다. 선생님께 문의하세요")
+                existing.google_sub = sub
+                existing.save(update_fields=["google_sub"])
+                user = existing
             else:
-                user = User.objects.create(
-                    username=_unique_username(email.split("@")[0] if email else ""),
-                    email=email or None,
-                    google_sub=sub,
-                    admin_type=AdminType.REGULAR_USER)
+                # 신규 가입 — 가입이 닫혀 있으면 만들지 않는다(기존 사용자 로그인은 항상 허용)
+                if not SysOptions.allow_register:
+                    return self.error("현재 신규 가입을 받고 있지 않습니다")
+
+                nickname = request.data.get("nickname")
+                if not nickname:
+                    # 프론트가 닉네임 입력 화면을 띄우도록 신호를 보낸다
+                    return self.success({"status": "nickname_required"})
+                nickname, error = validate_nickname(nickname)
+                if error:
+                    return self.error(error)
+
+                user = User.objects.create(username=nickname,
+                                           email=email or None,
+                                           google_sub=sub,
+                                           admin_type=AdminType.REGULAR_USER)
                 user.set_unusable_password()
                 user.save()
-                UserProfile.objects.create(user=user, real_name=claims.get("name") or None)
+                UserProfile.objects.create(user=user)
 
         if user.is_disabled:
             return self.error("비활성화된 계정입니다")
 
-        # 이미 권한이 있는 사용자(교사·관리자)는 바로 로그인
-        if user.is_teacher() or user.is_admin_role():
-            auth.login(request, user)
-            return self.success({"status": "logged_in"})
-
-        application, _ = TeacherApplication.objects.get_or_create(user=user)
-        if application.status == TeacherApplicationStatus.REJECTED:
-            return self.error("교사 가입 신청이 반려되었습니다. 관리자에게 문의하세요")
-        # 승인 대기: 로그인시키지 않는다.
-        return self.success({"status": "pending"})
+        # 승인 여부와 무관하게 로그인시킨다.
+        # 교사 신청은 로그인 후 별도 화면에서 진행한다.
+        auth.login(request, user)
+        return self.success({"status": "logged_in"})
 
 
 class TeacherApplicationAPI(APIView):
@@ -104,6 +118,25 @@ class TeacherApplicationAPI(APIView):
         application = TeacherApplication.objects.filter(user=request.user).first()
         if not application:
             return self.success(None)
+        return self.success(TeacherApplicationSerializer(application).data)
+
+    @login_required
+    def post(self, request):
+        """교사 신청. 로그인한 일반 사용자가 직접 누른다."""
+        user = request.user
+        if user.is_teacher() or user.is_admin_role():
+            return self.error("이미 교사 권한이 있습니다")
+        if user.created_by_id is not None:
+            return self.error("학교에서 발급받은 계정은 교사 신청을 할 수 없습니다")
+
+        application = TeacherApplication.objects.filter(user=user).first()
+        if application:
+            if application.status == TeacherApplicationStatus.PENDING:
+                return self.error("이미 신청하셨습니다. 승인을 기다려주세요")
+            if application.status == TeacherApplicationStatus.REJECTED:
+                return self.error("신청이 반려되었습니다. 관리자에게 문의하세요")
+
+        application = TeacherApplication.objects.create(user=user)
         return self.success(TeacherApplicationSerializer(application).data)
 
 

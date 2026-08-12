@@ -53,6 +53,17 @@
               <el-switch v-model="websiteConfig.submission_list_show_all" active-color="#13ce66" inactive-color="#ff4949" />
             </el-form-item>
           </el-col>
+          <el-col :span="24">
+            <el-form-item label="구글 로그인 클라이언트 ID">
+              <el-input v-model="websiteConfig.google_client_id"
+                        placeholder="000000000000-xxxxxxxx.apps.googleusercontent.com" />
+              <div class="field-help">
+                Google Cloud Console → 사용자 인증 정보 → OAuth 클라이언트 ID(웹 애플리케이션)에서 발급합니다.
+                승인된 자바스크립트 원본에 이 사이트 주소를 등록해야 합니다.
+                비워두면 구글 로그인 버튼이 표시되지 않습니다.
+              </div>
+            </el-form-item>
+          </el-col>
         </el-row>
       </el-form>
       <save @click="saveWebsiteConfig" />
@@ -107,3 +118,12 @@ function saveWebsiteConfig () {
   api.editWebsiteConfig(websiteConfig.value).then(() => {}).catch(() => {})
 }
 </script>
+
+<style scoped>
+.field-help {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+</style>

@@ -26,6 +26,8 @@ class CreateEditWebsiteConfigSerializer(serializers.Serializer):
     website_footer = serializers.CharField(max_length=1024 * 1024)
     allow_register = serializers.BooleanField()
     submission_list_show_all = serializers.BooleanField()
+    # 구글 로그인 클라이언트 ID. 비밀이 아니며 브라우저에 노출되는 값이다.
+    google_client_id = serializers.CharField(max_length=256, allow_blank=True, required=False)
 
 
 class JudgeServerSerializer(serializers.ModelSerializer):

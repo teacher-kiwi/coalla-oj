@@ -203,6 +203,10 @@ class ApplyResetPasswordAPI(APIView):
             user = User.objects.get(email__iexact=data["email"])
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
+        if user.google_sub:
+            return self.error("구글 계정으로 가입하셨습니다. 구글로 로그인해주세요")
+        if user.created_by_id is not None:
+            return self.error("학교에서 발급받은 계정입니다. 선생님께 문의하세요")
         if user.reset_password_token_expire_time and 0 < int(
                 (user.reset_password_token_expire_time - now()).total_seconds()) < 20 * 60:
             return self.error("비밀번호 재설정은 20분에 한 번만 요청할 수 있습니다")

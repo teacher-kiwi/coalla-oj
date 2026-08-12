@@ -21,6 +21,7 @@
             <el-menu-item index="/setting/profile">프로필</el-menu-item>
             <el-menu-item index="/setting/account">계정</el-menu-item>
             <el-menu-item index="/setting/security">보안</el-menu-item>
+            <el-menu-item v-if="showTeacherMenu" index="/setting/teacher">교사 인증</el-menu-item>
           </el-menu>
         </div>
         <div class="panel">
@@ -45,6 +46,8 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const activeName = computed(() => route.path)
+// 학교에서 발급받은 학생 계정에는 교사 신청을 노출하지 않는다
+const showTeacherMenu = computed(() => !userStore.user.created_by)
 
 function goRoute (path) {
   router.push(path)

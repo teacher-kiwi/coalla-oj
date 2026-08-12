@@ -62,7 +62,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "admin_type", "problem_permission",
-                  "create_time", "last_login", "is_disabled"]
+                  "create_time", "last_login", "is_disabled", "created_by"]
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -121,6 +121,8 @@ class SSOSerializer(serializers.Serializer):
 
 class GoogleLoginSerializer(serializers.Serializer):
     credential = serializers.CharField(max_length=4096)
+    # 최초 가입 시에만 필요하다. 없으면 서버가 nickname_required 로 응답한다.
+    nickname = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
 
 class TeacherApplicationSerializer(serializers.ModelSerializer):
