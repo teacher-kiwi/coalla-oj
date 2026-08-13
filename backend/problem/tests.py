@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import json
 import os
 import shutil
 from datetime import timedelta
@@ -27,6 +28,23 @@ DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test
                                              "input_size": 0, "score": 0}],
                         "io_mode": {"io_mode": ProblemIOMode.standard, "input": "input.txt", "output": "output.txt"},
                         "rule_type": "ACM", "hint": "<p>test</p>", "source": "test"}
+
+
+def create_test_case_dir(test_case_id=DEFAULT_PROBLEM_DATA["test_case_id"], spj=False):
+    """DEFAULT_PROBLEM_DATA 가 가리키는 테스트케이스를 실제로 만들어 둔다.
+
+    문제 저장 API 는 test_case_score 가 업로드된 파일과 맞는지 확인하므로
+    (check_test_case_score) 디스크에 info 파일이 있어야 한다.
+    """
+    test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
+    os.makedirs(test_case_dir, exist_ok=True)
+    case = {"input_name": "1.in", "input_size": 0}
+    if not spj:
+        case.update({"output_name": "1.out", "output_size": 0,
+                     "stripped_output_md5": "d41d8cd98f00b204e9800998ecf8427e"})
+    with open(os.path.join(test_case_dir, "info"), "w", encoding="utf-8") as f:
+        json.dump({"spj": spj, "test_cases": {"1": case}}, f)
+    return test_case_dir
 
 
 class ProblemCreateTestBase(APITestCase):
@@ -133,6 +151,7 @@ class ProblemAdminAPITest(APITestCase):
         self.create_super_admin()
         ProblemTag.objects.create(name="test")
         self.data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        create_test_case_dir()
 
     def test_create_problem(self):
         resp = self.client.post(self.url, data=self.data)
@@ -155,6 +174,31 @@ class ProblemAdminAPITest(APITestCase):
         data["spj_code"] = "test"
         resp = self.client.post(self.url, data=data)
         self.assertSuccess(resp)
+
+    def test_reject_unknown_test_case(self):
+        data = copy.deepcopy(self.data)
+        data["test_case_id"] = "0" * 32
+        self.assertFailed(self.client.post(self.url, data=data),
+                          "테스트 케이스가 존재하지 않습니다. 다시 업로드해주세요")
+
+    def test_reject_test_case_name_mismatch(self):
+        data = copy.deepcopy(self.data)
+        data["test_case_score"][0]["input_name"] = "2.in"
+        self.assertFailed(self.client.post(self.url, data=data),
+                          "테스트 케이스 파일 이름이 업로드된 것과 다릅니다. 다시 업로드해주세요")
+
+    def test_reject_test_case_count_mismatch(self):
+        data = copy.deepcopy(self.data)
+        data["test_case_score"].append(copy.deepcopy(data["test_case_score"][0]))
+        data["test_case_score"][1]["input_name"] = "2.in"
+        data["test_case_score"][1]["output_name"] = "2.out"
+        self.assertFailed(self.client.post(self.url, data=data),
+                          "테스트 케이스 개수가 맞지 않습니다. 업로드된 것은 1개입니다")
+
+    def test_reject_spj_test_case_for_normal_problem(self):
+        create_test_case_dir(spj=True)
+        self.assertFailed(self.client.post(self.url, data=self.data),
+                          "특수 채점용으로 올린 테스트 케이스입니다. 정답 파일과 함께 다시 업로드해주세요")
 
     def test_get_problem(self):
         self.test_create_problem()
@@ -233,6 +277,7 @@ class ContestProblemAdminTest(APITestCase):
         self.url = self.reverse("contest_problem_admin_api")
         self.create_admin()
         ProblemTag.objects.create(name="test")
+        create_test_case_dir()
         self.contest = self.client.post(self.reverse("contest_admin_api"), data=DEFAULT_CONTEST_DATA).data["data"]
 
     def test_create_contest_problem(self):

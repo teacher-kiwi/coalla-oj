@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import zipfile
 from wsgiref.util import FileWrapper
 
@@ -28,6 +29,45 @@ from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            EditProblemTagSerializer)
 from ..utils import (build_problem_template, filter_problem_tags_by_keyword,
                      normalize_tag_aliases)
+
+
+# 업로드된 테스트케이스 디렉터리 이름(rand_str 결과). 경로 조작을 막으려고 형태를 확인한다.
+TEST_CASE_ID_RE = re.compile(r"^[a-zA-Z0-9]+$")
+
+
+def check_test_case_score(test_case_id, test_case_score, spj):
+    """저장하려는 테스트케이스 정보가 실제 업로드된 파일과 맞는지 확인한다.
+
+    - test_case_id 의 디렉터리가 없으면 채점 서버가 파일을 찾지 못해 그 문제의
+      제출이 전부 SYSTEM_ERROR 로 떨어진다.
+    - 파일명·개수가 어긋나면 OI 점수 계산이 틀어진다. dispatcher 가 채점 결과와
+      test_case_score 를 순서대로 짝지어 점수를 매기기 때문이다.
+
+    둘 다 등록은 성공하고 한참 뒤에야 드러나는 형태라 저장 전에 막는다.
+    맞으면 None, 아니면 사유를 돌려준다.
+    """
+    if not test_case_id or not TEST_CASE_ID_RE.match(test_case_id):
+        return "테스트 케이스를 업로드해주세요"
+    try:
+        with open(os.path.join(settings.TEST_CASE_DIR, test_case_id, "info"), encoding="utf-8") as f:
+            cases = list(json.load(f)["test_cases"].values())
+    except (OSError, ValueError, KeyError, AttributeError):
+        return "테스트 케이스가 존재하지 않습니다. 다시 업로드해주세요"
+
+    if len(cases) != len(test_case_score):
+        return f"테스트 케이스 개수가 맞지 않습니다. 업로드된 것은 {len(cases)}개입니다"
+
+    if spj:
+        # 특수 채점은 정답 파일 없이 올리므로 입력 파일명만 맞춰본다
+        uploaded = {case.get("input_name") for case in cases}
+        given = {item["input_name"] for item in test_case_score}
+    else:
+        if any("output_name" not in case for case in cases):
+            return "특수 채점용으로 올린 테스트 케이스입니다. 정답 파일과 함께 다시 업로드해주세요"
+        uploaded = {(case["input_name"], case["output_name"]) for case in cases}
+        given = {(item["input_name"], item["output_name"]) for item in test_case_score}
+    if uploaded != given:
+        return "테스트 케이스 파일 이름이 업로드된 것과 다릅니다. 다시 업로드해주세요"
 
 
 def get_existing_problem_tags(tag_names):
@@ -253,6 +293,9 @@ class CompileSPJAPI(APIView):
 class ProblemBase(APIView):
     def common_checks(self, request):
         data = request.data
+        error = check_test_case_score(data["test_case_id"], data["test_case_score"], data["spj"])
+        if error:
+            return error
         if data["spj"]:
             if not data["spj_language"] or not data["spj_code"]:
                 return "특수 채점(SPJ) 설정이 올바르지 않습니다"
@@ -289,7 +332,6 @@ class ProblemAPI(ProblemBase):
         if error_info:
             return self.error(error_info)
 
-        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
@@ -347,7 +389,6 @@ class ProblemAPI(ProblemBase):
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
-        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
@@ -398,7 +439,6 @@ class ContestProblemAPI(ProblemBase):
         if error_info:
             return self.error(error_info)
 
-        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         data["contest"] = contest
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
@@ -466,7 +506,6 @@ class ContestProblemAPI(ProblemBase):
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
-        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
