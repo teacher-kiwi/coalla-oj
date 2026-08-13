@@ -2,7 +2,6 @@ import hashlib
 import json
 import os
 # import shutil
-import tempfile
 import zipfile
 from wsgiref.util import FileWrapper
 
@@ -13,7 +12,6 @@ from django.http import StreamingHttpResponse, FileResponse
 
 from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
 from contest.models import Contest, ContestStatus
-from fps.parser import FPSHelper, FPSParser
 from judge.dispatcher import SPJCompiler
 from options.options import SysOptions
 from submission.models import Submission, JudgeStatus
@@ -27,9 +25,9 @@ from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            ProblemAdminSerializer, TestCaseUploadForm, ContestProblemMakePublicSerializer,
                            AddContestProblemSerializer, ExportProblemSerializer,
                            ExportProblemRequestSerialzier, UploadProblemForm, ImportProblemSerializer,
-                           FPSProblemSerializer, TagSerializer, CreateProblemTagSerializer,
+                           TagSerializer, CreateProblemTagSerializer,
                            EditProblemTagSerializer)
-from ..utils import (TEMPLATE_BASE, build_problem_template, filter_problem_tags_by_keyword,
+from ..utils import (build_problem_template, filter_problem_tags_by_keyword,
                      normalize_tag_aliases)
 
 
@@ -712,83 +710,3 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                                                              )
                         problem_obj.tags.set(tag_objs)
         return self.success({"import_count": count})
-
-
-class FPSProblemImport(CSRFExemptAPIView):
-    request_parsers = ()
-
-    def _create_problem(self, problem_data, creator):
-        if problem_data["time_limit"]["unit"] == "ms":
-            time_limit = problem_data["time_limit"]["value"]
-        else:
-            time_limit = problem_data["time_limit"]["value"] * 1000
-        template = {}
-        prepend = {}
-        append = {}
-        for t in problem_data["prepend"]:
-            prepend[t["language"]] = t["code"]
-        for t in problem_data["append"]:
-            append[t["language"]] = t["code"]
-        for t in problem_data["template"]:
-            our_lang = lang = t["language"]
-            if lang == "Python":
-                our_lang = "Python3"
-            template[our_lang] = TEMPLATE_BASE.format(prepend.get(lang, ""), t["code"], append.get(lang, ""))
-        spj = problem_data["spj"] is not None
-        Problem.objects.create(_id=f"fps-{rand_str(4)}",
-                               title=problem_data["title"],
-                               description=problem_data["description"],
-                               input_description=problem_data["input"],
-                               output_description=problem_data["output"],
-                               hint=problem_data["hint"],
-                               test_case_score=problem_data["test_case_score"],
-                               time_limit=time_limit,
-                               memory_limit=problem_data["memory_limit"]["value"],
-                               samples=problem_data["samples"],
-                               template=template,
-                               rule_type=ProblemRuleType.ACM,
-                               source=problem_data.get("source", ""),
-                               spj=spj,
-                               spj_code=problem_data["spj"]["code"] if spj else None,
-                               spj_language=problem_data["spj"]["language"] if spj else None,
-                               spj_version=rand_str(8) if spj else "",
-                               visible=False,
-                               languages=SysOptions.language_names,
-                               created_by=creator,
-                               difficulty=Difficulty.MID,
-                               test_case_id=problem_data["test_case_id"])
-
-    def post(self, request):
-        form = UploadProblemForm(request.POST, request.FILES)
-        if form.is_valid():
-            file = form.cleaned_data["file"]
-            with tempfile.NamedTemporaryFile("wb") as tf:
-                for chunk in file.chunks(4096):
-                    tf.file.write(chunk)
-
-                tf.file.flush()
-                os.fsync(tf.file)
-
-                problems = FPSParser(tf.name).parse()
-        else:
-            return self.error("업로드한 파일을 분석할 수 없습니다")
-
-        helper = FPSHelper()
-        with transaction.atomic():
-            for _problem in problems:
-                test_case_id = rand_str()
-                test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
-                os.mkdir(test_case_dir)
-                score = []
-                for item in helper.save_test_case(_problem, test_case_dir)["test_cases"].values():
-                    score.append({"score": 0, "input_name": item["input_name"],
-                                  "output_name": item.get("output_name")})
-                problem_data = helper.save_image(_problem, settings.UPLOAD_DIR, settings.UPLOAD_PREFIX)
-                s = FPSProblemSerializer(data=problem_data)
-                if not s.is_valid():
-                    return self.error(f"FPS 파일 분석에 실패했습니다: {s.errors}")
-                problem_data = s.data
-                problem_data["test_case_id"] = test_case_id
-                problem_data["test_case_score"] = score
-                self._create_problem(problem_data, request.user)
-        return self.success({"import_count": len(problems)})

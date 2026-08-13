@@ -70,7 +70,6 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
     hint = serializers.CharField(allow_blank=True, allow_null=True)
     source = serializers.CharField(max_length=256, allow_blank=True, allow_null=True)
-    share_submission = serializers.BooleanField()
 
 
 class CreateProblemSerializer(CreateOrEditProblemSerializer):
@@ -265,26 +264,6 @@ class ImportProblemSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=200, allow_blank=True, allow_null=True)
     answers = serializers.ListField(child=AnswerSerializer())
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
-
-
-class FPSProblemSerializer(serializers.Serializer):
-    class UnitSerializer(serializers.Serializer):
-        unit = serializers.ChoiceField(choices=["MB", "s", "ms"])
-        value = serializers.IntegerField(min_value=1, max_value=60000)
-
-    title = serializers.CharField(max_length=128)
-    description = serializers.CharField()
-    input = serializers.CharField()
-    output = serializers.CharField()
-    hint = serializers.CharField(allow_blank=True, allow_null=True)
-    time_limit = UnitSerializer()
-    memory_limit = UnitSerializer()
-    samples = serializers.ListField(child=CreateSampleSerializer())
-    source = serializers.CharField(max_length=200, allow_blank=True, allow_null=True)
-    spj = SPJSerializer(allow_null=True)
-    template = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
-    append = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
-    prepend = serializers.ListField(child=serializers.DictField(), allow_empty=True, allow_null=True)
 
 
 # ---- 문제집 ----

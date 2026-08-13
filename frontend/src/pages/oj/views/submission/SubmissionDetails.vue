@@ -50,24 +50,12 @@
     <el-col :span="20">
       <Highlight :code="submission.code" :language="highlightLanguage" :border-color="statusInfo.color" />
     </el-col>
-
-    <el-col v-if="submission.can_unshare" :span="20">
-      <div id="share-btn">
-        <el-button v-if="submission.shared" type="warning" size="large" @click="shareSubmission(false)">
-          공유 해제
-        </el-button>
-        <el-button v-else type="primary" size="large" @click="shareSubmission(true)">
-          공유
-        </el-button>
-      </div>
-    </el-col>
   </el-row>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import api from '@oj/api'
 import { JUDGE_STATUS } from '@/utils/constants'
 import utils from '@/utils/utils'
@@ -118,14 +106,6 @@ function getSubmission () {
   })
 }
 
-function shareSubmission (shared) {
-  const data = { id: submission.value.id, shared }
-  api.updateSubmission(data).then(() => {
-    getSubmission()
-    ElMessage.success('성공')
-  }, () => {})
-}
-
 onMounted(() => {
   getSubmission()
 })
@@ -156,12 +136,6 @@ onMounted(() => {
     font-size: 16px;
     padding: 10px;
   }
-}
-
-#share-btn {
-  float: right;
-  margin-top: 5px;
-  margin-right: 10px;
 }
 
 pre {

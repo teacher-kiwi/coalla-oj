@@ -32,18 +32,6 @@
         <el-button class="upload-btn" size="small" type="success" @click="qduRef?.submit()">업로드</el-button>
       </el-upload>
     </Panel>
-
-    <Panel title="FPS 문제 가져오기 (베타)">
-      <el-upload ref="fpsRef" action="/api/admin/import_fps" name="file"
-                 :file-list="fileList2" :show-file-list="true" :with-credentials="true"
-                 :limit="3" :on-change="onFile2Change" :auto-upload="false"
-                 :on-success="uploadSucceeded" :on-error="uploadFailed">
-        <template #trigger>
-          <el-button size="small" type="primary">파일 선택</el-button>
-        </template>
-        <el-button class="upload-btn" size="small" type="success" @click="fpsRef?.submit()">업로드</el-button>
-      </el-upload>
-    </Panel>
   </div>
 </template>
 
@@ -62,9 +50,7 @@ const keyword = ref('')
 const problems = ref([])
 const selectedProblems = ref([])
 const fileList1 = ref([])
-const fileList2 = ref([])
 const qduRef = ref(null)
-const fpsRef = ref(null)
 
 function localtime (val) { return time.utcToLocal(val) }
 
@@ -85,8 +71,6 @@ function exportProblems () {
 }
 
 function onFile1Change (file, fileList) { fileList1.value = fileList.slice(-1) }
-function onFile2Change (file, fileList) { fileList2.value = fileList.slice(-1) }
-
 function uploadSucceeded (response) {
   if (response.error) {
     ElMessage.error(response.data)

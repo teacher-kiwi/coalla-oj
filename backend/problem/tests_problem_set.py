@@ -369,3 +369,11 @@ class TeacherStudentSubmissionTest(ProblemSetTestBase):
         self.assertFailed(self.client.get(self.url + f"?membership={self.membership.id}&limit=10"))
         self.assertFailed(self.client.get(
             self.reverse("submission_api") + f"?id={self.submission.id}"))
+
+    def test_other_student_cannot_read_code(self):
+        """제출 공유를 없앴으므로(6단계) 남의 코드를 볼 경로가 없어야 한다"""
+        self.client.logout()
+        self.create_user("옆반학생", "pass123")
+        self.assertFailed(self.client.get(
+            self.reverse("submission_api") + f"?id={self.submission.id}"),
+            "이 제출 기록에 접근할 권한이 없습니다")

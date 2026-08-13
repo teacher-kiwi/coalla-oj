@@ -232,9 +232,6 @@ export default {
   submissionRejudge (id) {
     return ajax('admin/submission/rejudge', 'get', { params: { id } })
   },
-  updateSubmission (data) {
-    return ajax('submission', 'put', { data })
-  },
   getUserRank (offset, limit, rule = 'acm', myStudents = false) {
     const params = { offset, limit, rule }
     if (myStudents) params.my_students = 1

@@ -12,8 +12,7 @@ from utils.captcha import Captcha
 from utils.throttling import TokenBucket
 from account.models import display_name_prefetch, my_student_ids
 from ..models import Submission
-from ..serializers import (CreateSubmissionSerializer, SubmissionModelSerializer,
-                           ShareSubmissionSerializer)
+from ..serializers import CreateSubmissionSerializer, SubmissionModelSerializer
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
 
 
@@ -103,27 +102,7 @@ class SubmissionAPI(APIView):
             submission_data = SubmissionModelSerializer(submission).data
         else:
             submission_data = SubmissionSafeModelSerializer(submission).data
-        # 是否有权限取消共享
-        submission_data["can_unshare"] = submission.check_user_permission(request.user, check_share=False)
         return self.success(submission_data)
-
-    @validate_serializer(ShareSubmissionSerializer)
-    @login_required
-    def put(self, request):
-        """
-        share submission
-        """
-        try:
-            submission = Submission.objects.select_related("problem").get(id=request.data["id"])
-        except Submission.DoesNotExist:
-            return self.error("제출 기록이 존재하지 않습니다")
-        if not submission.check_user_permission(request.user, check_share=False):
-            return self.error("제출 기록을 공유할 권한이 없습니다")
-        if submission.contest and submission.contest.status == ContestStatus.CONTEST_UNDERWAY:
-            return self.error("지금은 제출 기록을 공유할 수 없습니다")
-        submission.shared = request.data["shared"]
-        submission.save(update_fields=["shared"])
-        return self.success()
 
 
 class SubmissionListAPI(APIView):

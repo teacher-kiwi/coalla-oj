@@ -21,7 +21,6 @@
             <span v-else class="truncate">{{ row.user.username }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="기분" align="center" prop="mood" />
         <el-table-column label="점수" align="center" prop="total_score" />
         <el-table-column label="정답" align="center" prop="accepted_number" />
         <el-table-column label="총 제출" align="center" prop="submission_number" />

@@ -7,9 +7,7 @@
       <div v-if="profile.user">
         <p class="user-info">
           <span v-if="profile.user" class="emphasis">{{ profile.user.username }}</span>
-          <span v-if="profile.school">@{{ profile.school }}</span>
         </p>
-        <p v-if="profile.mood">{{ profile.mood }}</p>
         <hr id="split" />
 
         <div class="flex-container">
@@ -46,10 +44,8 @@
           </div>
         </div>
 
-        <div id="icons">
-          <a :href="profile.github"><el-icon :size="30"><Link /></el-icon></a>
-          <a :href="'mailto:' + profile.user.email"><el-icon :size="30" class="icon"><Message /></el-icon></a>
-          <a :href="profile.blog"><el-icon :size="30" class="icon"><Promotion /></el-icon></a>
+        <div v-if="profile.user.email" id="icons">
+          <a :href="'mailto:' + profile.user.email"><el-icon :size="30"><Message /></el-icon></a>
         </div>
       </div>
     </el-card>
@@ -60,7 +56,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { QuestionFilled, Link, Message, Promotion } from '@element-plus/icons-vue'
+import { QuestionFilled, Message } from '@element-plus/icons-vue'
 import time from '@/utils/time'
 import api from '@oj/api'
 import { useAppStore } from '@/store/app'

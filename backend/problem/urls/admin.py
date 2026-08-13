@@ -2,7 +2,7 @@ from django.urls import re_path
 
 from ..views.admin import (ContestProblemAPI, ProblemAPI, TestCaseAPI, MakeContestProblemPublicAPIView,
                            CompileSPJAPI, AddContestProblemAPI, ExportProblemAPI, ImportProblemAPI,
-                           FPSProblemImport, ProblemTagAdminAPI)
+                           ProblemTagAdminAPI)
 
 urlpatterns = [
     re_path(r"^test_case/?$", TestCaseAPI.as_view(), name="test_case_api"),
@@ -14,5 +14,4 @@ urlpatterns = [
     re_path(r"^contest/add_problem_from_public/?$", AddContestProblemAPI.as_view(), name="add_contest_problem_from_public_api"),
     re_path(r"^export_problem/?$", ExportProblemAPI.as_view(), name="export_problem_api"),
     re_path(r"^import_problem/?$", ImportProblemAPI.as_view(), name="import_problem_api"),
-    re_path(r"^import_fps/?$", FPSProblemImport.as_view(), name="fps_problem_api"),
 ]

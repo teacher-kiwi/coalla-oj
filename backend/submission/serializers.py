@@ -14,11 +14,6 @@ class CreateSubmissionSerializer(serializers.Serializer):
     blockly_state = serializers.CharField(required=False, allow_blank=True)
 
 
-class ShareSubmissionSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    shared = serializers.BooleanField()
-
-
 class SubmissionModelSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     profile_visible = serializers.SerializerMethodField()

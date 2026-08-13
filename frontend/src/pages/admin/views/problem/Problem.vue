@@ -61,11 +61,6 @@
               <el-switch v-model="problem.visible" />
             </el-form-item>
           </el-col>
-          <el-col :span="4">
-            <el-form-item label="제출 공유">
-              <el-switch v-model="problem.share_submission" />
-            </el-form-item>
-          </el-col>
           <el-col :span="8">
             <el-form-item label="태그" :error="error.tags" required>
               <el-select v-model="problem.tags" multiple filterable remote reserve-keyword
@@ -248,7 +243,7 @@ const error = reactive({ tags: '', spj: '', languages: '', testCase: '' })
 function defaultProblem () {
   return {
     _id: '', title: '', description: '', input_description: '', output_description: '',
-    time_limit: 1000, memory_limit: 256, difficulty: 'Low', visible: true, share_submission: false,
+    time_limit: 1000, memory_limit: 256, difficulty: 'Low', visible: true,
     tags: [], languages: [], template: {}, samples: [{ input: '', output: '' }],
     spj: false, spj_language: '', spj_code: '', spj_compile_ok: false,
     test_case_id: '', test_case_score: [], rule_type: 'ACM', hint: '', source: '',

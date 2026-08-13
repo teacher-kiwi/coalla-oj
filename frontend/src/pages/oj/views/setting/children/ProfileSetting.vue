@@ -21,26 +21,8 @@
           <el-form-item label="실명">
             <el-input v-model="formProfile.real_name" />
           </el-form-item>
-          <el-form-item label="학교">
-            <el-input v-model="formProfile.school" />
-          </el-form-item>
-          <el-form-item label="전공">
-            <el-input v-model="formProfile.major" />
-          </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="loadingSaveBtn" @click="updateProfile">모두 저장</el-button>
-          </el-form-item>
-        </el-col>
-
-        <el-col :span="11">
-          <el-form-item label="기분">
-            <el-input v-model="formProfile.mood" />
-          </el-form-item>
-          <el-form-item label="블로그">
-            <el-input v-model="formProfile.blog" />
-          </el-form-item>
-          <el-form-item label="Github">
-            <el-input v-model="formProfile.github" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -59,13 +41,10 @@ import { useUserStore } from '@/store/user'
 const userStore = useUserStore()
 
 const loadingSaveBtn = ref(false)
+// 실명은 교사가 학생을 알아보기 위한 것이고, 나머지 프로필 항목(학교·전공·블로그·
+// GitHub·기분)은 6단계에서 제거했다.
 const formProfile = ref({
-  real_name: '',
-  mood: '',
-  major: '',
-  blog: '',
-  school: '',
-  github: ''
+  real_name: ''
 })
 
 function checkFileType (file) {

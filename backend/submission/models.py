@@ -1,6 +1,5 @@
 from django.db import models
 
-from utils.constants import ContestStatus
 from utils.models import JSONField
 from account.models import ClassMembership, User
 from problem.models import Problem
@@ -38,28 +37,24 @@ class Submission(models.Model):
     info = JSONField(default=dict)
     language = models.TextField()
     blockly_state = models.TextField(null=True, blank=True)
-    shared = models.BooleanField(default=False)
     # 存储该提交所用时间和内存值，方便提交列表显示
     # {time_cost: "", memory_cost: "", err_info: "", score: 0}
     statistic_info = JSONField(default=dict)
     ip = models.TextField(null=True)
 
-    def check_user_permission(self, user, check_share=True):
+    def check_user_permission(self, user):
+        """제출 코드를 볼 수 있는 사람.
+
+        본인·관리자·문제 출제자, 그리고 담당 교사뿐이다. 원본에 있던 "제출 공유"는
+        교육용에서는 커닝 통로라 제거했다(6단계).
+        """
         if self.user_id == user.id or user.is_super_admin() or user.can_mgmt_all_problem() or self.problem.created_by_id == user.id:
             return True
 
         # 교사는 담당 학생의 코드를 본다(학습 지도가 목적). 범위는 "내가 만든 학급에
         # 속한 학생"까지다. 교사 전체로 넓히면 남의 반 학생 코드까지 열린다.
-        if user.is_teacher() and ClassMembership.objects.filter(
-                student_id=self.user_id, school_class__teacher_id=user.id).exists():
-            return True
-
-        if check_share:
-            if self.contest and self.contest.status != ContestStatus.CONTEST_ENDED:
-                return False
-            if self.problem.share_submission or self.shared:
-                return True
-        return False
+        return user.is_teacher() and ClassMembership.objects.filter(
+            student_id=self.user_id, school_class__teacher_id=user.id).exists()
 
     class Meta:
         db_table = "submission"

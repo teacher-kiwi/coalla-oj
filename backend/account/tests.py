@@ -185,13 +185,13 @@ class UserProfileAPITest(APITestCase):
 
     def test_update_profile(self):
         self.create_user("test", "test123")
-        update_data = {"real_name": "zemal", "submission_number": 233, "language": "en-US"}
+        # submission_number 는 집계값이라 수정 요청에 실려도 반영되지 않아야 한다
+        update_data = {"real_name": "zemal", "submission_number": 233}
         resp = self.client.put(self.url, data=update_data)
         self.assertSuccess(resp)
         data = resp.data["data"]
         self.assertEqual(data["real_name"], "zemal")
         self.assertEqual(data["submission_number"], 0)
-        self.assertEqual(data["language"], "en-US")
 
 
 @mock.patch("account.views.oj.send_email_async.send")
