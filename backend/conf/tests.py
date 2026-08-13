@@ -165,24 +165,6 @@ class TestCasePruneAPITest(APITestCase):
         mocked_delete_one.assert_called_once_with(valid_id)
 
 
-class ReleaseNoteAPITest(APITestCase):
-    def setUp(self):
-        self.url = self.reverse("get_release_notes_api")
-        self.create_super_admin()
-        self.latest_data = {"update": [
-            {
-                "version": "2099-12-25",
-                "level": 1,
-                "title": "Update at 2099-12-25",
-                "details": ["test get", ]
-            }
-        ]}
-
-    def test_get_versions(self):
-        resp = self.client.get(self.url)
-        self.assertSuccess(resp)
-
-
 class DashboardInfoAPITest(APITestCase):
     def setUp(self):
         self.url = self.reverse("dashboard_info_api")

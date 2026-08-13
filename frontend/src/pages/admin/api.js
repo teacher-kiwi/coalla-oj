@@ -181,9 +181,6 @@ export default {
   addProblemFromPublic (data) {
     return ajax('admin/contest/add_problem_from_public', 'post', { data })
   },
-  getReleaseNotes () {
-    return ajax('admin/versions', 'get')
-  },
   getDashboardInfo () {
     return ajax('admin/dashboard_info', 'get')
   },

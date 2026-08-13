@@ -53,40 +53,12 @@
         <InfoCard color="#409EFF" icon="Trophy" message="최근 대회" class="info-item"
                   :value="infoData.recent_contest_count" />
       </div>
-      <Panel class="release-panel">
-        <template #title>
-          <span v-loading="loadingReleases">릴리스 노트
-            <el-popover placement="right" trigger="hover">
-              <template #reference><el-icon class="help-icon"><QuestionFilled /></el-icon></template>
-              <p>Please upgrade to the latest version to enjoy the new features.</p>
-            </el-popover>
-          </span>
-        </template>
-        <el-collapse v-model="activeNames">
-          <el-collapse-item v-for="(release, index) in releases" :key="'release' + index" :name="index + 1">
-            <template #title>
-              <div v-if="release.new_version">{{ release.title }}
-                <el-tag size="small" type="success">새 버전</el-tag>
-              </div>
-              <span v-else>{{ release.title }}</span>
-            </template>
-            <p>Level: {{ release.level }}</p>
-            <p>Details:</p>
-            <div class="release-body">
-              <ul v-for="detail in release.details" :key="detail">
-                <li v-html="detail"></li>
-              </ul>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </Panel>
     </el-col>
   </el-row>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { QuestionFilled } from '@element-plus/icons-vue'
 import InfoCard from '@admin/components/infoCard.vue'
 import api from '@admin/api'
 import time from '@/utils/time'
@@ -100,10 +72,7 @@ const infoData = reactive({
   judge_server_count: 0,
   env: {}
 })
-const activeNames = ref([1])
 const session = ref({})
-const loadingReleases = ref(true)
-const releases = ref([])
 
 const user = computed(() => userStore.user)
 const cdn = computed(() => infoData.env.STATIC_CDN_HOST)
@@ -149,18 +118,6 @@ onMounted(() => {
     }
     session.value = s
   }, () => {})
-  api.getReleaseNotes().then(resp => {
-    loadingReleases.value = false
-    const data = resp.data.data
-    if (!data) return
-    const currentVersion = data.local_version
-    data.update.forEach(release => {
-      if (release.version > currentVersion) release.new_version = true
-    })
-    releases.value = data.update
-  }, () => {
-    loadingReleases.value = false
-  })
 })
 </script>
 
@@ -186,14 +143,6 @@ onMounted(() => {
         }
       }
     }
-  }
-
-  .release-panel {
-    margin-top: 5px;
-  }
-
-  .help-icon {
-    margin-left: 4px;
   }
 
   .info-container {
