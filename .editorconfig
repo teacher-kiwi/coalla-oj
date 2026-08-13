@@ -1,0 +1,24 @@
+# 편집기가 파일을 저장할 때 지킬 기본 서식.
+# 검사 도구가 아니라 편집기용 힌트라서, EditorConfig 를 지원하는 편집기에서만 동작한다
+# (VS Code 는 "EditorConfig for VS Code" 확장 필요, JetBrains 계열은 기본 지원).
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# 파이썬과 셸은 4칸을 쓴다. flake8 도 이 기준으로 본다.
+[*.{py,sh}]
+indent_size = 4
+
+# 깃 훅은 확장자가 없지만 셸 스크립트다
+[.githooks/*]
+indent_size = 4
+
+# 마크다운은 줄 끝 공백 두 칸이 줄바꿈을 뜻한다
+[*.md]
+trim_trailing_whitespace = false
