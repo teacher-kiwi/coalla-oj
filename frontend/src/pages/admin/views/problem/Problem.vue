@@ -166,9 +166,11 @@
           </el-col>
           <el-col :span="6">
             <el-form-item label="IO 모드">
+              <!-- 파일 입출력은 쓰지 않아 선택지에서 감춘다. 모델·채점기 쪽은 그대로라
+                   필요해지면 아래 한 줄만 되살리면 된다.
+              <el-radio label="File IO">파일 입출력</el-radio> -->
               <el-radio-group v-model="problem.io_mode.io_mode">
                 <el-radio label="Standard IO">표준 입출력</el-radio>
-                <el-radio label="File IO">파일 입출력</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
