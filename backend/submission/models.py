@@ -42,18 +42,25 @@ class Submission(models.Model):
     statistic_info = JSONField(default=dict)
     ip = models.TextField(null=True)
 
-    def check_user_permission(self, user):
+    def check_user_permission(self, user, student_ids=None):
         """제출 코드를 볼 수 있는 사람.
 
         본인·관리자·문제 출제자, 그리고 담당 교사뿐이다. 원본에 있던 "제출 공유"는
         교육용에서는 커닝 통로라 제거했다(6단계).
+
+        student_ids: 목록처럼 여러 건을 연달아 검사할 때 담당 학생 id 집합을 미리
+        넘기면 행마다 쿼리를 내지 않는다. 단건 호출에서는 그냥 비워두면 된다.
         """
         if self.user_id == user.id or user.is_super_admin() or user.can_mgmt_all_problem() or self.problem.created_by_id == user.id:
             return True
 
         # 교사는 담당 학생의 코드를 본다(학습 지도가 목적). 범위는 "내가 만든 학급에
         # 속한 학생"까지다. 교사 전체로 넓히면 남의 반 학생 코드까지 열린다.
-        return user.is_teacher() and ClassMembership.objects.filter(
+        if not user.is_teacher():
+            return False
+        if student_ids is not None:
+            return self.user_id in student_ids
+        return ClassMembership.objects.filter(
             student_id=self.user_id, school_class__teacher_id=user.id).exists()
 
     class Meta:

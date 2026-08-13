@@ -144,7 +144,8 @@ def check_contest_permission(check_type="details"):
 
 
 def ensure_created_by(obj, user):
-    e = APIError(msg=f"{obj.__class__.__name__} does not exist")
+    # 권한이 없는 경우와 없는 경우를 구분해서 알려주지 않는다(존재 여부가 새어나간다)
+    e = APIError(msg="존재하지 않거나 접근할 권한이 없습니다")
     if not user.is_admin_role():
         raise e
     if user.is_super_admin():

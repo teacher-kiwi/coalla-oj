@@ -41,24 +41,6 @@ def get_existing_problem_tags(tag_names):
 
 
 class ProblemTagAdminAPI(APIView):
-    def paginate_tag_list(self, request, tags):
-        try:
-            limit = int(request.GET.get("limit", "10"))
-        except ValueError:
-            limit = 10
-        if limit < 0 or limit > 250:
-            limit = 10
-        try:
-            offset = int(request.GET.get("offset", "0"))
-        except ValueError:
-            offset = 0
-        if offset < 0:
-            offset = 0
-        return {
-            "results": TagSerializer(tags[offset:offset + limit], many=True).data,
-            "total": len(tags)
-        }
-
     @admin_role_required
     def get(self, request):
         tag_id = request.GET.get("id")
@@ -73,10 +55,7 @@ class ProblemTagAdminAPI(APIView):
         if keyword:
             tags = filter_problem_tags_by_keyword(tags, keyword)
         if request.GET.get("paging") == "true":
-            if isinstance(tags, list):
-                return self.success(self.paginate_tag_list(request, tags))
-            else:
-                return self.success(self.paginate_data(request, tags, TagSerializer))
+            return self.success(self.paginate_data(request, tags, TagSerializer))
         return self.success(TagSerializer(tags, many=True).data)
 
     @validate_serializer(CreateProblemTagSerializer)
@@ -136,11 +115,11 @@ class TestCaseZipProcessor(object):
         try:
             zip_file = zipfile.ZipFile(uploaded_zip_file, "r")
         except zipfile.BadZipFile:
-            raise APIError("Bad zip file")
+            raise APIError("올바른 zip 파일이 아닙니다")
         name_list = zip_file.namelist()
         test_case_list = self.filter_name_list(name_list, spj=spj, dir=dir)
         if not test_case_list:
-            raise APIError("Empty file")
+            raise APIError("파일이 비어 있습니다")
 
         test_case_id = rand_str()
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
@@ -277,9 +256,9 @@ class ProblemBase(APIView):
         data = request.data
         if data["spj"]:
             if not data["spj_language"] or not data["spj_code"]:
-                return "Invalid spj"
+                return "특수 채점(SPJ) 설정이 올바르지 않습니다"
             if not data["spj_compile_ok"]:
-                return "SPJ code must be compiled successfully"
+                return "특수 채점(SPJ) 코드를 먼저 컴파일해야 합니다"
             data["spj_version"] = hashlib.md5(
                 (data["spj_language"] + ":" + data["spj_code"]).encode("utf-8")).hexdigest()
         else:
@@ -289,7 +268,7 @@ class ProblemBase(APIView):
             total_score = 0
             for item in data["test_case_score"]:
                 if item["score"] <= 0:
-                    return "Invalid score"
+                    return "점수는 1점 이상이어야 합니다"
                 else:
                     total_score += item["score"]
             data["total_score"] = total_score
@@ -374,7 +353,6 @@ class ProblemAPI(ProblemBase):
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
             return self.error(error)
-        data["languages"] = list(data["languages"])
 
         for k, v in data.items():
             setattr(problem, k, v)
@@ -497,7 +475,6 @@ class ContestProblemAPI(ProblemBase):
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
             return self.error(error)
-        data["languages"] = list(data["languages"])
 
         for k, v in data.items():
             setattr(problem, k, v)
@@ -615,7 +592,7 @@ class ExportProblemAPI(APIView):
 
     @validate_serializer(ExportProblemRequestSerialzier)
     def get(self, request):
-        problems = Problem.objects.filter(id__in=request.data["problem_id"])
+        problems = Problem.objects.filter(id__in=request.data["problem_id"]).select_related("contest")
         for problem in problems:
             if problem.contest:
                 ensure_created_by(problem.contest, request.user)

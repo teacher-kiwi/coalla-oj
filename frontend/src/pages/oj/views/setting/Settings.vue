@@ -11,7 +11,7 @@
                   <a @click.stop="goRoute('/setting/profile')">
                     <div class="mask-content">
                       <el-icon :size="30"><Camera /></el-icon>
-                      <p class="text">change avatar</p>
+                      <p class="text">사진 변경</p>
                     </div>
                   </a>
                 </div>

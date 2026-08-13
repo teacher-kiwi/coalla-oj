@@ -14,7 +14,7 @@
             <el-input v-model="formPassword.again_password" type="password" />
           </el-form-item>
           <el-form-item v-if="visible.passwordAlert">
-            <el-alert type="success" :closable="false">You will need to login again after 5 seconds..</el-alert>
+            <el-alert type="success" :closable="false">잠시 후 자동으로 로그아웃됩니다. 새 비밀번호로 다시 로그인해주세요.</el-alert>
           </el-form-item>
           <el-button type="primary" :loading="loading.btnPassword" @click="changePassword">비밀번호 업데이트</el-button>
         </el-form>

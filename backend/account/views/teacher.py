@@ -16,7 +16,7 @@ from options.options import SysOptions
 from submission.models import Submission
 from submission.serializers import TeacherStudentSubmissionSerializer
 from utils.api import APIView, validate_serializer
-from utils.shortcuts import rand_str
+from utils.shortcuts import int_or_none, rand_str
 from ..decorators import teacher_required
 from ..login_throttle import clear_login_failures
 from ..models import (AdminType, ClassMembership, School, SchoolClass, User,
@@ -36,7 +36,13 @@ def generate_pin():
 
 
 def owned_class(user, class_id):
-    """내가 담당하는 학급만 돌려준다. 아니면 None."""
+    """내가 담당하는 학급만 돌려준다. 아니면 None.
+
+    id 는 쿼리스트링에서 문자열로 온다. 숫자가 아니면 여기서 걸러야 한다.
+    """
+    class_id = int_or_none(class_id)
+    if class_id is None:
+        return None
     qs = SchoolClass.objects.select_related("school", "teacher")
     if user.is_super_admin():
         return qs.filter(id=class_id).first()
@@ -176,19 +182,20 @@ class StudentAPI(APIView):
         if current + len(numbers) > limit:
             return self.error(f"교사당 학생 수 상한({limit}명)을 넘습니다. 현재 {current}명")
 
-        created = []
+        # 한 학급이 30명이면 한 명씩 만들 때 90번의 INSERT 가 나간다. 세 번으로 끝낸다.
+        # (PostgreSQL 은 bulk_create 가 만든 객체에 pk 를 채워주므로 이어서 참조할 수 있다)
+        created = [(number, generate_pin()) for number in numbers]
+        students = [User(username=school_class.student_username(number),
+                         admin_type=AdminType.REGULAR_USER,
+                         created_by=school_class.teacher,
+                         password=make_password(pin))
+                    for number, pin in created]
         with transaction.atomic():
-            for number in numbers:
-                pin = generate_pin()
-                student = User.objects.create(
-                    username=school_class.student_username(number),
-                    admin_type=AdminType.REGULAR_USER,
-                    created_by=school_class.teacher,
-                    password=make_password(pin))
-                UserProfile.objects.create(user=student)
-                ClassMembership.objects.create(school_class=school_class,
-                                               student=student, number=number)
-                created.append((number, pin))
+            User.objects.bulk_create(students)
+            UserProfile.objects.bulk_create([UserProfile(user=student) for student in students])
+            ClassMembership.objects.bulk_create(
+                [ClassMembership(school_class=school_class, student=student, number=number)
+                 for (number, _), student in zip(created, students)])
 
         # 초기 PIN 은 해시로 저장되어 다시 조회할 수 없다. 교사가 배부해야 하므로
         # 생성 직후 이 응답에서만 평문으로 돌려준다.
@@ -217,12 +224,12 @@ class StudentAPI(APIView):
 
     @teacher_required
     def delete(self, request):
-        membership_id = request.GET.get("id")
-        if not membership_id:
+        membership_id = int_or_none(request.GET.get("id"))
+        if membership_id is None:
             return self.error("잘못된 요청입니다. id가 필요합니다")
-        try:
-            membership = ClassMembership.objects.select_related("school_class").get(id=membership_id)
-        except ClassMembership.DoesNotExist:
+        membership = ClassMembership.objects.select_related("school_class").filter(
+            id=membership_id).first()
+        if not membership:
             return self.error("학생이 존재하지 않습니다")
         if not owned_class(request.user, membership.school_class_id):
             return self.error("학생이 존재하지 않습니다")
@@ -238,20 +245,20 @@ class StudentSubmissionAPI(APIView):
     """
     @teacher_required
     def get(self, request):
-        membership_id = request.GET.get("membership")
-        if not membership_id or not membership_id.isdigit():
+        membership_id = int_or_none(request.GET.get("membership"))
+        if membership_id is None:
             return self.error("잘못된 요청입니다. membership이 필요합니다")
         membership = ClassMembership.objects.select_related("school_class").filter(
-            id=int(membership_id)).first()
+            id=membership_id).first()
         if not membership or not owned_class(request.user, membership.school_class_id):
             return self.error("학생이 존재하지 않습니다")
 
         submissions = Submission.objects.filter(user_id=membership.student_id,
                                                 contest_id__isnull=True) \
                                         .select_related("problem")
-        problem_id = request.GET.get("problem_id")
-        if problem_id and problem_id.isdigit():
-            submissions = submissions.filter(problem_id=int(problem_id))
+        problem_id = int_or_none(request.GET.get("problem_id"))
+        if problem_id is not None:
+            submissions = submissions.filter(problem_id=problem_id)
         return self.success(self.paginate_data(request, submissions,
                                                TeacherStudentSubmissionSerializer))
 

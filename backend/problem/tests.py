@@ -150,7 +150,7 @@ class ProblemAdminAPITest(APITestCase):
         data["spj"] = True
 
         resp = self.client.post(self.url, data)
-        self.assertFailed(resp, "Invalid spj")
+        self.assertFailed(resp, "특수 채점(SPJ) 설정이 올바르지 않습니다")
 
         data["spj_code"] = "test"
         resp = self.client.post(self.url, data=data)

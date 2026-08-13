@@ -66,9 +66,6 @@ export default {
   editClass (data) {
     return ajax('teacher/class', 'put', { data })
   },
-  deleteClass (id) {
-    return ajax('teacher/class', 'delete', { params: { id } })
-  },
   getClassStudents (classId) {
     return ajax('teacher/student', 'get', { params: { class_id: classId } })
   },
@@ -278,7 +275,7 @@ function ajax (url, method, options) {
         reject(res)
         if (isLoginRequired(res, detail)) {
           import('@/store/app').then(({ useAppStore }) => {
-            useAppStore().changeModalStatus({ mode: 'login', visible: true })
+            useAppStore().changeModalStatus({ visible: true })
           })
         }
       } else {

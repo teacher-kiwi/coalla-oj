@@ -1,10 +1,9 @@
-import random
 from django.db.models import Q, Count
 from utils.api import APIView
 from account.decorators import check_contest_permission, login_required
 from ..models import ProblemTag, Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment
-from ..serializers import (ProblemBriefSerializer, ProblemSerializer, TagSerializer,
-                           ProblemSafeSerializer)
+from ..serializers import (ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
+                           TagSerializer, ProblemSafeSerializer)
 from ..utils import filter_problem_tags_by_keyword
 from contest.models import ContestRuleType
 from submission.models import JudgeStatus
@@ -21,11 +20,10 @@ class ProblemTagAPI(APIView):
 
 class PickOneAPI(APIView):
     def get(self, request):
-        problems = Problem.objects.filter(contest_id__isnull=True, visible=True)
-        count = problems.count()
-        if count == 0:
+        problem = Problem.objects.filter(contest_id__isnull=True, visible=True).order_by("?").first()
+        if problem is None:
             return self.error("선택할 문제가 없습니다")
-        return self.success(problems[random.randint(0, count - 1)]._id)
+        return self.success(problem._id)
 
 
 class ProblemAPI(APIView):
@@ -64,7 +62,7 @@ class ProblemAPI(APIView):
         if not limit:
             return self.error("limit 값이 필요합니다")
 
-        problems = Problem.objects.select_related("created_by").filter(contest_id__isnull=True, visible=True)
+        problems = Problem.objects.prefetch_related("tags").filter(contest_id__isnull=True, visible=True)
         # 按照标签筛选
         tag_text = request.GET.get("tag")
         if tag_text:
@@ -80,7 +78,7 @@ class ProblemAPI(APIView):
         if difficulty:
             problems = problems.filter(difficulty=difficulty)
         # 根据profile 为做过的题目添加标记
-        data = self.paginate_data(request, problems, ProblemSerializer)
+        data = self.paginate_data(request, problems, ProblemListSerializer)
         self._add_problem_status(request, data)
         return self.success(data)
 

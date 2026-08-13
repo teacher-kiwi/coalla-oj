@@ -11,7 +11,6 @@ from django.utils.timezone import now
 
 from options.options import SysOptions
 from utils.api import APIView, validate_serializer
-from utils.shortcuts import rand_str
 from ..decorators import login_required, super_admin_required
 from ..models import (AdminType, ProblemPermission, STUDENT_USERNAME_RE,
                       TeacherApplication, TeacherApplicationStatus, User,

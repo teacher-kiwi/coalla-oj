@@ -3,7 +3,7 @@
     <div class="error404-body-con">
       <el-card>
         <div class="error404-body-con-title">4<span><el-icon><Compass /></el-icon></span>4</div>
-        <p class="error404-body-con-message">YOU&nbsp;&nbsp;LOOK&nbsp;&nbsp;LOST</p>
+        <p class="error404-body-con-message">길을&nbsp;&nbsp;잃으셨나요?</p>
         <div class="error404-btn-con">
           <el-button @click="goHome" size="large" class="error-btn">홈으로</el-button>
           <el-button @click="backPage" size="large" class="error-btn error-btn-back" type="primary">뒤로</el-button>

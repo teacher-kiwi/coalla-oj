@@ -11,7 +11,7 @@
       action=""
     >
       <el-icon :size="52" class="upload-icon"><UploadFilled /></el-icon>
-      <div>Drop here, or click to select manually (max 2MB)</div>
+      <div>이미지를 끌어다 놓거나 클릭해서 선택하세요 (최대 2MB)</div>
     </el-upload>
 
     <div class="section-title">프로필 설정</div>

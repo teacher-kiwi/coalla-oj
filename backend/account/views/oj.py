@@ -315,12 +315,15 @@ class ProfileProblemDisplayIDRefreshAPI(APIView):
         ids = list(acm_problems.keys()) + list(oi_problems.keys())
         if not ids:
             return self.success()
-        display_ids = Problem.objects.filter(id__in=ids, visible=True).values_list("_id", flat=True)
-        id_map = dict(zip(ids, display_ids))
-        for k, v in acm_problems.items():
-            v["_id"] = id_map[k]
-        for k, v in oi_problems.items():
-            v["_id"] = id_map[k]
+        # id 로 짝지어야 한다. 예전에는 zip(ids, display_ids) 로 조회 순서에 기댔는데,
+        # 순서가 보장되지 않아 엉뚱한 표시 ID 가 들어갔고 숨김·삭제된 문제가 있으면
+        # 개수가 어긋나 KeyError 로 터졌다.
+        id_map = {str(pk): _id for pk, _id in
+                  Problem.objects.filter(id__in=ids, visible=True).values_list("id", "_id")}
+        for problems in (acm_problems, oi_problems):
+            for k, v in problems.items():
+                if k in id_map:
+                    v["_id"] = id_map[k]
         profile.save(update_fields=["acm_problems_status", "oi_problems_status"])
         return self.success()
 

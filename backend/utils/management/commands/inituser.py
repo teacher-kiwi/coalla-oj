@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 
 from account.models import AdminType, ProblemPermission, User, UserProfile
-from utils.shortcuts import rand_str  # NOQA
 
 
 class Command(BaseCommand):

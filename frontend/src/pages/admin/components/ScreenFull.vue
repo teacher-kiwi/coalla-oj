@@ -20,7 +20,7 @@ function toggle () {
   if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
     if (el.requestFullscreen) el.requestFullscreen()
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
-    else ElMessage.warning("Your browser doesn't support fullscreen")
+    else ElMessage.warning('이 브라우저는 전체 화면을 지원하지 않습니다')
   } else {
     if (doc.exitFullscreen) doc.exitFullscreen()
     else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen()

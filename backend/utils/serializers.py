@@ -31,12 +31,3 @@ class LanguageNameMultiChoiceField(serializers.ListField):
             if item not in SysOptions.language_names:
                 raise InvalidLanguage(item)
         return data
-
-
-class SPJLanguageNameMultiChoiceField(serializers.ListField):
-    def to_internal_value(self, data):
-        data = super().to_internal_value(data)
-        for item in data:
-            if item not in SysOptions.spj_language_names:
-                raise InvalidLanguage(item)
-        return data

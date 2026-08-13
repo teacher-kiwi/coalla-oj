@@ -1,6 +1,5 @@
 import os
 import re
-import datetime
 import random
 from base64 import b64encode
 from io import BytesIO
@@ -26,20 +25,6 @@ def rand_str(length=32, type="lower_hex"):
         return random.choice("123456789") + get_random_string(length - 1, allowed_chars="0123456789")
 
 
-def build_query_string(kv_data, ignore_none=True):
-    # {"a": 1, "b": "test"} -> "?a=1&b=test"
-    query_string = ""
-    for k, v in kv_data.items():
-        if ignore_none is True and kv_data[k] is None:
-            continue
-        if query_string != "":
-            query_string += "&"
-        else:
-            query_string = "?"
-        query_string += (k + "=" + str(v))
-    return query_string
-
-
 def img2base64(img):
     with BytesIO() as buf:
         img.save(buf, "gif")
@@ -56,10 +41,6 @@ def datetime2str(value, format="iso-8601"):
             value = value[:-6] + "Z"
         return value
     return value.strftime(format)
-
-
-def timestamp2utcstr(value):
-    return datetime.datetime.utcfromtimestamp(value).isoformat()
 
 
 def natural_sort_key(s, _nsre=re.compile(r"(\d+)")):
@@ -92,3 +73,11 @@ def check_is_id(value):
         return int(value) > 0
     except Exception:
         return False
+
+
+def int_or_none(value):
+    """쿼리스트링에서 온 id 는 문자열이라 그대로 filter 에 넣으면 ValueError 로 500 이 난다."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

@@ -37,11 +37,10 @@ class UserAdminAPI(APIView):
                 ret = User.objects.bulk_create(user_list)
                 UserProfile.objects.bulk_create([UserProfile(user=ret[i], real_name=data[i][3]) for i in range(len(ret))])
             return self.success()
-        except IntegrityError as e:
-            # Extract detail from exception message
-            #    duplicate key value violates unique constraint "user_username_key"
-            #    DETAIL:  Key (username)=(root11) already exists.
-            return self.error(str(e).split("\n")[1])
+        except IntegrityError:
+            # 원본은 DB 예외 메시지(DETAIL: Key (username)=(root11) already exists.)를
+            # 그대로 돌려줬다. 읽히지도 않고 DB 내부 구조만 드러난다.
+            return self.error("이미 사용 중인 사용자명이 있습니다")
 
     @validate_serializer(EditUserSerializer)
     @super_admin_required
@@ -178,8 +177,7 @@ class GenerateUserAPI(APIView):
                     i += 1
                 workbook.close()
                 return self.success({"file_id": file_id})
-        except IntegrityError as e:
-            # Extract detail from exception message
-            #    duplicate key value violates unique constraint "user_username_key"
-            #    DETAIL:  Key (username)=(root11) already exists.
-            return self.error(str(e).split("\n")[1])
+        except IntegrityError:
+            # 원본은 DB 예외 메시지(DETAIL: Key (username)=(root11) already exists.)를
+            # 그대로 돌려줬다. 읽히지도 않고 DB 내부 구조만 드러난다.
+            return self.error("이미 사용 중인 사용자명이 있습니다")

@@ -32,8 +32,8 @@
               <template #reference>
                 <el-icon><QuestionFilled /></el-icon>
               </template>
-              <p>If you find the following problem id does not exist,<br /> try to click the button.</p>
-              <el-button type="info" @click="freshProblemDisplayID">regenerate</el-button>
+              <p>아래 문제 번호가 실제와 다르면<br />이 버튼으로 다시 맞출 수 있습니다.</p>
+              <el-button type="info" @click="freshProblemDisplayID">번호 새로고침</el-button>
             </el-popover>
           </div>
           <p v-else>아직 문제를 해결하지 않은 게으른 사람입니다.</p>
@@ -57,7 +57,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { QuestionFilled, Message } from '@element-plus/icons-vue'
-import time from '@/utils/time'
 import api from '@oj/api'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
@@ -95,9 +94,6 @@ async function init () {
   appStore.changeDomTitle(res.data.data.user.username)
   profile.value = res.data.data
   getSolvedProblems()
-  const registerTime = time.utcToLocal(profile.value.user.create_time, 'YYYY-MM-D')
-  // eslint-disable-next-line no-console
-  console.log('The guy registered at ' + registerTime + '.')
 }
 
 function goProblem (problemID) {

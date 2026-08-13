@@ -10,7 +10,7 @@
                      @change="onFilterChange" />
         </template>
         <div class="echarts">
-          <VChart ref="chart" :option="options" autoresize />
+          <VChart :option="options" autoresize />
         </div>
       </Panel>
       <el-table :data="dataRank" v-loading="loadingTable" size="large" stripe
@@ -58,7 +58,6 @@ const limit = ref(30)
 const total = ref(0)
 const loadingTable = ref(false)
 const dataRank = ref([])
-const chart = ref(null)
 
 const options = ref({
   tooltip: { trigger: 'axis' },

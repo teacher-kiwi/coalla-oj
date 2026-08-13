@@ -7,7 +7,7 @@ import io
 from urllib.parse import quote
 
 import xlsxwriter
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Count, Max, Q
 from django.http import HttpResponse
 
@@ -15,6 +15,7 @@ from account.decorators import teacher_required
 from account.views.teacher import owned_class
 from submission.models import JudgeStatus, Submission
 from utils.api import APIView, validate_serializer
+from utils.shortcuts import int_or_none
 
 from ..models import Problem, ProblemSet, ProblemSetAssignment, ProblemSetItem
 from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSetSerializer,
@@ -23,26 +24,19 @@ from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSe
                            ProblemSetProblemSerializer, ProblemSetSerializer)
 
 
-def owned_problem_set(user, problem_set_id):
+def owned_problem_set(user, problem_set_id, queryset=None):
     """내가 만든 문제집만 돌려준다. 아니면 None.
 
     최고관리자는 운영·점검을 위해 통과시킨다(`owned_class` 와 같은 규칙).
+    상세 화면처럼 딸린 항목까지 필요하면 prefetch 를 건 queryset 을 넘긴다.
     """
     problem_set_id = int_or_none(problem_set_id)
     if problem_set_id is None:
         return None
-    qs = ProblemSet.objects.all()
+    qs = ProblemSet.objects.all() if queryset is None else queryset
     if user.is_super_admin():
         return qs.filter(id=problem_set_id).first()
     return qs.filter(id=problem_set_id, created_by=user).first()
-
-
-def int_or_none(value):
-    """쿼리스트링에서 온 id 는 문자열이라 그대로 filter 에 넣으면 ValueError 로 500 이 난다."""
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 class ProblemSetAPI(APIView):
@@ -50,11 +44,12 @@ class ProblemSetAPI(APIView):
     def get(self, request):
         problem_set_id = request.GET.get("id")
         if problem_set_id:
-            problem_set = owned_problem_set(request.user, problem_set_id)
+            problem_set = owned_problem_set(
+                request.user, problem_set_id,
+                queryset=ProblemSet.objects.prefetch_related(
+                    "items__problem", "assignments__school_class__school"))
             if not problem_set:
                 return self.error("문제집이 존재하지 않습니다")
-            problem_set = ProblemSet.objects.prefetch_related(
-                "items__problem", "assignments__school_class__school").get(id=problem_set.id)
             return self.success(ProblemSetDetailSerializer(problem_set).data)
 
         problem_sets = ProblemSet.objects.annotate(
@@ -110,16 +105,15 @@ class ProblemSetProblemAPI(APIView):
 
         existing = set(problem_set.items.values_list("problem_id", flat=True))
         next_order = (problem_set.items.aggregate(m=Max("order"))["m"] or 0) + 1
-        added = 0
-        with transaction.atomic():
-            for problem in problems:
-                if problem.id in existing:
-                    continue
-                ProblemSetItem.objects.create(problem_set=problem_set, problem=problem,
-                                              order=next_order)
-                next_order += 1
-                added += 1
-        return self.success({"added": added})
+        new_items = []
+        for problem in problems:
+            if problem.id in existing:
+                continue
+            new_items.append(ProblemSetItem(problem_set=problem_set, problem=problem,
+                                            order=next_order))
+            next_order += 1
+        ProblemSetItem.objects.bulk_create(new_items)
+        return self.success({"added": len(new_items)})
 
     @validate_serializer(ProblemSetItemOrderSerializer)
     @teacher_required
@@ -133,11 +127,9 @@ class ProblemSetProblemAPI(APIView):
         if set(request.data["items"]) != set(items.keys()):
             return self.error("문제 목록이 바뀌었습니다. 새로고침 후 다시 시도하세요")
 
-        with transaction.atomic():
-            for order, item_id in enumerate(request.data["items"], start=1):
-                item = items[item_id]
-                item.order = order
-                item.save(update_fields=["order"])
+        for order, item_id in enumerate(request.data["items"], start=1):
+            items[item_id].order = order
+        ProblemSetItem.objects.bulk_update(items.values(), ["order"])
         return self.success()
 
     @teacher_required

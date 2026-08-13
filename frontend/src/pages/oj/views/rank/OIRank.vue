@@ -4,7 +4,7 @@
       <Panel :padding="10">
         <template #title>OI 순위</template>
         <div class="echarts">
-          <VChart ref="chart" :option="options" autoresize />
+          <VChart :option="options" autoresize />
         </div>
       </Panel>
       <el-table :data="dataRank" size="large" stripe>
@@ -48,7 +48,6 @@ const page = ref(1)
 const limit = ref(30)
 const total = ref(0)
 const dataRank = ref([])
-const chart = ref(null)
 
 const options = ref({
   tooltip: { trigger: 'axis' },

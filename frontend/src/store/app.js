@@ -3,8 +3,8 @@ import { defineStore } from 'pinia'
 export const useAppStore = defineStore('app', {
   state: () => ({
     website: {},
+    // 모달은 로그인 하나뿐이라 열림 여부만 둔다
     modalStatus: {
-      mode: 'login',
       visible: false
     }
   }),
@@ -14,8 +14,7 @@ export const useAppStore = defineStore('app', {
       const res = await api.getWebsiteConf()
       this.website = res.data.data
     },
-    changeModalStatus ({ mode, visible }) {
-      if (mode !== undefined) this.modalStatus.mode = mode
+    changeModalStatus ({ visible }) {
       if (visible !== undefined) this.modalStatus.visible = visible
     },
     changeDomTitle (title) {

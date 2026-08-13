@@ -1,4 +1,4 @@
-from account.models import has_public_profile, public_display_name
+from account.models import has_public_profile, my_student_ids, public_display_name
 from .models import Submission
 from utils.api import serializers
 from utils.serializers import LanguageNameChoiceField
@@ -54,6 +54,11 @@ class SubmissionListSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
+        # 교사가 목록을 볼 때 행마다 "내 학생인가"를 묻지 않도록 한 번만 모아둔다.
+        # (Submission.check_user_permission 은 단건용이라 행마다 쿼리를 낸다)
+        self._my_student_ids = None
+        if self.user is not None and self.user.is_authenticated and self.user.is_teacher():
+            self._my_student_ids = set(my_student_ids(self.user))
         super().__init__(*args, **kwargs)
 
     class Meta:
@@ -70,7 +75,7 @@ class SubmissionListSerializer(serializers.ModelSerializer):
         # 没传user或为匿名user
         if self.user is None or not self.user.is_authenticated:
             return False
-        return obj.check_user_permission(self.user)
+        return obj.check_user_permission(self.user, student_ids=self._my_student_ids)
 
 
 class TeacherStudentSubmissionSerializer(serializers.ModelSerializer):

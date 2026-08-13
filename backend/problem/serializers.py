@@ -28,10 +28,6 @@ class CreateTestCaseScoreSerializer(serializers.Serializer):
     score = serializers.IntegerField(min_value=0)
 
 
-class CreateProblemCodeTemplateSerializer(serializers.Serializer):
-    pass
-
-
 class ProblemIOModeSerializer(serializers.Serializer):
     io_mode = serializers.ChoiceField(choices=ProblemIOMode.choices())
     input = serializers.CharField()
@@ -39,10 +35,10 @@ class ProblemIOModeSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs["input"] == attrs["output"]:
-            raise serializers.ValidationError("Invalid io mode")
+            raise serializers.ValidationError("입력 파일명과 출력 파일명이 같을 수 없습니다")
         for item in (attrs["input"], attrs["output"]):
             if not re.match("^[a-zA-Z0-9.]+$", item):
-                raise serializers.ValidationError("Invalid io file name format")
+                raise serializers.ValidationError("파일명은 영문·숫자·마침표만 사용할 수 있습니다")
         return attrs
 
 
@@ -133,6 +129,20 @@ class ProblemSerializer(BaseProblemSerializer):
         model = Problem
         exclude = ("test_case_score", "test_case_id", "visible", "is_public",
                    "spj_code", "spj_version", "spj_compile_ok")
+
+
+class ProblemListSerializer(serializers.ModelSerializer):
+    """목록 화면용. 본문·힌트·예제·코드 템플릿은 상세 API 에서 받는다.
+
+    목록에 전문을 실으면 한 페이지에 문제 본문이 10개씩 실려 나간다.
+    rule_type 은 화면에 쓰이진 않지만 "내가 푼 문제" 표시(_add_problem_status)에 필요하다.
+    """
+    tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+
+    class Meta:
+        model = Problem
+        fields = ("id", "_id", "title", "difficulty", "tags", "rule_type",
+                  "submission_number", "accepted_number")
 
 
 class ProblemSafeSerializer(BaseProblemSerializer):

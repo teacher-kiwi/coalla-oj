@@ -237,16 +237,18 @@ function handleRejudge (id, index) {
 }
 
 onMounted(() => {
-  init()
+  userStore.ensureProfile()
 })
 
 watch(() => route.fullPath, (newVal, oldVal) => {
   if (newVal !== oldVal) init()
 })
 
-watch(() => userStore.isAuthenticated, () => {
-  init()
-})
+// 로그인 여부가 확정된 뒤에 한 번, 그리고 로그인/로그아웃할 때마다 다시 부른다.
+// 두 값을 한 감시자에 묶어 둘이 같이 바뀌는 최초 로드에서도 한 번만 실행되게 한다.
+watch(() => [userStore.profileReady, userStore.user.id], ([ready]) => {
+  if (ready) init()
+}, { immediate: true })
 </script>
 
 <style scoped lang="less">

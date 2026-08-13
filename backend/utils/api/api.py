@@ -45,7 +45,7 @@ class JSONResponse(object):
 
     @classmethod
     def response(cls, data):
-        resp = HttpResponse(json.dumps(data, indent=4), content_type=cls.content_type)
+        resp = HttpResponse(json.dumps(data), content_type=cls.content_type)
         resp.data = data
         return resp
 
@@ -108,7 +108,7 @@ class APIView(View):
         return self.error(err=f"invalid-{key}", msg=msg)
 
     def server_error(self):
-        return self.error(err="server-error", msg="server error")
+        return self.error(err="server-error", msg="서버 오류가 발생했습니다")
 
     def paginate_data(self, request, query_set, object_serializer=None):
         """
@@ -129,12 +129,12 @@ class APIView(View):
             offset = 0
         if offset < 0:
             offset = 0
+        # 파이썬에서 걸러낸 결과(list)도 그대로 넘어올 수 있다. list.count() 는
+        # 인자를 요구하므로 QuerySet 인지 보고 세는 방법을 고른다.
+        count = len(query_set) if isinstance(query_set, (list, tuple)) else query_set.count()
         results = query_set[offset:offset + limit]
         if object_serializer:
-            count = query_set.count()
             results = object_serializer(results, many=True).data
-        else:
-            count = query_set.count()
         data = {"results": results,
                 "total": count}
         return data

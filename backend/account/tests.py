@@ -7,7 +7,7 @@ from copy import deepcopy
 from django.contrib import auth
 from django.utils.timezone import now
 
-from utils.api.tests import APIClient, APITestCase
+from utils.api.tests import APITestCase
 from utils.shortcuts import rand_str
 from options.options import SysOptions
 
@@ -436,7 +436,7 @@ class AdminUserTest(APITestCase):
                           ["user1", "pass1", "eami1@e.com", "user1"]]
                 }
         resp = self.client.post(self.url, data)
-        self.assertFailed(resp, "DETAIL:  Key (username)=(user1) already exists.")
+        self.assertFailed(resp, "이미 사용 중인 사용자명이 있습니다")
         # no user is created
         self.assertEqual(User.objects.all().count(), 2)
 

@@ -70,7 +70,7 @@ function submit () {
 
 function goLogin () {
   router.push({ name: 'home' })
-  appStore.changeModalStatus({ mode: 'login', visible: true })
+  appStore.changeModalStatus({ visible: true })
 }
 </script>
 

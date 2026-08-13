@@ -55,7 +55,7 @@
       <div class="flex-spacer" />
 
       <div v-if="!userStore.isAuthenticated" class="btn-menu">
-        <el-button round @click="handleBtnClick('login')">로그인</el-button>
+        <el-button round @click="openLogin">로그인</el-button>
       </div>
       <el-dropdown v-else class="drop-menu" trigger="click" @command="handleRoute">
         <el-button text class="drop-menu-title">
@@ -78,7 +78,7 @@
       <template #header>
         <div class="modal-title">환영합니다 {{ appStore.website.website_name_shortcut }}</div>
       </template>
-      <component :is="currentModal" v-if="modalVisible" />
+      <Login v-if="modalVisible" />
     </el-dialog>
   </div>
 </template>
@@ -96,7 +96,7 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 
 onMounted(() => {
-  userStore.getProfile()
+  userStore.ensureProfile()
 })
 
 const activeMenu = computed(() => {
@@ -108,13 +108,11 @@ const activeMenu = computed(() => {
 // 학급 소속 여부는 프로필에 없지만, 수업용 학생은 교사가 만든 계정이라 created_by 가 있다
 const isStudent = computed(() => !!userStore.user.created_by)
 
+// 가입은 구글 로그인 안에서 처리하므로 모달은 로그인 하나뿐이다
 const modalVisible = computed({
   get: () => appStore.modalStatus.visible,
   set: (value) => appStore.changeModalStatus({ visible: value })
 })
-
-// 가입은 구글 로그인 안에서 처리하므로 모달은 로그인 하나뿐이다
-const currentModal = computed(() => Login)
 
 function handleRoute (target) {
   if (!target) return
@@ -125,8 +123,8 @@ function handleRoute (target) {
   }
 }
 
-function handleBtnClick (mode) {
-  appStore.changeModalStatus({ visible: true, mode })
+function openLogin () {
+  appStore.changeModalStatus({ visible: true })
 }
 </script>
 
