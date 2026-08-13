@@ -215,13 +215,17 @@ class JudgeDispatcher(DispatcherBase):
 
     def update_problem_status_rejudge(self):
         result = str(self.submission.result)
+        # statistic_info 는 JSON 이라 키가 항상 문자열이다. 예전에는 int 인
+        # self.last_result 로 조회해서 항상 빗나갔고, 그 결과 이전 결과의 횟수가
+        # 실제 값과 무관하게 0 이 되었다(오답 5회 -> 재채점 한 번에 0회).
+        last_result = str(self.last_result)
         problem_id = str(self.problem.id)
         with transaction.atomic():
             problem = Problem.objects.select_for_update().get(contest_id=self.contest_id, id=self.problem.id)
             if self.last_result != JudgeStatus.ACCEPTED and self.submission.result == JudgeStatus.ACCEPTED:
                 problem.accepted_number += 1
             problem_info = problem.statistic_info
-            problem_info[self.last_result] = problem_info.get(self.last_result, 1) - 1
+            problem_info[last_result] = max(problem_info.get(last_result, 1) - 1, 0)
             problem_info[result] = problem_info.get(result, 0) + 1
             problem.save(update_fields=["accepted_number", "statistic_info"])
 

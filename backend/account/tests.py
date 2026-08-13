@@ -11,8 +11,22 @@ from utils.api.tests import APITestCase
 from utils.shortcuts import rand_str
 from options.options import SysOptions
 
+from problem.models import Problem, ProblemTag
 from .models import AdminType, ProblemPermission, TeacherApplication, User
 from utils.constants import ContestRuleType
+
+# 표시 ID 새로고침 테스트에서만 쓰는 최소 문제 데이터
+PROBLEM_DATA = {
+    "_id": "P-1", "title": "test", "description": "<p>test</p>",
+    "input_description": "test", "output_description": "test",
+    "time_limit": 1000, "memory_limit": 256, "difficulty": "Low", "visible": True,
+    "languages": ["Python3"], "template": {}, "samples": [{"input": "1", "output": "1"}],
+    "spj": False, "spj_language": None, "spj_code": None,
+    "test_case_id": "d41d8cd98f00b204e9800998ecf8427e",
+    "test_case_score": [{"output_name": "1.out", "input_name": "1.in", "score": 100}],
+    "rule_type": "ACM", "hint": "", "source": "test",
+    "io_mode": {"io_mode": "Standard IO", "input": "input.txt", "output": "output.txt"},
+}
 
 
 class PermissionDecoratorTest(APITestCase):
@@ -373,8 +387,58 @@ class UserRankAPITest(APITestCase):
 
 
 class ProfileProblemDisplayIDRefreshAPITest(APITestCase):
+    """프로필에 저장된 문제 표시 ID 를 실제 값으로 다시 맞춘다.
+
+    문제 번호를 바꾸면 프로필의 사본이 옛 번호로 남아, 사용자 홈에서 없는 번호를
+    누르게 된다. 이 API 가 그것을 고쳐준다.
+    """
     def setUp(self):
-        pass
+        self.user = self.create_user("test", "test123")
+        admin = self.create_admin("problem_admin", "test123", login=False)
+        ProblemTag.objects.create(name="test")
+        self.problem = self._create_problem(admin, "OLD-1")
+        self.other = self._create_problem(admin, "OLD-2")
+        self.url = self.reverse("display_id_fresh")
+
+    def _create_problem(self, created_by, display_id):
+        data = deepcopy(PROBLEM_DATA)
+        data["_id"] = display_id
+        data["created_by"] = created_by
+        return Problem.objects.create(**data)
+
+    def _set_solved(self, problems):
+        profile = self.user.userprofile
+        profile.acm_problems_status = {
+            "problems": {str(p.id): {"status": 0, "_id": stale} for p, stale in problems}
+        }
+        profile.save()
+
+    def test_display_id_is_refreshed(self):
+        self._set_solved([(self.problem, "STALE-1"), (self.other, "STALE-2")])
+        self.problem._id = "NEW-1"
+        self.problem.save()
+
+        self.assertSuccess(self.client.get(self.url))
+
+        status = User.objects.get(id=self.user.id).userprofile.acm_problems_status["problems"]
+        # 문제마다 자기 번호를 받아야 한다. 순서에 기대면 서로 바뀐다.
+        self.assertEqual(status[str(self.problem.id)]["_id"], "NEW-1")
+        self.assertEqual(status[str(self.other.id)]["_id"], "OLD-2")
+
+    def test_hidden_problem_is_left_alone(self):
+        # 숨긴 문제는 조회되지 않는다. 개수가 어긋나도 죽지 않고 그 항목만 그대로 둔다.
+        self.other.visible = False
+        self.other.save()
+        self._set_solved([(self.problem, "STALE-1"), (self.other, "STALE-2")])
+
+        self.assertSuccess(self.client.get(self.url))
+
+        status = User.objects.get(id=self.user.id).userprofile.acm_problems_status["problems"]
+        self.assertEqual(status[str(self.problem.id)]["_id"], "OLD-1")
+        self.assertEqual(status[str(self.other.id)]["_id"], "STALE-2")
+
+    def test_nothing_solved(self):
+        self.assertSuccess(self.client.get(self.url))
 
 
 class AdminUserTest(APITestCase):

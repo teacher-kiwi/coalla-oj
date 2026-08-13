@@ -21,6 +21,7 @@ class SchoolClassTestBase(APITestCase):
         self.teacher = self.create_teacher(username="김선생")
         self.class_url = self.reverse("teacher_class_api")
         self.student_url = self.reverse("teacher_student_api")
+        self.sheet_url = self.reverse("teacher_student_sheet_api")
 
     def _create_class(self, grade=3, class_no=2):
         resp = self.client.post(self.class_url, data={
@@ -127,6 +128,55 @@ class StudentAccountAPITest(SchoolClassTestBase):
         self.client.logout()
         self.create_teacher(username="박선생")
         self.assertFailed(self.client.put(self.student_url, data={"membership": membership.id}))
+
+    def test_delete_student(self):
+        self._create_students(self.class_id, 1, 2)
+        membership = ClassMembership.objects.get(number=1)
+        student_id = membership.student_id
+
+        self.assertSuccess(self.client.delete(self.student_url + f"?id={membership.id}"))
+        # 계정과 소속이 함께 사라진다
+        self.assertFalse(User.objects.filter(id=student_id).exists())
+        self.assertFalse(ClassMembership.objects.filter(id=membership.id).exists())
+        # 같은 학급의 다른 학생은 그대로 있다
+        self.assertEqual(ClassMembership.objects.filter(school_class_id=self.class_id).count(), 1)
+
+    def test_other_teacher_cannot_delete_student(self):
+        # 학생 삭제는 제출 기록까지 함께 지우는 되돌릴 수 없는 동작이다.
+        # 남의 반 학생에게 절대 닿으면 안 된다.
+        self._create_students(self.class_id, 1, 1)
+        membership = ClassMembership.objects.get(number=1)
+        self.client.logout()
+        self.create_teacher(username="박선생")
+
+        self.assertFailed(self.client.delete(self.student_url + f"?id={membership.id}"),
+                          "학생이 존재하지 않습니다")
+        self.assertTrue(ClassMembership.objects.filter(id=membership.id).exists())
+
+    def test_delete_student_rejects_non_numeric_id(self):
+        # 쿼리스트링으로 온 id 를 그대로 조회하면 ValueError 로 500 이 난다
+        self.assertFailed(self.client.delete(self.student_url + "?id=abc"),
+                          "잘못된 요청입니다. id가 필요합니다")
+
+    def test_download_account_sheet(self):
+        # 학기 초에 교사가 아이디·PIN 을 배부할 때 쓰는 경로다.
+        # 파일은 한 번 내려받으면 지워지므로 두 번째 요청은 실패해야 한다.
+        resp = self._create_students(self.class_id, 1, 2)
+        file_id = resp.data["data"]["file_id"]
+
+        downloaded = self.client.get(self.sheet_url + f"?file_id={file_id}")
+        self.assertEqual(downloaded.status_code, 200)
+        self.assertEqual(downloaded["Content-Type"], "application/xlsx")
+        self.assertTrue(downloaded.content)
+
+        self.assertFailed(self.client.get(self.sheet_url + f"?file_id={file_id}"),
+                          "파일이 존재하지 않습니다")
+
+    def test_account_sheet_rejects_bad_file_id(self):
+        # file_id 가 그대로 경로에 들어가므로 형태를 반드시 검사해야 한다
+        for bad in ("", "../../etc/passwd", "a b"):
+            self.assertFailed(self.client.get(self.sheet_url + f"?file_id={bad}"),
+                              "잘못된 요청입니다")
 
     def test_delete_class_removes_students(self):
         self._create_students(self.class_id, 1, 3)

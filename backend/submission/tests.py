@@ -75,3 +75,38 @@ class SubmissionAPITest(SubmissionPrepare):
         self.assertDictEqual(resp.data, {"error": "error",
                                          "data": "Python3 언어는 이 문제에서 사용할 수 없습니다"})
         judge_task.assert_not_called()
+
+
+class SubmissionDetailPermissionTest(SubmissionPrepare):
+    """제출 코드를 누가 볼 수 있는지.
+
+    학생 코드가 다른 학생에게 새어나가면 그대로 커닝 통로가 된다.
+    """
+    def setUp(self):
+        self._create_problem_and_submission()
+        self.url = self.reverse("submission_api")
+
+    def test_owner_can_read_own_submission(self):
+        # 제출은 create_admin("test") 이 만든 것이다
+        self.client.login(username="test", password="test123")
+        resp = self.client.get(self.url + "?id=" + self.submission.id)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["id"], self.submission.id)
+
+    def test_other_user_cannot_read(self):
+        self.create_user("other", "test123")
+        self.assertFailed(self.client.get(self.url + "?id=" + self.submission.id),
+                          "이 제출 기록에 접근할 권한이 없습니다")
+
+    def test_super_admin_can_read(self):
+        self.create_super_admin("root2", "test123")
+        self.assertSuccess(self.client.get(self.url + "?id=" + self.submission.id))
+
+    def test_anonymous_is_rejected(self):
+        self.client.logout()
+        resp = self.client.get(self.url + "?id=" + self.submission.id)
+        self.assertFailed(resp)
+
+    def test_missing_id(self):
+        self.create_user("other2", "test123")
+        self.assertFailed(self.client.get(self.url), "잘못된 요청입니다. id가 필요합니다")
