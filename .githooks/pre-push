@@ -75,6 +75,22 @@ if echo "$CHANGED" | grep -q '^frontend/'; then
             fail=1
         fi
 
+        echo "▶ 프론트엔드 정적 점검"
+        if (cd frontend && npm run check --silent); then
+            echo "✓ 정적 점검"
+        else
+            echo "✗ 정적 점검 실패"
+            fail=1
+        fi
+
+        echo "▶ 프론트엔드 유닛 테스트"
+        if (cd frontend && npm run test --silent); then
+            echo "✓ 유닛 테스트"
+        else
+            echo "✗ 유닛 테스트 실패"
+            fail=1
+        fi
+
         # 빌드는 경고가 길게 나와서 실패했을 때만 보여준다
         echo "▶ 프론트엔드 빌드"
         build_log=$(mktemp)

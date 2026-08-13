@@ -95,6 +95,16 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      # 템플릿이 참조하는 전역 컴포넌트·식별자가 실제로 있는지 본다.
+      # 빌드는 이런 실수를 잡지 못하고 런타임에야 드러난다.
+      - name: 정적 점검
+        working-directory: frontend
+        run: npm run check
+
+      - name: 유닛 테스트
+        working-directory: frontend
+        run: npm run test
+
       - name: 빌드
         working-directory: frontend
         run: npm run build

@@ -57,5 +57,11 @@ export default defineConfig({
         javascriptEnabled: true
       }
     }
+  },
+  test: {
+    // localStorage 를 쓰는 코드(utils/storage.js)가 있어 DOM 환경이 필요하다
+    environment: 'happy-dom',
+    include: ['tests/**/*.spec.js'],
+    setupFiles: ['tests/setup.js']
   }
 })
