@@ -33,11 +33,11 @@ class Submission(models.Model):
                              related_name="submissions")
     code = models.TextField()
     result = models.IntegerField(db_index=True, default=JudgeStatus.PENDING)
-    # 从JudgeServer返回的判题详情
+    # 채점 서버가 돌려준 상세 결과
     info = JSONField(default=dict)
     language = models.TextField()
     blockly_state = models.TextField(null=True, blank=True)
-    # 存储该提交所用时间和内存值，方便提交列表显示
+    # 목록에서 바로 보여주려고 걸린 시간·메모리를 따로 담아둔다
     # {time_cost: "", memory_cost: "", err_info: "", score: 0}
     statistic_info = JSONField(default=dict)
     ip = models.TextField(null=True)

@@ -126,7 +126,6 @@ class SessionManagementAPITest(APITestCase):
     def setUp(self):
         self.create_user("test", "test123")
         self.url = self.reverse("session_management_api")
-        # launch a request to provide session data
         login_url = self.reverse("user_login_api")
         self.client.post(login_url, data={"username": "test", "password": "test123"})
 
@@ -136,9 +135,6 @@ class SessionManagementAPITest(APITestCase):
         data = resp.data["data"]
         self.assertEqual(len(data), 1)
 
-    # def test_delete_session_key(self):
-    #     resp = self.client.delete(self.url + "?session_key=" + self.session_key)
-    #     self.assertSuccess(resp)
 
     def test_delete_session_with_invalid_key(self):
         resp = self.client.delete(self.url + "?session_key=aaaaaaaaaa")
@@ -305,7 +301,6 @@ class UserChangePasswordAPITest(APITestCase):
     def setUp(self):
         self.url = self.reverse("user_change_password_api")
 
-        # Create user at first
         self.username = "test_user"
         self.old_password = "testuserpassword"
         self.new_password = "new_password"
@@ -428,7 +423,6 @@ class AdminUserTest(APITestCase):
                 }
         resp = self.client.post(self.url, data)
         self.assertSuccess(resp)
-        # successfully created 2 users
         self.assertEqual(User.objects.all().count(), 4)
 
     def test_import_duplicate_user(self):
@@ -437,7 +431,6 @@ class AdminUserTest(APITestCase):
                 }
         resp = self.client.post(self.url, data)
         self.assertFailed(resp, "이미 사용 중인 사용자명이 있습니다")
-        # no user is created
         self.assertEqual(User.objects.all().count(), 2)
 
     def test_delete_users(self):

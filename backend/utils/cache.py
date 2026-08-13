@@ -11,9 +11,7 @@ class MyRedisClient(DefaultClient):
         return getattr(client, item)
 
     def redis_incr(self, key, count=1):
-        """
-        django 默认的 incr 在 key 不存在时候会抛异常
-        """
+        """django 기본 incr 은 key 가 없으면 예외를 던진다."""
         client = self.get_client(write=True)
         return client.incr(key, count)
 

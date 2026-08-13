@@ -123,7 +123,7 @@ const contestID = ref('')
 const problemID = ref('')
 const routeName = ref('')
 
-// Filter out submitting (9) and duplicate TLE (2)
+// 제출 중(9)과 중복되는 TLE(2)는 목록에서 뺀다
 const judgeStatusFiltered = computed(() => {
   const filtered = { ...JUDGE_STATUS }
   delete filtered['9']

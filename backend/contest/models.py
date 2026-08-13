@@ -11,30 +11,27 @@ from utils.models import RichTextField
 class Contest(models.Model):
     title = models.TextField()
     description = RichTextField()
-    # show real time rank or cached rank
+    # 순위를 실시간으로 보여줄지, 캐시된 순위를 보여줄지(봉인)
     real_time_rank = models.BooleanField()
     password = models.TextField(null=True)
-    # enum of ContestRuleType
+    # ContestRuleType 중 하나
     rule_type = models.TextField()
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     create_time = models.DateTimeField(auto_now_add=True)
     last_update_time = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    # 是否可见 false的话相当于删除
+    # false 면 삭제한 것과 같다
     visible = models.BooleanField(default=True)
     allowed_ip_ranges = JSONField(default=list)
 
     @property
     def status(self):
         if self.start_time > now():
-            # 没有开始 返回1
             return ContestStatus.CONTEST_NOT_START
         elif self.end_time < now():
-            # 已经结束 返回-1
             return ContestStatus.CONTEST_ENDED
         else:
-            # 正在进行 返回0
             return ContestStatus.CONTEST_UNDERWAY
 
     @property
@@ -43,7 +40,7 @@ class Contest(models.Model):
             return ContestType.PASSWORD_PROTECTED_CONTEST
         return ContestType.PUBLIC_CONTEST
 
-    # 是否有权查看problem 的一些统计信息 诸如submission_number, accepted_number 等
+    # 문제의 통계(제출 수·정답 수 등)를 볼 수 있는지
     def problem_details_permission(self, user):
         return self.rule_type == ContestRuleType.ACM or \
                self.status == ContestStatus.CONTEST_ENDED or \
@@ -66,10 +63,10 @@ class AbstractContestRank(models.Model):
 
 class ACMContestRank(AbstractContestRank):
     accepted_number = models.IntegerField(default=0)
-    # total_time is only for ACM contest, total_time =  ac time + none-ac times * 20 * 60
+    # ACM 전용. 정답까지 걸린 시간 + 틀린 횟수 * 20분(패널티)
     total_time = models.IntegerField(default=0)
+    # 문제 id 를 키로 갖는다
     # {"23": {"is_ac": True, "ac_time": 8999, "error_number": 2, "is_first_ac": True}}
-    # key is problem id
     submission_info = JSONField(default=dict)
 
     class Meta:
@@ -79,8 +76,7 @@ class ACMContestRank(AbstractContestRank):
 
 class OIContestRank(AbstractContestRank):
     total_score = models.IntegerField(default=0)
-    # {"23": 333}
-    # key is problem id, value is current score
+    # 문제 id -> 현재 점수 {"23": 333}
     submission_info = JSONField(default=dict)
 
     class Meta:

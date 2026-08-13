@@ -18,13 +18,5 @@ export const logicCategory = {
       type: "logic_negate",
       kind: "block",
     },
-    // {
-    //   type: "logic_null",
-    //   kind: "block",
-    // },
-    // {
-    //   type: "logic_ternary",
-    //   kind: "block",
-    // },
   ],
 };

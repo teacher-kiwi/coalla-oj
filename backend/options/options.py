@@ -11,11 +11,11 @@ from .models import SysOptions as SysOptionsModel
 
 
 class my_property:
-    """
-    在 metaclass 中使用，以实现：
-    1. ttl = None，不缓存
-    2. ttl is callable，条件缓存
-    3. 缓存 ttl 秒
+    """metaclass 에서 쓰는 캐시 프로퍼티.
+
+    1. ttl = None 이면 캐시하지 않는다
+    2. ttl 이 함수면 조건부 캐시(함수가 캐시할 초를 돌려준다)
+    3. ttl 이 숫자면 그 초만큼 캐시한다
     """
     def __init__(self, func=None, fset=None, ttl=None):
         self.fset = fset
@@ -49,9 +49,9 @@ class my_property:
 
             value = self.func(obj)
 
-            # 如果定义了条件缓存, ttl 是一个函数，返回要缓存多久；返回 0 代表不要缓存
+            # 조건부 캐시: ttl 함수가 캐시할 초를 돌려준다. 0 이면 캐시하지 않는다
             if callable(self.ttl):
-                # 而且条件缓存说不要缓存，那就直接返回，不要设置 local
+                # 캐시하지 말라고 했으면 local 에 담지 않고 바로 돌려준다
                 timeout = self.ttl(value)
                 self._check_timeout(timeout)
 
@@ -60,7 +60,7 @@ class my_property:
                 elif timeout > 0:
                     self.local.value = (value, now + timeout)
             else:
-                # ttl 是一个数字
+                # ttl 이 숫자인 경우
                 self.local.value = (value, now + self.ttl)
             return value
         else:

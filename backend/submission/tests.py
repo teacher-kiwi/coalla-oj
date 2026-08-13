@@ -25,7 +25,7 @@ DEFAULT_SUBMISSION_DATA = {
 }
 
 
-# todo contest submission
+# TODO: 대회 제출 테스트 추가
 
 
 class SubmissionPrepare(APITestCase):

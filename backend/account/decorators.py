@@ -72,7 +72,7 @@ def check_contest_password(password, contest_password):
     if password == contest_password:
         return True
     else:
-        # sig#timestamp 这种形式的密码也可以，但是在界面上没提供支持
+        # sig#timestamp 형태의 임시 비밀번호도 받는다(화면에는 없는 기능)
         # sig = sha256(contest_password + timestamp)[:8]
         if "#" in password:
             s = password.split("#")
@@ -93,9 +93,10 @@ def check_contest_password(password, contest_password):
 
 
 def check_contest_permission(check_type="details"):
-    """
-    只供Class based view 使用，检查用户是否有权进入该contest, check_type 可选 details, problems, ranks, submissions
-    若通过验证，在view中可通过self.contest获得该contest
+    """대회 접근 권한 검사. 클래스 기반 view 전용.
+
+    check_type 은 details, problems, ranks, submissions 중 하나다.
+    통과하면 view 안에서 self.contest 로 대회를 꺼내 쓸 수 있다.
     """
 
     def decorator(func):
@@ -111,29 +112,26 @@ def check_contest_permission(check_type="details"):
                 return self.error("잘못된 요청입니다. contest_id가 필요합니다")
 
             try:
-                # use self.contest to avoid query contest again in view.
+                # view 에서 다시 조회하지 않도록 self.contest 에 담아둔다
                 self.contest = Contest.objects.select_related("created_by").get(id=contest_id, visible=True)
             except Contest.DoesNotExist:
                 return self.error("대회 %s 이(가) 존재하지 않습니다" % contest_id)
 
-            # Anonymous
             if not user.is_authenticated:
                 return self.error("먼저 로그인하세요.")
 
-            # creator or owner
             if user.is_contest_admin(self.contest):
                 return func(*args, **kwargs)
 
             if self.contest.contest_type == ContestType.PASSWORD_PROTECTED_CONTEST:
-                # password error
                 if not check_contest_password(request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(self.contest.id), self.contest.password):
                     return self.error("비밀번호가 올바르지 않거나 만료되었습니다")
 
-            # regular user get contest problems, ranks etc. before contest started
+            # 시작 전 대회는 일반 사용자에게 문제·순위를 보여주지 않는다(설명만 열어둔다)
             if self.contest.status == ContestStatus.CONTEST_NOT_START and check_type != "details":
                 return self.error("아직 시작하지 않은 대회입니다.")
 
-            # check does user have permission to get ranks, submissions in OI Contest
+            # OI 대회가 진행 중이고 봉인 상태면 순위·제출을 막는다
             if self.contest.status == ContestStatus.CONTEST_UNDERWAY and self.contest.rule_type == ContestRuleType.OI:
                 if not self.contest.real_time_rank and (check_type == "ranks" or check_type == "submissions"):
                     return self.error(f"{check_type} 에 접근할 권한이 없습니다")
@@ -144,7 +142,7 @@ def check_contest_permission(check_type="details"):
 
 
 def ensure_created_by(obj, user):
-    # 권한이 없는 경우와 없는 경우를 구분해서 알려주지 않는다(존재 여부가 새어나간다)
+    # 없는 경우와 권한이 없는 경우를 구분해서 알려주지 않는다(존재 여부가 새어나간다)
     e = APIError(msg="존재하지 않거나 접근할 권한이 없습니다")
     if not user.is_admin_role():
         raise e

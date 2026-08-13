@@ -16,25 +16,6 @@ export const loopCategory = {
       kind: "block",
       fields: { MODE: "WHILE" },
     },
-    // {
-    //   type: "controls_for",
-    //   kind: "block",
-    //   fields: { VAR: { name: "i" } },
-    //   inputs: {
-    //     FROM: { shadow: { type: "math_number", fields: { NUM: 1 } } },
-    //     TO: { shadow: { type: "math_number", fields: { NUM: 10 } } },
-    //     BY: { shadow: { type: "math_number", fields: { NUM: 1 } } },
-    //   },
-    // },
-    // {
-    //   type: "controls_forEach",
-    //   kind: "block",
-    //   fields: {
-    //     VAR: {
-    //       name: "j",
-    //     },
-    //   },
-    // },
     {
       type: "controls_flow_statements",
       kind: "block",

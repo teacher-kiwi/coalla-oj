@@ -10,9 +10,6 @@ class AnnouncementAdminAPI(APIView):
     @validate_serializer(CreateAnnouncementSerializer)
     @super_admin_required
     def post(self, request):
-        """
-        publish announcement
-        """
         data = request.data
         announcement = Announcement.objects.create(title=data["title"],
                                                    content=data["content"],
@@ -23,9 +20,6 @@ class AnnouncementAdminAPI(APIView):
     @validate_serializer(EditAnnouncementSerializer)
     @super_admin_required
     def put(self, request):
-        """
-        edit announcement
-        """
         data = request.data
         try:
             announcement = Announcement.objects.get(id=data.pop("id"))
@@ -40,9 +34,6 @@ class AnnouncementAdminAPI(APIView):
 
     @super_admin_required
     def get(self, request):
-        """
-        get announcement list / get one announcement
-        """
         announcement_id = request.GET.get("id")
         if announcement_id:
             try:

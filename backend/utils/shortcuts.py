@@ -9,11 +9,10 @@ from envelopes import Envelope
 
 
 def rand_str(length=32, type="lower_hex"):
-    """
-    生成指定长度的随机字符串或者数字, 可以用于密钥等安全场景
-    :param length: 字符串或者数字的长度
-    :param type: str 代表随机字符串，num 代表随机数字
-    :return: 字符串
+    """지정한 길이의 임의 문자열·숫자를 만든다. 비밀키 등 보안 용도로 쓸 수 있다.
+
+    :param length: 길이
+    :param type: str 이면 임의 문자열, num 이면 임의 숫자
     """
     if type == "str":
         return get_random_string(length, allowed_chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")

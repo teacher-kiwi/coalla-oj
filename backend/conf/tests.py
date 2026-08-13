@@ -84,7 +84,6 @@ class WebsiteConfigAPITest(APITestCase):
         self.assertEqual(SysOptions.google_client_id, "abc.apps.googleusercontent.com")
 
     def test_get_website_config(self):
-        # do not need to login
         url = self.reverse("website_info_api")
         resp = self.client.get(url)
         self.assertSuccess(resp)

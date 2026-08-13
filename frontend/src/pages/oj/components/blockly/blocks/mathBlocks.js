@@ -1,9 +1,7 @@
 import * as Blockly from "blockly";
 import { pythonGenerator, Order } from "blockly/python";
 
-// ============================================
 // 수학 카테고리 커스텀 블록
-// ============================================
 
 // 텍스트를 숫자로 변환
 Blockly.Blocks["text_to_number"] = {

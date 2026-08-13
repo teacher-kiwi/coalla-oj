@@ -36,12 +36,12 @@ class User(AbstractBaseUser):
     username = models.TextField(unique=True)
     email = models.TextField(null=True)
     create_time = models.DateTimeField(auto_now_add=True, null=True)
-    # One of UserType
+    # AdminType 중 하나
     admin_type = models.TextField(default=AdminType.REGULAR_USER)
     problem_permission = models.TextField(default=ProblemPermission.NONE)
     reset_password_token = models.TextField(null=True)
     reset_password_token_expire_time = models.DateTimeField(null=True)
-    # SSO auth token
+    # SSO 인증 토큰
     auth_token = models.TextField(null=True)
     session_keys = JSONField(default=list)
     is_disabled = models.BooleanField(default=False)
@@ -82,32 +82,18 @@ class User(AbstractBaseUser):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # acm_problems_status examples:
-    # {
-    #     "problems": {
-    #         "1": {
-    #             "status": JudgeStatus.ACCEPTED,
-    #             "_id": "1000"
-    #         }
-    #     },
-    #     "contest_problems": {
-    #         "1": {
-    #             "status": JudgeStatus.ACCEPTED,
-    #             "_id": "1000"
-    #         }
-    #     }
-    # }
+    # 푼 문제 현황. 문제 id 를 키로 갖는다.
+    # {"problems": {"1": {"status": JudgeStatus.ACCEPTED, "_id": "1000"}},
+    #  "contest_problems": {...}}
     acm_problems_status = JSONField(default=dict)
-    # like acm_problems_status, merely add "score" field
+    # 위와 같고 "score" 가 하나 더 붙는다
     oi_problems_status = JSONField(default=dict)
 
     # 학교·전공·블로그·GitHub·기분은 6단계에서 제거했다. 입력률이 0이었고,
     # 학교 정보는 학급(SchoolClass)이 대신한다.
     real_name = models.TextField(null=True)
     avatar = models.TextField(default=f"{settings.AVATAR_URI_PREFIX}/default.png")
-    # for ACM
     accepted_number = models.IntegerField(default=0)
-    # for OI
     total_score = models.BigIntegerField(default=0)
     submission_number = models.IntegerField(default=0)
 
@@ -119,7 +105,7 @@ class UserProfile(models.Model):
         self.submission_number = models.F("submission_number") + 1
         self.save()
 
-    # 计算总分时， 应先减掉上次该题所得分数， 然后再加上本次所得分数
+    # 총점은 이 문제에서 지난번에 받은 점수를 빼고 이번 점수를 더한다
     def add_score(self, this_time_score, last_time_score=None):
         last_time_score = last_time_score or 0
         self.total_score = models.F("total_score") - last_time_score + this_time_score

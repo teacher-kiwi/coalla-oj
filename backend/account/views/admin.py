@@ -21,9 +21,6 @@ class UserAdminAPI(APIView):
     @validate_serializer(ImportUserSeralizer)
     @super_admin_required
     def post(self, request):
-        """
-        Import User
-        """
         data = request.data["users"]
 
         user_list = []
@@ -45,9 +42,6 @@ class UserAdminAPI(APIView):
     @validate_serializer(EditUserSerializer)
     @super_admin_required
     def put(self, request):
-        """
-        Edit user api
-        """
         data = request.data
         try:
             user = User.objects.get(id=data["id"])
@@ -83,9 +77,6 @@ class UserAdminAPI(APIView):
 
     @super_admin_required
     def get(self, request):
-        """
-        User list api / Get user by id
-        """
         user_id = request.GET.get("id")
         if user_id:
             try:
@@ -118,9 +109,6 @@ class UserAdminAPI(APIView):
 class GenerateUserAPI(APIView):
     @super_admin_required
     def get(self, request):
-        """
-        download users excel
-        """
         file_id = request.GET.get("file_id")
         if not file_id:
             return self.error("잘못된 요청입니다. file_id가 필요합니다")
@@ -140,9 +128,6 @@ class GenerateUserAPI(APIView):
     @validate_serializer(GenerateUserSerializer)
     @super_admin_required
     def post(self, request):
-        """
-        Generate User
-        """
         data = request.data
         number_max_length = max(len(str(data["number_from"])), len(str(data["number_to"])))
         if number_max_length + len(data["prefix"]) + len(data["suffix"]) > 32:

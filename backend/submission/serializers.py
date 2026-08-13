@@ -6,7 +6,6 @@ from utils.serializers import LanguageNameChoiceField
 
 class CreateSubmissionSerializer(serializers.Serializer):
     problem_id = serializers.IntegerField()
-    # language = LanguageNameChoiceField()
     language = serializers.CharField()  # Block Coding 허용을 위해 CharField로 변경
     code = serializers.CharField(max_length=1024 * 1024)
     contest_id = serializers.IntegerField(required=False)
@@ -29,7 +28,7 @@ class SubmissionModelSerializer(serializers.ModelSerializer):
         return has_public_profile(obj.user)
 
 
-# 不显示submission info的serializer, 用于ACM rule_type
+# 채점 상세(info)를 감추는 직렬화기. ACM 규칙에서 쓴다.
 class SubmissionSafeModelSerializer(serializers.ModelSerializer):
     problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
     username = serializers.SerializerMethodField()
@@ -72,7 +71,6 @@ class SubmissionListSerializer(serializers.ModelSerializer):
         return has_public_profile(obj.user)
 
     def get_show_link(self, obj):
-        # 没传user或为匿名user
         if self.user is None or not self.user.is_authenticated:
             return False
         return obj.check_user_permission(self.user, student_ids=self._my_student_ids)

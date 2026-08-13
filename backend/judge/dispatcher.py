@@ -20,10 +20,10 @@ from utils.constants import CacheKey
 logger = logging.getLogger(__name__)
 
 
-# 继续处理在队列中的问题
+# 대기열에 남은 채점을 이어서 처리한다
 def process_pending_task():
     if cache.llen(CacheKey.waiting_queue):
-        # 防止循环引入
+        # 순환 임포트를 피하려고 여기서 가져온다
         from judge.tasks import judge_task
         tmp_data = cache.rpop(CacheKey.waiting_queue)
         if tmp_data:
@@ -102,11 +102,11 @@ class JudgeDispatcher(DispatcherBase):
             self.problem = Problem.objects.get(id=problem_id)
 
     def _compute_statistic_info(self, resp_data):
-        # 用时和内存占用保存为多个测试点中最长的那个
+        # 여러 테스트케이스 중 가장 오래 걸리고 가장 많이 쓴 값을 대표로 저장한다
         self.submission.statistic_info["time_cost"] = max([x["cpu_time"] for x in resp_data])
         self.submission.statistic_info["memory_cost"] = max([x["memory"] for x in resp_data])
 
-        # sum up the score in OI mode
+        # OI 규칙은 테스트케이스 점수를 합산한다
         if self.problem.rule_type == ProblemRuleType.OI:
             score = 0
             try:
@@ -185,8 +185,8 @@ class JudgeDispatcher(DispatcherBase):
             self.submission.info = resp
             self._compute_statistic_info(resp["data"])
             error_test_case = list(filter(lambda case: case["result"] != 0, resp["data"]))
-            # ACM模式下,多个测试点全部正确则AC，否则取第一个错误的测试点的状态
-            # OI模式下, 若多个测试点全部正确则AC， 若全部错误则取第一个错误测试点状态，否则为部分正确
+            # ACM: 전부 맞으면 AC, 아니면 처음 틀린 테스트케이스의 결과를 쓴다
+            # OI: 전부 맞으면 AC, 전부 틀리면 처음 틀린 결과, 그 사이면 부분 점수
             if not error_test_case:
                 self.submission.result = JudgeStatus.ACCEPTED
             elif self.problem.rule_type == ProblemRuleType.ACM or len(error_test_case) == len(resp["data"]):
@@ -210,14 +210,13 @@ class JudgeDispatcher(DispatcherBase):
             else:
                 self.update_problem_status()
 
-        # 至此判题结束，尝试处理任务队列中剩余的任务
+        # 채점이 끝났으니 대기열에 남은 것을 이어서 처리한다
         process_pending_task()
 
     def update_problem_status_rejudge(self):
         result = str(self.submission.result)
         problem_id = str(self.problem.id)
         with transaction.atomic():
-            # update problem status
             problem = Problem.objects.select_for_update().get(contest_id=self.contest_id, id=self.problem.id)
             if self.last_result != JudgeStatus.ACCEPTED and self.submission.result == JudgeStatus.ACCEPTED:
                 problem.accepted_number += 1
@@ -240,7 +239,7 @@ class JudgeDispatcher(DispatcherBase):
                 oi_problems_status = profile.oi_problems_status.get("problems", {})
                 score = self.submission.statistic_info["score"]
                 if oi_problems_status[problem_id]["status"] != JudgeStatus.ACCEPTED:
-                    # minus last time score, add this tim score
+                    # 지난번 점수를 빼고 이번 점수를 더한다
                     profile.add_score(this_time_score=score,
                                       last_time_score=oi_problems_status[problem_id]["score"])
                     oi_problems_status[problem_id]["score"] = score
@@ -254,7 +253,6 @@ class JudgeDispatcher(DispatcherBase):
         result = str(self.submission.result)
         problem_id = str(self.problem.id)
         with transaction.atomic():
-            # update problem status
             problem = Problem.objects.select_for_update().get(contest_id=self.contest_id, id=self.problem.id)
             problem.submission_number += 1
             if self.submission.result == JudgeStatus.ACCEPTED:
@@ -263,7 +261,6 @@ class JudgeDispatcher(DispatcherBase):
             problem_info[result] = problem_info.get(result, 0) + 1
             problem.save(update_fields=["accepted_number", "submission_number", "statistic_info"])
 
-            # update_userprofile
             user = User.objects.select_for_update().get(id=self.submission.user_id)
             user_profile = user.userprofile
             user_profile.submission_number += 1
@@ -291,7 +288,7 @@ class JudgeDispatcher(DispatcherBase):
                     if self.submission.result == JudgeStatus.ACCEPTED:
                         user_profile.accepted_number += 1
                 elif oi_problems_status[problem_id]["status"] != JudgeStatus.ACCEPTED:
-                    # minus last time score, add this time score
+                    # 지난번 점수를 빼고 이번 점수를 더한다
                     user_profile.add_score(this_time_score=score,
                                            last_time_score=oi_problems_status[problem_id]["score"])
                     oi_problems_status[problem_id]["score"] = score
@@ -313,7 +310,7 @@ class JudgeDispatcher(DispatcherBase):
                 elif contest_problems_status[problem_id]["status"] != JudgeStatus.ACCEPTED:
                     contest_problems_status[problem_id]["status"] = self.submission.result
                 else:
-                    # 如果已AC， 直接跳过 不计入任何计数器
+                    # 이미 AC 라면 어떤 카운터도 건드리지 않는다
                     return
                 user_profile.acm_problems_status["contest_problems"] = contest_problems_status
                 user_profile.save(update_fields=["acm_problems_status"])
@@ -366,9 +363,9 @@ class JudgeDispatcher(DispatcherBase):
 
     def _update_acm_contest_rank(self, rank):
         info = rank.submission_info.get(str(self.submission.problem_id))
-        # 因前面更改过，这里需要重新获取
+        # 앞에서 값을 바꿨으므로 다시 읽어온다
         problem = Problem.objects.select_for_update().get(contest_id=self.contest_id, id=self.problem.id)
-        # 此题提交过
+        # 이 문제를 이미 제출한 적이 있다
         if info:
             if info["is_ac"]:
                 return
@@ -385,7 +382,7 @@ class JudgeDispatcher(DispatcherBase):
             elif self.submission.result != JudgeStatus.COMPILE_ERROR:
                 info["error_number"] += 1
 
-        # 第一次提交
+        # 이 문제의 첫 제출
         else:
             rank.submission_number += 1
             info = {"is_ac": False, "ac_time": 0, "error_number": 0, "is_first_ac": False}

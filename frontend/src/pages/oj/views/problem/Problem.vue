@@ -1,8 +1,7 @@
 <template>
   <div class="flex-container">
     <div id="problem-main">
-      <!--problem main-->
-      <Panel :padding="40" shadow>
+        <Panel :padding="40" shadow>
         <template #title>{{ problem.title }}</template>
         <div v-if="problemLoaded" id="problem-content" class="markdown-body" v-katex>
           <p class="title">문제 설명</p>
@@ -51,8 +50,7 @@
           </div>
         </div>
       </Panel>
-      <!--problem main end-->
-
+  
       <el-card :body-style="{ padding: '20px' }" id="submit-code">
         <CodeMirror
           v-if="language !== 'Block Coding'"
@@ -319,7 +317,7 @@ function init () {
     if (prob.statistic_info) changePie(prob)
     problemLoaded.value = true
 
-    // Load from storage
+    // 저장해둔 코드가 있으면 불러온다
     const savedCode = storage.get(buildProblemCodeKey(route.params.problemID, route.params.contestID))
     if (savedCode) {
       language.value = savedCode.language

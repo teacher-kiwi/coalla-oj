@@ -1,9 +1,7 @@
 import * as Blockly from "blockly";
 import { pythonGenerator, Order } from "blockly/python";
 
-// ============================================
 // 리스트 카테고리 커스텀 블록
-// ============================================
 
 // 텍스트를 분리하기
 Blockly.Blocks["text_split"] = {

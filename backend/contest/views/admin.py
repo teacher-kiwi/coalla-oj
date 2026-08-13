@@ -91,9 +91,6 @@ class ContestAPI(APIView):
 class ContestAnnouncementAPI(APIView):
     @validate_serializer(CreateContestAnnouncementSerializer)
     def post(self, request):
-        """
-        Create one contest_announcement.
-        """
         data = request.data
         try:
             contest = Contest.objects.get(id=data.pop("contest_id"))
@@ -107,9 +104,6 @@ class ContestAnnouncementAPI(APIView):
 
     @validate_serializer(EditContestAnnouncementSerializer)
     def put(self, request):
-        """
-        update contest_announcement
-        """
         data = request.data
         try:
             contest_announcement = ContestAnnouncement.objects.get(id=data.pop("id"))
@@ -122,9 +116,6 @@ class ContestAnnouncementAPI(APIView):
         return self.success()
 
     def delete(self, request):
-        """
-        Delete one contest_announcement.
-        """
         contest_announcement_id = request.GET.get("id")
         if contest_announcement_id:
             if request.user.is_admin():
@@ -135,9 +126,6 @@ class ContestAnnouncementAPI(APIView):
         return self.success()
 
     def get(self, request):
-        """
-        Get one contest_announcement or contest_announcement list.
-        """
         contest_announcement_id = request.GET.get("id")
         if contest_announcement_id:
             try:

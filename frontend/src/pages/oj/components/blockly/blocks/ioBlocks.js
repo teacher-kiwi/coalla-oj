@@ -1,9 +1,7 @@
 import * as Blockly from "blockly";
 import { pythonGenerator, Order } from "blockly/python";
 
-// ============================================
 // 입출력 카테고리 커스텀 블록
-// ============================================
 
 // 한 줄 입력 받기(텍스트)
 Blockly.Blocks["input_readline"] = {

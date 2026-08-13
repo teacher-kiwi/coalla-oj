@@ -4,7 +4,6 @@ from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
 from judge.tasks import judge_task
 from options.options import SysOptions
-# from judge.dispatcher import JudgeDispatcher
 from problem.models import Problem, ProblemRuleType
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
@@ -24,11 +23,6 @@ class SubmissionAPI(APIView):
         if not can_consume:
             return "Please wait %d seconds" % (int(wait))
 
-        # ip_bucket = TokenBucket(key=request.session["ip"],
-        #                         redis_conn=cache, **SysOptions.throttling["ip"])
-        # can_consume, wait = ip_bucket.consume()
-        # if not can_consume:
-        #     return "보안 문자를 입력해야 합니다"
 
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):
@@ -78,8 +72,6 @@ class SubmissionAPI(APIView):
                                                ip=request.session["ip"],
                                                contest_id=data.get("contest_id"),
                                                blockly_state=data.get("blockly_state") or None)
-        # use this for debug
-        # JudgeDispatcher(submission.id, problem.id).judge()
         judge_task.send(submission.id, problem.id)
         if hide_id:
             return self.success()
@@ -168,11 +160,11 @@ class ContestSubmissionListAPI(APIView):
         if result:
             submissions = submissions.filter(result=result)
 
-        # filter the test submissions submitted before contest start
+        # 대회 시작 전에 넣어본 테스트 제출은 제외한다
         if contest.status != ContestStatus.CONTEST_NOT_START:
             submissions = submissions.filter(create_time__gte=contest.start_time)
 
-        # 封榜的时候只能看到自己的提交
+        # 순위를 봉인한 동안에는 자기 제출만 보인다
         if contest.rule_type == ContestRuleType.ACM:
             if not contest.real_time_rank and not request.user.is_contest_admin(contest):
                 submissions = submissions.filter(user_id=request.user.id)

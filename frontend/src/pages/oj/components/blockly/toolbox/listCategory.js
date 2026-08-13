@@ -89,59 +89,5 @@ export const listCategory = {
         },
       },
     },
-
-    // { kind: "block", type: "lists_isEmpty" },
-    //     {
-    //       kind: "block",
-    //       type: "lists_indexOf",
-    //       fields: { END: "FIRST" },
-    //       inputs: {
-    //         VALUE: {
-    //           block: { type: "variables_get", fields: { VAR: { name: "list" } } },
-    //         },
-    //       },
-    //     },
-    //     {
-    //       kind: "block",
-    //       type: "lists_getIndex",
-    //       fields: { MODE: "GET", WHERE: "FROM_START" },
-    //       inputs: {
-    //         VALUE: {
-    //           block: { type: "variables_get", fields: { VAR: { name: "list" } } },
-    //         },
-    //       },
-    //     },
-    //     {
-    //       kind: "block",
-    //       type: "lists_setIndex",
-    //       fields: { MODE: "SET", WHERE: "FROM_START" },
-    //       inputs: {
-    //         LIST: {
-    //           block: { type: "variables_get", fields: { VAR: { name: "list" } } },
-    //         },
-    //       },
-    //     },
-    //     {
-    //       kind: "block",
-    //       type: "lists_getSublist",
-    //       fields: { WHERE1: "FROM_START", WHERE2: "FROM_START" },
-    //       inputs: {
-    //         LIST: {
-    //           block: { type: "variables_get", fields: { VAR: { name: "list" } } },
-    //         },
-    //       },
-    //     },
-    //     {
-    //       kind: "block",
-    //       type: "lists_split",
-    //       fields: { MODE: "SPLIT" },
-    //       inputs: { DELIM: { shadow: { type: "text", fields: { TEXT: "," } } } },
-    //     },
-    //     {
-    //       kind: "block",
-    //       type: "lists_sort",
-    //       fields: { TYPE: "NUMERIC", DIRECTION: "1" },
-    //     },
-    //     { type: "lists_reverse", kind: "block" },
   ],
 };

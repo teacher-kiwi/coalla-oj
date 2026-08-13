@@ -71,11 +71,11 @@ class SMTPTestAPI(APIView):
                        subject="SMTP 설정이 완료되었습니다",
                        content="SMTP 설정이 정상적으로 완료되었습니다.")
         except smtplib.SMTPResponseException as e:
-            # guess error message encoding
+            # 오류 메시지 인코딩을 추측한다
             msg = b"Failed to send email"
             try:
                 msg = e.smtp_error
-                # qq mail
+                # QQ 메일
                 msg = msg.decode("gbk")
             except Exception:
                 msg = msg.decode("utf-8", "ignore")
@@ -163,7 +163,7 @@ class JudgeServerHeartbeatAPI(CSRFExemptAPIView):
                                        service_url=data["service_url"],
                                        last_heartbeat=timezone.now(),
                                        )
-        # 新server上线 处理队列中的，防止没有新的提交而导致一直waiting
+        # 새 채점 서버가 붙으면 대기열을 처리한다. 새 제출이 없으면 계속 대기로 남기 때문이다
         process_pending_task()
 
         return self.success()
@@ -177,13 +177,10 @@ class LanguagesAPI(APIView):
 class TestCasePruneAPI(APIView):
     @super_admin_required
     def get(self, request):
-        """
-        return orphan test_case list
-        """
+        """어느 문제에도 매여 있지 않은 테스트케이스 목록."""
         ret_data = []
         dir_to_be_removed = self.get_orphan_ids()
 
-        # return an iterator
         for d in os.scandir(settings.TEST_CASE_DIR):
             if d.name in dir_to_be_removed:
                 ret_data.append({"id": d.name, "create_time": d.stat().st_mtime})

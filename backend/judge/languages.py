@@ -10,7 +10,7 @@ _c_lang_config = {
 
 //TEMPLATE BEGIN
 int add(int a, int b) {
-  // code
+  // 여기에 코드를 작성하세요
 }
 //TEMPLATE END
 
@@ -57,7 +57,7 @@ _cpp_lang_config = {
 
 //TEMPLATE BEGIN
 int add(int a, int b) {
-  // code
+  // 여기에 코드를 작성하세요
 }
 //TEMPLATE END
 
@@ -104,7 +104,7 @@ class Main {
 
 //TEMPLATE BEGIN
   static int add(int a, int b) {
-    // code
+    // 여기에 코드를 작성하세요
   }
 //TEMPLATE END
 
@@ -136,7 +136,7 @@ _py3_lang_config = {
 
 //TEMPLATE BEGIN
 def add(a, b):
-  # code
+  # 여기에 코드를 작성하세요
 
 //TEMPLATE END
 
@@ -167,7 +167,7 @@ import "fmt"
 
 //TEMPLATE BEGIN
 func add(a int, b int) int {
-	// code
+	// 여기에 코드를 작성하세요
 }
 //TEMPLATE END
 
@@ -199,7 +199,7 @@ _node_lang_config = {
 
 //TEMPLATE BEGIN
 function add(a, b) {
-  // code
+  // 여기에 코드를 작성하세요
 }
 //TEMPLATE END
 

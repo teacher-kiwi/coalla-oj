@@ -1,4 +1,3 @@
-// all routes here.
 import Home from '@oj/views/general/Home.vue'
 import NotFound from '@oj/views/general/404.vue'
 import Announcements from '@oj/views/general/Announcements.vue'

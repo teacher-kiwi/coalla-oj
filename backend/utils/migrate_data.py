@@ -26,9 +26,9 @@ languages_map = {
 }
 email_regex = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
-# pk -> name
+# pk -> 이름
 tags = {}
-# pk -> user obj
+# pk -> User 객체
 users = {}
 
 problems = []

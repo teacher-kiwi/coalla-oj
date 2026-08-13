@@ -2,15 +2,13 @@ import time
 
 
 class TokenBucket:
-    """
-    注意：对于单个key的操作不是线程安全的
-    """
+    """주의: 같은 key 에 대한 연산은 스레드 안전하지 않다."""
     def __init__(self, key, capacity, fill_rate, default_capacity, redis_conn):
         """
-        :param capacity: 最大容量
-        :param fill_rate: 填充速度/每秒
-        :param default_capacity: 初始容量
-        :param redis_conn: redis connection
+        :param capacity: 최대 용량
+        :param fill_rate: 초당 채워지는 양
+        :param default_capacity: 초기 용량
+        :param redis_conn: redis 연결
         """
         self._key = key
         self._capacity = capacity
@@ -52,12 +50,10 @@ class TokenBucket:
         return min(self._last_capacity + delta, self._capacity)
 
     def consume(self, num=1):
+        """토큰 num 개를 소비하고 성공 여부를 돌려준다.
+
+        :return: (성공 여부: bool, 다음까지 기다릴 시간: float)
         """
-        消耗 num 个 token，返回是否成功
-        :param num:
-        :return: result: bool, wait_time: float
-        """
-        # print("capacity ", self.fill(time.time()))
         if self._last_capacity >= num:
             self._last_capacity -= num
             return True, 0

@@ -1,13 +1,11 @@
 <template>
   <div class="flex-container">
     <div id="contest-main">
-      <!--children-->
       <router-view v-slot="{ Component }">
         <transition name="fadeInUp">
           <component :is="Component" />
         </transition>
       </router-view>
-      <!--children end-->
       <div class="flex-container" v-if="route_name === 'contest-details'">
         <div id="contest-desc">
           <Panel :padding="20" shadow>

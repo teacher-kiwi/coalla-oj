@@ -79,11 +79,11 @@ class ContestPasswordVerifyAPI(APIView):
         if not check_contest_password(data["password"], contest.password):
             return self.error("비밀번호가 올바르지 않거나 만료되었습니다")
 
-        # password verify OK.
         if CONTEST_PASSWORD_SESSION_KEY not in request.session:
             request.session[CONTEST_PASSWORD_SESSION_KEY] = {}
         request.session[CONTEST_PASSWORD_SESSION_KEY][contest.id] = data["password"]
-        # https://docs.djangoproject.com/en/dev/topics/http/sessions/#when-sessions-are-saved
+        # 중첩 dict 를 바꾼 것만으로는 세션이 저장되지 않는다
+        # https://docs.djangoproject.com/en/4.2/topics/http/sessions/#when-sessions-are-saved
         request.session.modified = True
         return self.success(True)
 

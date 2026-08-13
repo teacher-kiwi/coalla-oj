@@ -30,9 +30,7 @@ from ..tasks import send_email_async
 class UserProfileAPI(APIView):
     @method_decorator(ensure_csrf_cookie)
     def get(self, request, **kwargs):
-        """
-        判断是否登录， 若登录返回用户信息
-        """
+        """로그인 여부를 판단하고, 로그인 상태면 사용자 정보를 돌려준다."""
         user = request.user
         if not user.is_authenticated:
             return self.success()
@@ -47,7 +45,7 @@ class UserProfileAPI(APIView):
                     return self.error("사용자가 존재하지 않습니다")
             else:
                 user = request.user
-                # api返回的是自己的信息，可以返real_name
+                # 자기 정보를 돌려주는 경우라 real_name 도 포함한다
                 show_real_name = True
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
@@ -94,12 +92,8 @@ class AvatarUploadAPI(APIView):
 class UserLoginAPI(APIView):
     @validate_serializer(UserLoginSerializer)
     def post(self, request):
-        """
-        User login api
-        """
         data = request.data
         user = auth.authenticate(username=data["username"], password=data["password"])
-        # None is returned if username or password is wrong
         if user:
             if user.is_disabled:
                 return self.error("비활성화된 계정입니다")
@@ -118,11 +112,8 @@ class UserLogoutAPI(APIView):
 class UsernameOrEmailCheck(APIView):
     @validate_serializer(UsernameOrEmailCheckSerializer)
     def post(self, request):
-        """
-        check username or email is duplicate
-        """
         data = request.data
-        # True means already exist.
+        # True 면 이미 사용 중이라는 뜻
         result = {
             "username": False,
             "email": False
@@ -166,9 +157,6 @@ class UserChangePasswordAPI(APIView):
     @validate_serializer(UserChangePasswordSerializer)
     @login_required
     def post(self, request):
-        """
-        User change password api
-        """
         data = request.data
         username = request.user.username
         user = auth.authenticate(username=username, password=data["old_password"])
@@ -247,7 +235,7 @@ class SessionManagementAPI(APIView):
         modified = False
         for key in session_keys[:]:
             session = session_store(key)
-            # session does not exist or is expiry
+            # 세션이 없거나 만료됐다
             if not session._session:
                 session_keys.remove(key)
                 modified = True

@@ -1,7 +1,6 @@
 import hashlib
 import json
 import os
-# import shutil
 import zipfile
 from wsgiref.util import FileWrapper
 
@@ -146,7 +145,7 @@ class TestCaseZipProcessor(object):
                 info.append(data)
                 test_case_info["test_cases"][str(index + 1)] = data
         else:
-            # ["1.in", "1.out", "2.in", "2.out"] => [("1.in", "1.out"), ("2.in", "2.out")]
+            # ["1.in", "1.out", "2.in", "2.out"] -> [("1.in", "1.out"), ("2.in", "2.out")]
             test_case_list = zip(*[test_case_list[i::2] for i in range(2)])
             for index, item in enumerate(test_case_list):
                 data = {"stripped_output_md5": md5_cache[item[1]],
@@ -290,7 +289,7 @@ class ProblemAPI(ProblemBase):
         if error_info:
             return self.error(error_info)
 
-        # todo check filename and score info
+        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
@@ -348,7 +347,7 @@ class ProblemAPI(ProblemBase):
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
-        # todo check filename and score info
+        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
@@ -371,9 +370,6 @@ class ProblemAPI(ProblemBase):
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
         ensure_created_by(problem, request.user)
-        # d = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
-        # if os.path.isdir(d):
-        #     shutil.rmtree(d, ignore_errors=True)
         problem.delete()
         return self.success()
 
@@ -402,7 +398,7 @@ class ContestProblemAPI(ProblemBase):
         if error_info:
             return self.error(error_info)
 
-        # todo check filename and score info
+        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         data["contest"] = contest
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
@@ -470,7 +466,7 @@ class ContestProblemAPI(ProblemBase):
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
-        # todo check filename and score info
+        # TODO: 테스트케이스 파일명과 점수 정보 검증 추가
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
@@ -493,9 +489,6 @@ class ContestProblemAPI(ProblemBase):
         ensure_created_by(problem.contest, request.user)
         if Submission.objects.filter(problem=problem).exists():
             return self.error("제출 기록이 있어 문제를 삭제할 수 없습니다")
-        # d = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
-        # if os.path.isdir(d):
-        #    shutil.rmtree(d, ignore_errors=True)
         problem.delete()
         return self.success()
 
@@ -518,7 +511,8 @@ class MakeContestProblemPublicAPIView(APIView):
             return self.error("이미 공개된 문제입니다")
         problem.is_public = True
         problem.save()
-        # https://docs.djangoproject.com/en/1.11/topics/db/queries/#copying-model-instances
+        # pk 를 비우고 저장하면 복사본이 만들어진다
+        # https://docs.djangoproject.com/en/4.2/topics/db/queries/#copying-model-instances
         tags = problem.tags.all()
         problem.pk = None
         problem.contest = None
@@ -654,7 +648,6 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                         rule_type = problem_info["rule_type"]
                         test_case_score = problem_info["test_case_score"]
 
-                        # process test case
                         _, test_case_id = self.process_zip(tmp_file, spj=spj, dir=f"{i}/testcase/")
 
                         problem_obj = Problem.objects.create(_id=problem_info["display_id"],

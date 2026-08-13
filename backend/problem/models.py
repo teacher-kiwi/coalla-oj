@@ -36,17 +36,16 @@ def _default_io_mode():
 
 
 class Problem(models.Model):
-    # display ID
+    # 화면에 보이는 문제 번호(1000 등). DB pk 와 별개다.
     _id = models.TextField(db_index=True)
     contest = models.ForeignKey(Contest, null=True, on_delete=models.CASCADE)
-    # for contest problem
+    # 대회 문제를 공개 문제로도 열어둘지
     is_public = models.BooleanField(default=False)
     title = models.TextField()
-    # HTML
     description = RichTextField()
     input_description = RichTextField()
     output_description = RichTextField()
-    # [{input: "test", output: "123"}, {input: "test123", output: "456"}]
+    # [{input: "test", output: "123"}, ...]
     samples = JSONField()
     test_case_id = models.TextField()
     # [{"input_name": "1.in", "output_name": "1.out", "score": 0}]
@@ -55,16 +54,13 @@ class Problem(models.Model):
     languages = JSONField()
     template = JSONField()
     create_time = models.DateTimeField(auto_now_add=True)
-    # we can not use auto_now here
+    # auto_now 를 쓰면 통계 갱신 같은 저장에도 값이 바뀌어 직접 넣는다
     last_update_time = models.DateTimeField(null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    # ms
-    time_limit = models.IntegerField()
-    # MB
-    memory_limit = models.IntegerField()
-    # io mode
+    time_limit = models.IntegerField()   # ms
+    memory_limit = models.IntegerField() # MB
     io_mode = JSONField(default=_default_io_mode)
-    # special judge related
+    # 특수 채점(정답이 여러 개인 문제)
     spj = models.BooleanField(default=False)
     spj_language = models.TextField(null=True)
     spj_code = models.TextField(null=True)
@@ -75,11 +71,11 @@ class Problem(models.Model):
     difficulty = models.TextField()
     tags = models.ManyToManyField(ProblemTag)
     source = models.TextField(null=True)
-    # for OI mode
+    # OI 규칙에서만 쓴다
     total_score = models.IntegerField(default=0)
     submission_number = models.BigIntegerField(default=0)
     accepted_number = models.BigIntegerField(default=0)
-    # {JudgeStatus.ACCEPTED: 3, JudgeStaus.WRONG_ANSWER: 11}, the number means count
+    # 결과별 제출 수 {JudgeStatus.ACCEPTED: 3, JudgeStatus.WRONG_ANSWER: 11}
     statistic_info = JSONField(default=dict)
 
     class Meta:

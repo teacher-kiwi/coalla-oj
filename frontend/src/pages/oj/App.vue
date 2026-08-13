@@ -34,7 +34,7 @@ try {
   const loader = document.getElementById('app-loader')
   if (loader) loader.remove()
 } catch (e) {
-  // noop
+  // 무시한다
 }
 
 function updateTitle () {
