@@ -1,0 +1,53 @@
+#!/bin/sh
+# 커밋 직전 검사. 빠른 것만 한다(보통 1~3초).
+# 무거운 테스트는 pre-push 가 맡는다.
+#
+# 설치: git config core.hooksPath .githooks
+# 건너뛰기: git commit --no-verify
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$STAGED" ] && exit 0
+
+fail=0
+
+# --- 백엔드: flake8 ---
+# 파이썬은 컨테이너 안에만 설치돼 있다. 컨테이너 작업 디렉터리가 /app 이라
+# backend/ 접두사를 떼고 넘긴다.
+PY=$(echo "$STAGED" | grep '^backend/.*\.py$' | grep -v '/migrations/')
+if [ -n "$PY" ]; then
+    if docker exec backend true >/dev/null 2>&1; then
+        PATHS=$(echo "$PY" | sed 's|^backend/||')
+        if docker exec backend flake8 $PATHS; then
+            echo "✓ flake8"
+        else
+            echo "✗ flake8 위반이 있습니다"
+            fail=1
+        fi
+    else
+        echo "! backend 컨테이너가 꺼져 있어 flake8 을 건너뜁니다"
+        echo "  (docker compose -f docker-compose.dev.yml up -d backend)"
+    fi
+fi
+
+# --- 프론트엔드: ESLint ---
+FE=$(echo "$STAGED" | grep '^frontend/.*\.\(js\|vue\|mjs\)$')
+if [ -n "$FE" ]; then
+    if [ -d frontend/node_modules ]; then
+        PATHS=$(echo "$FE" | sed 's|^frontend/||')
+        if (cd frontend && npx eslint $PATHS); then
+            echo "✓ eslint"
+        else
+            echo "✗ eslint 위반이 있습니다"
+            fail=1
+        fi
+    else
+        echo "! frontend/node_modules 가 없어 eslint 를 건너뜁니다 (npm install)"
+    fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+    echo
+    echo "커밋을 멈췄습니다. 고치고 다시 커밋하거나, 지금은 넘기려면 --no-verify 를 쓰세요."
+    exit 1
+fi
+exit 0

@@ -1,0 +1,100 @@
+#!/bin/sh
+# 푸시 직전 검사. CI(.github/workflows/test.yml)와 같은 것을 미리 돌린다.
+# 백엔드 테스트까지 돌아서 1~2분 걸린다.
+#
+# 설치: git config core.hooksPath .githooks
+# 건너뛰기: git push --no-verify
+#
+# 이번에 푸시할 커밋들이 건드린 영역만 검사한다.
+# 프론트만 고쳤으면 백엔드 테스트는 돌리지 않는다.
+
+# git 이 stdin 으로 "<로컬ref> <로컬sha> <원격ref> <원격sha>" 를 준다
+CHANGED=""
+saw_ref=0
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    saw_ref=1
+    # 브랜치 삭제(로컬 sha 가 전부 0)면 검사할 것이 없다
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+
+    case "$remote_sha" in
+        *[!0]*)
+            # 원격에 이미 있는 브랜치: 그 뒤로 쌓인 것만 본다
+            range="$remote_sha..$local_sha"
+            ;;
+        *)
+            # 새 브랜치: 기본 브랜치와 갈라진 지점부터 본다
+            base=$(git merge-base origin/main "$local_sha" 2>/dev/null)
+            [ -z "$base" ] && base=$(git rev-list --max-parents=0 "$local_sha" | tail -1)
+            range="$base..$local_sha"
+            ;;
+    esac
+    CHANGED="$CHANGED
+$(git diff --name-only "$range" 2>/dev/null)"
+done
+
+# stdin 이 아예 없었다면(직접 실행 등) 마지막 커밋 기준으로 본다.
+# ref 를 받았는데 변경이 없는 경우(브랜치 삭제 등)는 그대로 통과시킨다.
+[ "$saw_ref" -eq 0 ] && CHANGED=$(git diff --name-only HEAD~1 2>/dev/null)
+
+fail=0
+
+# --- 백엔드 ---
+if echo "$CHANGED" | grep -q '^backend/'; then
+    if docker exec backend true >/dev/null 2>&1; then
+        echo "▶ 백엔드 flake8"
+        if docker exec backend flake8 --statistics .; then
+            echo "✓ flake8"
+        else
+            echo "✗ flake8 위반이 있습니다"
+            fail=1
+        fi
+
+        echo "▶ 백엔드 테스트 (1분 남짓 걸립니다)"
+        if docker exec backend python manage.py test; then
+            echo "✓ 테스트"
+        else
+            echo "✗ 테스트 실패"
+            fail=1
+        fi
+    else
+        echo "✗ backend 컨테이너가 꺼져 있어 백엔드 검사를 못 했습니다"
+        echo "  docker compose -f docker-compose.dev.yml up -d backend"
+        echo "  검사 없이 밀어붙이려면 git push --no-verify"
+        fail=1
+    fi
+fi
+
+# --- 프론트엔드 ---
+if echo "$CHANGED" | grep -q '^frontend/'; then
+    if [ -d frontend/node_modules ]; then
+        echo "▶ 프론트엔드 ESLint"
+        if (cd frontend && npm run lint --silent); then
+            echo "✓ eslint"
+        else
+            echo "✗ eslint 위반이 있습니다"
+            fail=1
+        fi
+
+        # 빌드는 경고가 길게 나와서 실패했을 때만 보여준다
+        echo "▶ 프론트엔드 빌드"
+        build_log=$(mktemp)
+        if (cd frontend && npm run build --silent) >"$build_log" 2>&1; then
+            echo "✓ 빌드"
+        else
+            cat "$build_log"
+            echo "✗ 빌드 실패"
+            fail=1
+        fi
+        rm -f "$build_log"
+    else
+        echo "✗ frontend/node_modules 가 없어 프론트 검사를 못 했습니다 (npm install)"
+        fail=1
+    fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+    echo
+    echo "푸시를 멈췄습니다. 어차피 CI 에서 같은 검사에 걸립니다."
+    exit 1
+fi
+exit 0
