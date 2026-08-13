@@ -1,5 +1,6 @@
 <template>
   <div>
+    <!-- 관리자는 /admin 에서 따로 로그인한다. 여기는 학생과 구글 계정(선생님·개인)만 둔다. -->
     <el-tabs v-model="tab" class="login-tabs">
       <el-tab-pane label="학생" name="student">
         <StudentLogin />
@@ -20,62 +21,27 @@
           구글 로그인이 아직 설정되지 않았습니다. 관리자에게 문의하세요.
         </p>
       </el-tab-pane>
-
-      <el-tab-pane label="관리자" name="admin">
-        <el-form ref="formRef" :model="formLogin" :rules="ruleLogin">
-          <el-form-item prop="username">
-            <el-input v-model="formLogin.username" placeholder="사용자명" size="large"
-                      :prefix-icon="User" @keyup.enter="handleLogin" />
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input type="password" v-model="formLogin.password" placeholder="비밀번호"
-                      size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
-          </el-form-item>
-        </el-form>
-        <el-button type="primary" class="btn" :loading="btnLoginLoading" @click="handleLogin">
-          로그인
-        </el-button>
-        <div class="footer">
-          <a @click.stop="goResetPassword" class="forget-link">비밀번호 찾기</a>
-        </div>
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import StudentLogin from '@oj/views/user/StudentLogin.vue'
-import { useForm } from '@oj/components/mixins'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
 
-const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
-const { validateForm } = useForm()
 
 const tab = ref('student')
 const googleBtnRef = ref(null)
 const needNickname = ref(false)
 const nickname = ref('')
 let pendingCredential = null
-const formRef = ref(null)
 const btnLoginLoading = ref(false)
-const formLogin = ref({ username: '', password: '' })
-
-const ruleLogin = {
-  username: [
-    { required: true, trigger: 'blur' }
-  ],
-  password: [
-    { required: true, trigger: 'change', min: 6, max: 20 }
-  ]
-}
 
 // 구글 로그인 스크립트는 필요한 순간에만 불러온다.
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
@@ -157,27 +123,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.google?.accounts?.id?.cancel?.()
 })
-
-async function handleLogin () {
-  const valid = await validateForm(formRef.value)
-  if (!valid) return
-  btnLoginLoading.value = true
-  const formData = { ...formLogin.value }
-  try {
-    await api.login(formData)
-    btnLoginLoading.value = false
-    appStore.changeModalStatus({ visible: false })
-    userStore.getProfile()
-    ElMessage.success('환영합니다')
-  } catch (e) {
-    btnLoginLoading.value = false
-  }
-}
-
-function goResetPassword () {
-  appStore.changeModalStatus({ visible: false })
-  router.push({ name: 'apply-reset-password' })
-}
 </script>
 
 <style scoped lang="less">
@@ -188,18 +133,6 @@ function goResetPassword () {
 .btn {
   width: 100%;
   margin-top: 12px;
-}
-
-.footer {
-  overflow: auto;
-  margin-top: 16px;
-  text-align: left;
-
-  a {
-    display: block;
-    font-size: 13px;
-    margin-top: 6px;
-  }
 }
 
 .google-btn {
