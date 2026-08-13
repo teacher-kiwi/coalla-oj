@@ -40,7 +40,7 @@ function breakLongWords (value, length = 16) {
 }
 
 function downloadFile (url) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     axios.get(url, { responseType: 'blob' }).then(resp => {
       let headers = resp.headers
       if (headers['content-type'].indexOf('json') !== -1) {

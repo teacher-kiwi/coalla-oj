@@ -23,7 +23,6 @@ class SubmissionAPI(APIView):
         if not can_consume:
             return "Please wait %d seconds" % (int(wait))
 
-
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):
         contest = self.contest
@@ -63,8 +62,9 @@ class SubmissionAPI(APIView):
             if "Python3" not in problem.languages:
                 return self.error("블록 코딩은 이 문제에서 Python3가 허용되어야 사용할 수 있습니다")
         elif data["language"] not in problem.languages:
-            return self.error(f"{data['language']} 언어는 이 문제에서 사용할 수 없습니다")
-        
+            language = data["language"]
+            return self.error(f"{language} 언어는 이 문제에서 사용할 수 없습니다")
+
         submission = Submission.objects.create(user_id=request.user.id,
                                                language=data["language"],
                                                code=data["code"],

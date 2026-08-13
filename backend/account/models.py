@@ -49,7 +49,7 @@ class User(AbstractBaseUser):
     google_sub = models.TextField(null=True, unique=True)
     # 학생 계정을 만든 교사. 학급이 바뀌어도 비밀번호 초기화 권한은 여기를 따른다.
     created_by = models.ForeignKey("self", null=True, on_delete=models.SET_NULL,
-                                  related_name="created_students")
+                                   related_name="created_students")
 
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = []

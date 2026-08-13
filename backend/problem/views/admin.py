@@ -75,7 +75,7 @@ def get_existing_problem_tags(tag_names):
     tag_map = {tag.name: tag for tag in ProblemTag.objects.filter(name__in=tag_names)}
     missing = [name for name in tag_names if name not in tag_map]
     if missing:
-        return None, f"등록되지 않은 태그입니다: {', '.join(missing)}"
+        return None, "등록되지 않은 태그입니다: " + ", ".join(missing)
     return [tag_map[name] for name in tag_names], None
 
 
@@ -615,12 +615,14 @@ class ExportProblemAPI(APIView):
         with open(os.path.join(problem_test_case_dir, "info")) as f:
             info = json.load(f)
         for k, v in info["test_cases"].items():
-            zip_file.write(filename=os.path.join(problem_test_case_dir, v["input_name"]),
-                           arcname=f"{index}/testcase/{v['input_name']}",
+            input_name = v["input_name"]
+            zip_file.write(filename=os.path.join(problem_test_case_dir, input_name),
+                           arcname=f"{index}/testcase/{input_name}",
                            compress_type=compression)
             if not info["spj"]:
-                zip_file.write(filename=os.path.join(problem_test_case_dir, v["output_name"]),
-                               arcname=f"{index}/testcase/{v['output_name']}",
+                output_name = v["output_name"]
+                zip_file.write(filename=os.path.join(problem_test_case_dir, output_name),
+                               arcname=f"{index}/testcase/{output_name}",
                                compress_type=compression)
 
     @validate_serializer(ExportProblemRequestSerialzier)

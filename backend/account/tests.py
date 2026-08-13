@@ -91,7 +91,6 @@ class UserLoginAPITest(APITestCase):
         user = auth.get_user(self.client)
         self.assertFalse(user.is_authenticated)
 
-
     def test_user_disabled(self):
         self.user.is_disabled = True
         self.user.save()
@@ -134,7 +133,6 @@ class SessionManagementAPITest(APITestCase):
         self.assertSuccess(resp)
         data = resp.data["data"]
         self.assertEqual(len(data), 1)
-
 
     def test_delete_session_with_invalid_key(self):
         resp = self.client.delete(self.url + "?session_key=aaaaaaaaaa")
@@ -224,7 +222,6 @@ class ApplyResetPasswordAPITest(CaptchaTest):
         self._refresh_captcha()
         self.test_apply_reset_password()
 
-
     def test_google_account_blocked(self, send_email_send):
         user = User.objects.first()
         user.google_sub = "google-sub-1"
@@ -307,7 +304,6 @@ class UserChangePasswordAPITest(APITestCase):
         self.user = self.create_user(username=self.username, password=self.old_password, login=False)
 
         self.data = {"old_password": self.old_password, "new_password": self.new_password}
-
 
     def test_login_required(self):
         response = self.client.post(self.url, data=self.data)
@@ -415,7 +411,6 @@ class AdminUserTest(APITestCase):
         user = User.objects.get(id=self.regular_user.id)
         self.assertFalse(user.check_password(self.password))
         self.assertTrue(user.check_password(new_password))
-
 
     def test_import_users(self):
         data = {"users": [["user1", "pass1", "eami1@e.com", "user1"],

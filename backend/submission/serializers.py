@@ -1,7 +1,6 @@
 from account.models import has_public_profile, my_student_ids, public_display_name
 from .models import Submission
 from utils.api import serializers
-from utils.serializers import LanguageNameChoiceField
 
 
 class CreateSubmissionSerializer(serializers.Serializer):

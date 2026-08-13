@@ -57,8 +57,8 @@ class Problem(models.Model):
     # auto_now 를 쓰면 통계 갱신 같은 저장에도 값이 바뀌어 직접 넣는다
     last_update_time = models.DateTimeField(null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    time_limit = models.IntegerField()   # ms
-    memory_limit = models.IntegerField() # MB
+    time_limit = models.IntegerField()  # ms
+    memory_limit = models.IntegerField()  # MB
     io_mode = JSONField(default=_default_io_mode)
     # 특수 채점(정답이 여러 개인 문제)
     spj = models.BooleanField(default=False)

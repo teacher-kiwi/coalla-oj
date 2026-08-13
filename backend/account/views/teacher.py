@@ -175,7 +175,8 @@ class StudentAPI(APIView):
         taken = set(school_class.memberships.filter(number__in=numbers)
                     .values_list("number", flat=True))
         if taken:
-            return self.error(f"이미 사용 중인 번호입니다: {', '.join(map(str, sorted(taken)))}")
+            taken_numbers = ", ".join(map(str, sorted(taken)))
+            return self.error(f"이미 사용 중인 번호입니다: {taken_numbers}")
 
         limit = SysOptions.max_students_per_teacher
         current = ClassMembership.objects.filter(school_class__teacher=school_class.teacher).count()

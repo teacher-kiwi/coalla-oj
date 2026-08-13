@@ -144,10 +144,11 @@ class GenerateUserAPI(APIView):
         worksheet.write("B1", "Password")
         i = 1
 
+        prefix, suffix = data["prefix"], data["suffix"]
         user_list = []
         for number in range(data["number_from"], data["number_to"] + 1):
             raw_password = rand_str(data["password_length"])
-            user = User(username=f"{data['prefix']}{number}{data['suffix']}", password=make_password(raw_password))
+            user = User(username=f"{prefix}{number}{suffix}", password=make_password(raw_password))
             user.raw_password = raw_password
             user_list.append(user)
 

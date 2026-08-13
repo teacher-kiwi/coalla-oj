@@ -90,7 +90,7 @@ import { House, ChatDotRound, PictureFilled, List, TrendCharts, MagicStick } fro
 import dayjs from 'dayjs'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { CONTEST_STATUS_REVERSE, CONTEST_STATUS, RULE_TYPE_LABEL, CONTEST_TYPE_LABEL } from '@/utils/constants'
+import { CONTEST_STATUS_REVERSE, RULE_TYPE_LABEL, CONTEST_TYPE_LABEL } from '@/utils/constants'
 import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import { useContestStore } from '@/store/contest'

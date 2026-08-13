@@ -278,7 +278,7 @@ def _progress_xlsx(data):
     worksheet.set_column("A:A", 8)
     worksheet.write(0, 0, "번호")
     for index, problem in enumerate(data["problems"]):
-        worksheet.write(0, 1 + index, f"{problem['_id']} {problem['title']}")
+        worksheet.write(0, 1 + index, "{} {}".format(problem["_id"], problem["title"]))
     worksheet.write(0, 1 + len(data["problems"]), "해결")
 
     for row, student in enumerate(data["students"], start=1):
@@ -287,15 +287,15 @@ def _progress_xlsx(data):
             if cell["solved"]:
                 worksheet.write_string(row, 1 + index, "O")
             elif cell["attempts"]:
-                worksheet.write_string(row, 1 + index, f"△({cell['attempts']})")
+                worksheet.write_string(row, 1 + index, "△({})".format(cell["attempts"]))
             else:
                 worksheet.write_string(row, 1 + index, "")
         worksheet.write_string(row, 1 + len(data["problems"]),
-                               f"{student['solved_count']}/{len(data['problems'])}")
+                               "{}/{}".format(student["solved_count"], len(data["problems"])))
     workbook.close()
 
     response = HttpResponse(output.getvalue())
-    filename = quote(f"{data['school_class']['name']} {data['problem_set']['title']}.xlsx")
+    filename = quote("{} {}.xlsx".format(data["school_class"]["name"], data["problem_set"]["title"]))
     response["Content-Disposition"] = f"attachment; filename*=UTF-8''{filename}"
     response["Content-Type"] = "application/xlsx"
     return response
