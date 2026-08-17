@@ -14,9 +14,9 @@
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item command="">전체</el-dropdown-item>
-                    <el-dropdown-item command="Low">낮음</el-dropdown-item>
-                    <el-dropdown-item command="Mid">중간</el-dropdown-item>
-                    <el-dropdown-item command="High">높음</el-dropdown-item>
+                    <el-dropdown-item v-for="d in DIFFICULTY" :key="d.value" :command="d.value">
+                      {{ d.label }}
+                    </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -37,7 +37,8 @@
             </li>
           </ul>
         </template>
-        <el-table :data="problemList" v-loading="loadings.table" class="problem-table">
+        <el-table :key="`${statusColumnVisible}-${tagsVisible}`" :data="problemList"
+                  v-loading="loadings.table" class="problem-table">
           <el-table-column v-if="statusColumnVisible" width="50" align="center">
             <template #default="{ row }">
               <template v-if="row.my_status === 0">
@@ -64,7 +65,7 @@
           </el-table-column>
           <el-table-column label="난이도">
             <template #default="{ row }">
-              <el-tag :type="difficultyColor(row.difficulty)">{{ DIFFICULTY_LABEL[row.difficulty] }}</el-tag>
+              <DifficultyTag :value="row.difficulty" />
             </template>
           </el-table-column>
           <el-table-column label="총 제출" prop="submission_number" />
@@ -110,7 +111,8 @@ import { ElMessage } from 'element-plus'
 import { ArrowDown, Search, Refresh as RefreshIcon, Switch, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import utils from '@/utils/utils'
-import { DIFFICULTY_LABEL } from '@/utils/constants'
+import { DIFFICULTY, DIFFICULTY_LABEL } from '@/utils/constants'
+import DifficultyTag from '@oj/components/DifficultyTag.vue'
 import Pagination from '@oj/components/Pagination.vue'
 import { useUserStore } from '@/store/user'
 
@@ -128,13 +130,6 @@ const query = reactive({ keyword: '', difficulty: '', tag: '', page: 1, limit: 1
 
 function getACRate (ac, total) {
   return utils.getACRate(ac, total)
-}
-
-function difficultyColor (d) {
-  if (d === 'Low') return 'success'
-  if (d === 'Mid') return 'info'
-  if (d === 'High') return 'warning'
-  return 'info'
 }
 
 function init (simulate = false) {

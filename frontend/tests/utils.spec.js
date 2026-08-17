@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
-import { buildProblemCodeKey, JUDGE_STATUS, DIFFICULTY_LABEL } from '@/utils/constants'
+import { buildProblemCodeKey, JUDGE_STATUS, DIFFICULTY, DIFFICULTY_LABEL,
+  DIFFICULTY_COLOR, DIFFICULTY_GUIDE } from '@/utils/constants'
 
 describe('정답률 표시', () => {
   it('제출이 없어도 0으로 나누지 않는다', () => {
@@ -80,9 +81,19 @@ describe('상수 표', () => {
     }
   })
 
-  it('난이도 라벨이 세 단계 모두 있다', () => {
-    expect(DIFFICULTY_LABEL.Low).toBeTruthy()
-    expect(DIFFICULTY_LABEL.Mid).toBeTruthy()
-    expect(DIFFICULTY_LABEL.High).toBeTruthy()
+  it('난이도 6단계가 라벨·색·기준을 모두 갖는다', () => {
+    // 하나라도 빠지면 문제 목록에서 빈 칸이나 색 없는 태그가 나온다
+    expect(DIFFICULTY).toHaveLength(6)
+    for (const { value, label, color } of DIFFICULTY) {
+      expect(label, value).toBeTruthy()
+      expect(color, value).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(DIFFICULTY_LABEL[value]).toBe(label)
+      expect(DIFFICULTY_COLOR[value]).toBe(color)
+      expect(DIFFICULTY_GUIDE[value], `${value} 기준 설명`).toBeTruthy()
+    }
+  })
+
+  it('난이도 값은 L1~L6 순서다', () => {
+    expect(DIFFICULTY.map(d => d.value)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6'])
   })
 })

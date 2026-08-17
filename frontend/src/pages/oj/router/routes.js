@@ -27,6 +27,8 @@ const SecuritySetting = () => import('@oj/views/setting/children/SecuritySetting
 const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.vue')
 const TeacherClassList = () => import('@oj/views/teacher/ClassList.vue')
 const TeacherClassDetail = () => import('@oj/views/teacher/ClassDetail.vue')
+const TeacherProblemList = () => import('@oj/views/teacher/ProblemList.vue')
+const TeacherProblemEdit = () => import('@oj/views/teacher/ProblemEdit.vue')
 const TeacherProblemSetList = () => import('@oj/views/teacher/ProblemSetList.vue')
 const TeacherProgressBoard = () => import('@oj/views/teacher/ProgressBoard.vue')
 const TeacherStudentDetail = () => import('@oj/views/teacher/StudentDetail.vue')
@@ -210,6 +212,24 @@ export default [
     name: 'teacher-problem-set-list',
     meta: { requiresAuth: true, title: '문제집 관리' },
     component: TeacherProblemSetList
+  },
+  {
+    path: '/teacher/problem',
+    name: 'teacher-problem-list',
+    meta: { requiresAuth: true, title: '내가 만든 문제' },
+    component: TeacherProblemList
+  },
+  {
+    path: '/teacher/problem/create',
+    name: 'teacher-problem-create',
+    meta: { requiresAuth: true, title: '문제 만들기' },
+    component: TeacherProblemEdit
+  },
+  {
+    path: '/teacher/problem/:problemId/edit',
+    name: 'teacher-problem-edit',
+    meta: { requiresAuth: true, title: '문제 수정' },
+    component: TeacherProblemEdit
   },
   {
     path: '/teacher/problem-set/:setId',

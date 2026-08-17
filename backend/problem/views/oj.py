@@ -1,7 +1,8 @@
 from django.db.models import Q, Count
 from utils.api import APIView
 from account.decorators import check_contest_permission, login_required
-from ..models import ProblemTag, Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment
+from ..models import (can_access_problem, ProblemTag, Problem, ProblemRuleType,
+                      ProblemSet, ProblemSetAssignment, ProblemVisibility)
 from ..serializers import (ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
                            TagSerializer, ProblemSafeSerializer)
 from ..utils import filter_problem_tags_by_keyword
@@ -12,7 +13,14 @@ from submission.models import JudgeStatus
 class ProblemTagAPI(APIView):
     def get(self, request):
         keyword = request.GET.get("keyword")
-        tags = ProblemTag.objects.annotate(problem_count=Count("problem")).filter(problem_count__gt=0)
+        # 기본은 "문제가 붙어 있는 태그"만 준다. 문제 목록의 태그 사이드바에
+        # 아무 문제도 없는 태그가 줄줄이 보이면 고를 수 없는 항목만 늘어난다.
+        # 출제 화면처럼 "붙일 태그를 고르는" 곳은 all=1 로 전체를 받아야 한다.
+        if request.GET.get("all") == "1":
+            tags = ProblemTag.objects.order_by("name")
+        else:
+            tags = (ProblemTag.objects.annotate(problem_count=Count("problem"))
+                    .filter(problem_count__gt=0))
         if keyword:
             tags = filter_problem_tags_by_keyword(tags, keyword)
         return self.success(TagSerializer(tags, many=True).data)
@@ -20,7 +28,9 @@ class ProblemTagAPI(APIView):
 
 class PickOneAPI(APIView):
     def get(self, request):
-        problem = Problem.objects.filter(contest_id__isnull=True, visible=True).order_by("?").first()
+        problem = (Problem.objects.filter(contest_id__isnull=True, visible=True,
+                                          visibility=ProblemVisibility.public)
+                   .order_by("?").first())
         if problem is None:
             return self.error("선택할 문제가 없습니다")
         return self.success(problem._id)
@@ -47,20 +57,29 @@ class ProblemAPI(APIView):
     def get(self, request):
         problem_id = request.GET.get("problem_id")
         if problem_id:
-            try:
-                problem = Problem.objects.select_related("created_by") \
-                    .get(_id=problem_id, contest_id__isnull=True, visible=True)
-                problem_data = ProblemSerializer(problem).data
-                self._add_problem_status(request, problem_data)
-                return self.success(problem_data)
-            except Problem.DoesNotExist:
+            problem = (Problem.objects.select_related("created_by")
+                       .filter(_id=problem_id, contest_id__isnull=True).first())
+            # 비공개 문제는 만든 교사와 배포받은 학급 학생만 열 수 있다.
+            # 없는 문제와 권한 없는 문제를 같은 문구로 돌려준다(존재 여부를 알리지 않는다).
+            if problem is None or not can_access_problem(problem, request.user):
                 return self.error("문제가 존재하지 않습니다")
+            problem_data = ProblemSerializer(problem).data
+            self._add_problem_status(request, problem_data)
+            return self.success(problem_data)
 
         limit = request.GET.get("limit")
         if not limit:
             return self.error("limit 값이 필요합니다")
 
-        problems = Problem.objects.prefetch_related("tags").filter(contest_id__isnull=True, visible=True)
+        problems = Problem.objects.prefetch_related("tags").filter(
+            contest_id__isnull=True, visible=True)
+        # 교사가 문제집에 담을 문제를 고르는 화면은 "공개 문제 + 내가 만든 문제"를 함께 본다.
+        # 그 밖의 경로(학생 문제 목록 등)는 공개 문제만 본다.
+        if request.GET.get("mine") == "1" and request.user.is_authenticated:
+            problems = problems.filter(Q(visibility=ProblemVisibility.public)
+                                       | Q(created_by=request.user))
+        else:
+            problems = problems.filter(visibility=ProblemVisibility.public)
         tag_text = request.GET.get("tag")
         if tag_text:
             problems = problems.filter(tags__name=tag_text)
@@ -192,6 +211,9 @@ class ProblemSetDetailAPI(APIView):
         for item in problem_set.items.all():
             problem = ProblemBriefSerializer(item.problem).data
             problem["my_status"] = status_map.get(str(item.problem_id), {}).get("status")
+            # 관리자가 감춘 문제는 목록에서 빼지 않고 "지금 풀 수 없다"고 알려준다.
+            # 조용히 사라지면 학생은 문제집이 짧아진 이유를 알 수 없다.
+            problem["available"] = item.problem.visible
             problems.append(problem)
 
         return self.success({

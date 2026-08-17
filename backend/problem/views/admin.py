@@ -19,14 +19,14 @@ from utils.api import APIView, CSRFExemptAPIView, validate_serializer, APIError
 from utils.constants import Difficulty
 from utils.shortcuts import rand_str, natural_sort_key
 from utils.tasks import delete_files
-from ..models import Problem, ProblemRuleType, ProblemTag
+from ..models import Problem, ProblemRuleType, ProblemTag, ProblemVisibility
 from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            CreateProblemSerializer, EditProblemSerializer, EditContestProblemSerializer,
                            ProblemAdminSerializer, TestCaseUploadForm, ContestProblemMakePublicSerializer,
                            AddContestProblemSerializer, ExportProblemSerializer,
                            ExportProblemRequestSerialzier, UploadProblemForm, ImportProblemSerializer,
                            TagSerializer, CreateProblemTagSerializer,
-                           EditProblemTagSerializer)
+                           EditProblemTagSerializer, ReviewProblemPublishSerializer)
 from ..utils import (build_problem_template, filter_problem_tags_by_keyword,
                      normalize_tag_aliases)
 
@@ -204,6 +204,40 @@ class TestCaseZipProcessor(object):
 
         return info, test_case_id
 
+    def process_cases(self, cases):
+        """손으로 입력한 입출력 쌍을 테스트케이스로 저장한다.
+
+        zip 업로드와 결과물(파일 이름·info)이 같아야 채점 서버가 그대로 읽는다.
+        특수 채점은 정답 파일이 없어야 하므로 이 경로에서는 지원하지 않는다.
+        """
+        test_case_id = rand_str()
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
+        os.mkdir(test_case_dir)
+        os.chmod(test_case_dir, 0o710)
+
+        info = []
+        test_case_info = {"spj": False, "test_cases": {}}
+        for index, case in enumerate(cases, start=1):
+            input_name, output_name = f"{index}.in", f"{index}.out"
+            # 채점 서버는 줄바꿈을 LF 로 본다(zip 경로와 같게 맞춘다)
+            input_bytes = case["input"].replace("\r\n", "\n").encode("utf-8")
+            output_bytes = case["output"].replace("\r\n", "\n").encode("utf-8")
+            with open(os.path.join(test_case_dir, input_name), "wb") as f:
+                f.write(input_bytes)
+            with open(os.path.join(test_case_dir, output_name), "wb") as f:
+                f.write(output_bytes)
+            data = {"input_name": input_name, "input_size": len(input_bytes),
+                    "output_name": output_name, "output_size": len(output_bytes),
+                    "stripped_output_md5": hashlib.md5(output_bytes.rstrip()).hexdigest()}
+            info.append(data)
+            test_case_info["test_cases"][str(index)] = data
+
+        with open(os.path.join(test_case_dir, "info"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(test_case_info, indent=4))
+        for item in os.listdir(test_case_dir):
+            os.chmod(os.path.join(test_case_dir, item), 0o640)
+        return info, test_case_id
+
     def filter_name_list(self, name_list, spj, dir=""):
         ret = []
         prefix = 1
@@ -290,6 +324,29 @@ class CompileSPJAPI(APIView):
             return self.success()
 
 
+class ProblemPublishReviewAPI(APIView):
+    """교사가 공개 신청한 문제를 관리자가 검토한다."""
+    @admin_role_required
+    def get(self, request):
+        problems = (Problem.objects.filter(visibility=ProblemVisibility.pending,
+                                           contest_id__isnull=True)
+                    .select_related("created_by").prefetch_related("tags"))
+        return self.success(ProblemAdminSerializer(problems, many=True).data)
+
+    @validate_serializer(ReviewProblemPublishSerializer)
+    @admin_role_required
+    def post(self, request):
+        problem = Problem.objects.filter(id=request.data["id"],
+                                         visibility=ProblemVisibility.pending).first()
+        if not problem:
+            return self.error("공개 신청 중인 문제가 아닙니다")
+        approve = request.data["approve"]
+        # 반려하면 다시 비공개로 돌아가고 교사가 고쳐서 다시 신청할 수 있다
+        problem.visibility = ProblemVisibility.public if approve else ProblemVisibility.private
+        problem.save(update_fields=["visibility"])
+        return self.success({"visibility": problem.visibility})
+
+
 class ProblemBase(APIView):
     def common_checks(self, request):
         data = request.data
@@ -322,9 +379,9 @@ class ProblemAPI(ProblemBase):
     @validate_serializer(CreateProblemSerializer)
     def post(self, request):
         data = request.data
-        _id = data["_id"]
-        if not _id:
-            return self.error("표시 ID를 입력하세요")
+        # 표시 번호는 서버가 매긴다. 직접 넣은 값이 있으면 그것을 쓴다(옛 데이터 이관용).
+        _id = data["_id"] or Problem.next_display_id()
+        data["_id"] = _id
         if Problem.objects.filter(_id=_id, contest_id__isnull=True).exists():
             return self.error("이미 사용 중인 표시 ID입니다")
 
@@ -380,9 +437,9 @@ class ProblemAPI(ProblemBase):
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
 
-        _id = data["_id"]
-        if not _id:
-            return self.error("표시 ID를 입력하세요")
+        # 빈 값으로 오면 기존 번호를 유지한다(출제 화면에 번호 칸이 없다)
+        _id = data["_id"] or problem._id
+        data["_id"] = _id
         if Problem.objects.exclude(id=problem_id).filter(_id=_id, contest_id__isnull=True).exists():
             return self.error("이미 사용 중인 표시 ID입니다")
 
@@ -714,7 +771,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                                                              languages=SysOptions.language_names,
                                                              created_by=request.user,
                                                              visible=False,
-                                                             difficulty=Difficulty.MID,
+                                                             difficulty=Difficulty.L3,
                                                              total_score=sum(item["score"] for item in test_case_score)
                                                              if rule_type == ProblemRuleType.OI else 0,
                                                              test_case_id=test_case_id

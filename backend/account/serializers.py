@@ -53,10 +53,18 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    # 구글로 가입했는지만 알려준다. sub 자체는 내부 식별자라 내보내지 않는다.
+    # 화면에서 "회원 탈퇴"를 보여줄지 판단하는 데 쓴다.
+    is_google_account = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ["id", "username", "email", "admin_type", "problem_permission",
-                  "create_time", "last_login", "is_disabled", "created_by"]
+                  "create_time", "last_login", "is_disabled", "created_by",
+                  "is_google_account"]
+
+    def get_is_google_account(self, obj):
+        return bool(obj.google_sub)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -111,6 +119,11 @@ class GoogleLoginSerializer(serializers.Serializer):
     credential = serializers.CharField(max_length=4096)
     # 최초 가입 시에만 필요하다. 없으면 서버가 nickname_required 로 응답한다.
     nickname = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+
+class DeleteAccountSerializer(serializers.Serializer):
+    # 탈퇴 직전에 구글로 다시 로그인해 받은 토큰. 지금 로그인한 계정과 같은지 대조한다.
+    credential = serializers.CharField(max_length=4096)
 
 
 class TeacherApplicationSerializer(serializers.ModelSerializer):

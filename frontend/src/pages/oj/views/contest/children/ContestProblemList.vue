@@ -3,6 +3,7 @@
     <Panel>
       <template #title>문제 목록</template>
       <el-table v-if="contestRuleType === 'ACM' || OIContestRealTimePermission"
+                :key="statusColumnVisible"
                 :data="problems" @row-click="goContestProblem" empty-text="문제 없음">
         <el-table-column label="#" prop="_id" sortable width="150" />
         <el-table-column label="제목" prop="title" />

@@ -46,8 +46,11 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     _id = serializers.CharField(max_length=32, allow_blank=True, allow_null=True)
     title = serializers.CharField(max_length=1024)
     description = serializers.CharField()
-    input_description = serializers.CharField()
-    output_description = serializers.CharField()
+    # 입력이 없는 문제("Hello World 출력하기")도 있어 비워둘 수 있다.
+    # 교사 출제 화면(TeacherProblemSerializer)도 같은 규칙이다. 여기서만 막으면
+    # 교사가 비워 만든 문제를 관리자가 저장할 수 없다(공개 스위치를 켜는 것도 저장이다).
+    input_description = serializers.CharField(allow_blank=True)
+    output_description = serializers.CharField(allow_blank=True)
     samples = serializers.ListField(child=CreateSampleSerializer(), allow_empty=False)
     test_case_id = serializers.CharField(max_length=32)
     test_case_score = serializers.ListField(child=CreateTestCaseScoreSerializer(), allow_empty=True)
@@ -141,7 +144,7 @@ class ProblemListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Problem
-        fields = ("id", "_id", "title", "difficulty", "tags", "rule_type",
+        fields = ("id", "_id", "title", "difficulty", "tags", "rule_type", "visibility",
                   "submission_number", "accepted_number")
 
 
@@ -276,6 +279,78 @@ class ImportProblemSerializer(serializers.Serializer):
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
 
 
+# ---- 교사 출제 ----
+
+# 예제는 문제를 여는 모든 학생에게 매번 전송되므로 크기와 개수를 제한한다.
+MAX_SAMPLES = 3
+MAX_SAMPLE_BYTES = 2 * 1024
+# 손으로 넣는 테스트케이스. 많거나 크면 zip 업로드(관리자 화면)를 쓰는 게 맞다.
+MAX_CASES = 20
+MAX_CASE_BYTES = 64 * 1024
+
+
+class TeacherTestCaseSerializer(serializers.Serializer):
+    input = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
+                                  trim_whitespace=False)
+    output = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
+                                   trim_whitespace=False)
+    # 학생에게 예제로 보여줄지. 체크하지 않은 것은 채점에만 쓰인다.
+    is_sample = serializers.BooleanField(default=False)
+
+
+class TeacherProblemSerializer(serializers.Serializer):
+    """교사용 간단 출제.
+
+    표시 번호·시간 제한·메모리 제한·특수 채점·코드 템플릿은 받지 않는다.
+    서버가 기본값을 채운다.
+    """
+    title = serializers.CharField(max_length=1024)
+    description = serializers.CharField()
+    input_description = serializers.CharField(allow_blank=True)
+    output_description = serializers.CharField(allow_blank=True)
+    hint = serializers.CharField(allow_blank=True, required=False, default="")
+    difficulty = serializers.ChoiceField(choices=Difficulty.choices())
+    tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
+    cases = serializers.ListField(child=TeacherTestCaseSerializer(), allow_empty=False)
+
+    def validate_cases(self, cases):
+        if len(cases) > MAX_CASES:
+            raise serializers.ValidationError(
+                f"테스트 케이스는 {MAX_CASES}개까지 넣을 수 있습니다")
+        samples = [c for c in cases if c["is_sample"]]
+        if not samples:
+            raise serializers.ValidationError("예제로 보여줄 케이스를 하나 이상 골라주세요")
+        if len(samples) > MAX_SAMPLES:
+            raise serializers.ValidationError(f"예제는 {MAX_SAMPLES}개까지 고를 수 있습니다")
+        for case in samples:
+            if (len(case["input"].encode("utf-8")) > MAX_SAMPLE_BYTES
+                    or len(case["output"].encode("utf-8")) > MAX_SAMPLE_BYTES):
+                raise serializers.ValidationError(
+                    f"예제로 보여줄 케이스는 {MAX_SAMPLE_BYTES // 1024}KB 를 넘을 수 없습니다")
+        return cases
+
+
+class EditTeacherProblemSerializer(TeacherProblemSerializer):
+    id = serializers.IntegerField()
+    # 케이스를 다시 보내지 않으면 기존 테스트케이스를 그대로 둔다
+    cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
+
+
+class ReviewProblemPublishSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    approve = serializers.BooleanField()
+
+
+class TeacherProblemListSerializer(serializers.ModelSerializer):
+    """교사가 자기 문제를 관리하는 목록용."""
+    tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+
+    class Meta:
+        model = Problem
+        fields = ("id", "_id", "title", "difficulty", "tags", "visibility", "visible",
+                  "create_time", "submission_number", "accepted_number")
+
+
 # ---- 문제집 ----
 
 class ProblemBriefSerializer(serializers.ModelSerializer):
@@ -287,10 +362,14 @@ class ProblemBriefSerializer(serializers.ModelSerializer):
 
 class ProblemSetItemSerializer(serializers.ModelSerializer):
     problem = ProblemBriefSerializer()
+    # 교사가 담아둔 문제가 그동안 감춰졌는지(관리자 조치) 또는 비공개인지 알려준다.
+    # 그래야 교사가 문제집에서 빼거나 자기 문제를 고쳐 다시 공개 신청할 수 있다.
+    problem_visible = serializers.BooleanField(source="problem.visible", read_only=True)
+    problem_visibility = serializers.CharField(source="problem.visibility", read_only=True)
 
     class Meta:
         model = ProblemSetItem
-        fields = ("id", "order", "problem")
+        fields = ("id", "order", "problem", "problem_visible", "problem_visibility")
 
 
 class ProblemSetAssignmentSerializer(serializers.ModelSerializer):

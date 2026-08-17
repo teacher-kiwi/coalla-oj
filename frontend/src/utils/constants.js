@@ -108,10 +108,31 @@ export const CONTEST_STATUS_REVERSE = {
 }
 
 // 서버가 내려주는 영문 값에 대응하는 화면 표시용 한국어 라벨
-export const DIFFICULTY_LABEL = {
-  Low: '낮음',
-  Mid: '중간',
-  High: '높음'
+// 난이도 6단계. DB 에는 L1~L6 만 저장하고 이름·색은 여기서 붙인다.
+// 색은 solved.ac 티어 색을 빌려왔다(브론즈→루비). 이름은 초등에서 통하는 말로 쓴다.
+export const DIFFICULTY = [
+  { value: 'L1', label: '입문', color: '#ad5600' },
+  { value: 'L2', label: '기초', color: '#435f7a' },
+  { value: 'L3', label: '기본', color: '#ec9a00' },
+  { value: 'L4', label: '응용', color: '#27e2a4' },
+  { value: 'L5', label: '심화', color: '#00b4fc' },
+  { value: 'L6', label: '도전', color: '#ff0062' }
+]
+
+export const DIFFICULTY_LABEL = Object.fromEntries(
+  DIFFICULTY.map(d => [d.value, d.label]))
+
+export const DIFFICULTY_COLOR = Object.fromEntries(
+  DIFFICULTY.map(d => [d.value, d.color]))
+
+// 난이도를 고를 때 무엇을 뜻하는지. 출제 화면에서 안내로 보여준다.
+export const DIFFICULTY_GUIDE = {
+  L1: '입력을 그대로 출력하거나 사칙연산 한 번',
+  L2: '조건문 하나 또는 반복문 하나',
+  L3: '조건과 반복을 함께 사용',
+  L4: '리스트나 문자열을 다룸',
+  L5: '중첩 반복, 여러 단계를 조합',
+  L6: '위 범위를 넘어서는 것'
 }
 
 export const RULE_TYPE_LABEL = {

@@ -126,9 +126,12 @@ class SchoolClassAPI(APIView):
         with transaction.atomic():
             student_ids = list(school_class.memberships.values_list("student_id", flat=True))
             school_class.delete()
-            # 다른 학급에도 속한 학생은 남긴다(현재 정책상 드물지만 안전하게)
-            User.objects.filter(id__in=student_ids, class_memberships__isnull=True).delete()
-        return self.success({"deleted_students": len(student_ids)})
+            # 다른 학급에도 속한 학생은 남긴다(현재 정책상 드물지만 안전하게).
+            # 그래서 소속 수가 아니라 실제로 지운 계정 수를 돌려준다.
+            orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
+            deleted_students = orphans.count()
+            orphans.delete()
+        return self.success({"deleted_students": deleted_students})
 
 
 class StudentSheetAPI(APIView):

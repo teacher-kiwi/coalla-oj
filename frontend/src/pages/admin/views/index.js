@@ -7,6 +7,7 @@ import PruneTestCase from './general/PruneTestCase.vue'
 import Problem from './problem/Problem.vue'
 import ProblemList from './problem/ProblemList.vue'
 import ProblemTags from './problem/ProblemTags.vue'
+import ProblemPublishReview from './problem/PublishReview.vue'
 import ContestList from './contest/ContestList.vue'
 import Contest from './contest/Contest.vue'
 import Login from './general/Login.vue'
@@ -15,7 +16,8 @@ import ProblemImportOrExport from './problem/ImportAndExport.vue'
 import TeacherApplication from './general/TeacherApplication.vue'
 
 export {
-  Announcement, User, Conf, JudgeServer, Problem, ProblemList, ProblemTags, Contest,
+  Announcement, User, Conf, JudgeServer, Problem, ProblemList, ProblemTags,
+  ProblemPublishReview, Contest,
   ContestList, Login, Home, PruneTestCase, Dashboard, ProblemImportOrExport,
   TeacherApplication
 }

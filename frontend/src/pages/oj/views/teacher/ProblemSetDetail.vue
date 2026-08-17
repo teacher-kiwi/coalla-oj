@@ -24,7 +24,25 @@
           </template>
         </el-table-column>
         <el-table-column label="난이도" width="100">
-          <template #default="{ row }">{{ DIFFICULTY_LABEL[row.problem.difficulty] }}</template>
+          <template #default="{ row }"><DifficultyTag :value="row.problem.difficulty" /></template>
+        </el-table-column>
+        <el-table-column label="상태" width="150" align="center">
+          <template #default="{ row }">
+            <!-- 담아둔 뒤에 관리자가 감췄거나, 아직 비공개인 문제를 교사가 알아야 한다 -->
+            <el-tooltip v-if="!row.problem_visible"
+                        content="관리자가 감춘 문제입니다. 학생은 풀 수 없습니다." placement="top">
+              <el-tag size="small" type="danger">풀 수 없음</el-tag>
+            </el-tooltip>
+            <el-tooltip v-else-if="row.problem_visibility === 'private'"
+                        content="비공개 문제입니다. 이 문제집을 배포한 학급만 볼 수 있습니다."
+                        placement="top">
+              <el-tag size="small" type="info">비공개</el-tag>
+            </el-tooltip>
+            <el-tag v-else-if="row.problem_visibility === 'pending'" size="small" type="warning">
+              승인 대기
+            </el-tag>
+            <span v-else class="state-ok">공개</span>
+          </template>
         </el-table-column>
         <el-table-column label="관리" width="240">
           <template #default="{ row, $index }">
@@ -37,7 +55,13 @@
       </el-table>
 
       <p v-if="!loading && !info.items.length" class="empty">
-        담긴 문제가 없습니다. "문제 추가"로 공개 문제를 골라 담으세요.
+        담긴 문제가 없습니다. "문제 추가"로 문제를 골라 담으세요.
+      </p>
+
+      <p v-if="hasBlocked" class="notice">
+        <b>풀 수 없음</b> 으로 표시된 문제는 관리자가 감춘 것입니다. 학생 화면에도
+        "지금 풀 수 없습니다" 로 나옵니다. 문제집에서 빼거나, 내가 만든 문제라면
+        고쳐서 다시 공개를 신청하세요.
       </p>
     </Panel>
 
@@ -81,9 +105,20 @@
         <el-table-column label="#" prop="_id" width="100" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="난이도" width="90">
-          <template #default="{ row }">{{ DIFFICULTY_LABEL[row.difficulty] }}</template>
+          <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
+        </el-table-column>
+        <el-table-column label="공개" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.visibility !== 'public'" size="small" type="info">
+              {{ row.visibility === 'pending' ? '승인 대기' : '비공개' }}
+            </el-tag>
+            <span v-else class="public-mark">공개</span>
+          </template>
         </el-table-column>
       </el-table>
+      <p class="picker-guide">
+        내가 만든 비공개 문제도 담을 수 있습니다. 배포한 학급 학생만 볼 수 있습니다.
+      </p>
       <Pagination :total="candidateTotal" :page-size="10" :current="candidatePage"
                   @on-change="searchProblems" />
       <template #footer>
@@ -120,13 +155,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { DIFFICULTY_LABEL } from '@/utils/constants'
+import DifficultyTag from '@oj/components/DifficultyTag.vue'
 import Pagination from '@oj/components/Pagination.vue'
 
 const route = useRoute()
@@ -136,6 +171,7 @@ const setId = parseInt(route.params.setId)
 const loading = ref(false)
 const saving = ref(false)
 const info = ref({ items: [], assignments: [] })
+const hasBlocked = computed(() => info.value.items.some(i => !i.problem_visible))
 
 const problemDialogVisible = ref(false)
 const searching = ref(false)
@@ -183,7 +219,8 @@ function openProblemDialog () {
 function searchProblems (page) {
   candidatePage.value = page
   searching.value = true
-  api.getProblemList((page - 1) * 10, 10, { keyword: keyword.value }).then(res => {
+  // 공개 문제와 내가 만든 비공개 문제를 함께 고를 수 있어야 한다
+  api.getProblemList((page - 1) * 10, 10, { keyword: keyword.value, mine: 1 }).then(res => {
     searching.value = false
     candidates.value = res.data.data.results
     candidateTotal.value = res.data.data.total
@@ -284,11 +321,35 @@ onMounted(load)
   margin-top: 20px;
 }
 
+.state-ok {
+  font-size: 12px;
+  color: #909399;
+}
+
+.notice {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.7;
+}
+
 .description {
   color: #606266;
   line-height: 1.7;
   margin-bottom: 12px;
   white-space: pre-wrap;
+}
+
+.picker-guide {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.public-mark {
+  font-size: 12px;
+  color: #909399;
 }
 
 .candidate-table {

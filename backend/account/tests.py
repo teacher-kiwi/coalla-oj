@@ -12,14 +12,14 @@ from utils.shortcuts import rand_str
 from options.options import SysOptions
 
 from problem.models import Problem, ProblemTag
-from .models import AdminType, ProblemPermission, TeacherApplication, User
+from .models import AdminType, ProblemPermission, TeacherApplication, User, UserProfile
 from utils.constants import ContestRuleType
 
 # 표시 ID 새로고침 테스트에서만 쓰는 최소 문제 데이터
 PROBLEM_DATA = {
     "_id": "P-1", "title": "test", "description": "<p>test</p>",
     "input_description": "test", "output_description": "test",
-    "time_limit": 1000, "memory_limit": 256, "difficulty": "Low", "visible": True,
+    "time_limit": 1000, "memory_limit": 256, "difficulty": "L1", "visible": True,
     "languages": ["Python3"], "template": {}, "samples": [{"input": "1", "output": "1"}],
     "spj": False, "spj_language": None, "spj_code": None,
     "test_case_id": "d41d8cd98f00b204e9800998ecf8427e",
@@ -656,6 +656,73 @@ class GoogleLoginAPITest(APITestCase):
         verify.return_value = self._claims()
         self.assertFailed(self.client.post(self.url, data={"credential": "x"}),
                           "비활성화된 계정입니다")
+
+
+@mock.patch("account.views.google.verify_google_token")
+class AccountDeleteAPITest(APITestCase):
+    """회원 탈퇴. 되돌릴 수 없는 동작이라 누가 무엇까지 지울 수 있는지를 고정한다."""
+    def setUp(self):
+        self.url = self.reverse("delete_account_api")
+        SysOptions.google_client_id = "test-client-id.apps.googleusercontent.com"
+        self.user = self.create_user("구글선생", "test123")
+        self.user.google_sub = "google-sub-1"
+        self.user.save()
+
+    def _delete(self, verify, sub="google-sub-1"):
+        verify.return_value = {"sub": sub, "email": "t@school.kr", "email_verified": True}
+        return self.client.post(self.url, data={"credential": "x"})
+
+    def test_profile_marks_google_account(self, verify):
+        # 화면이 이 값으로 탈퇴 버튼을 보여줄지 정한다
+        resp = self.client.get(self.reverse("user_profile_api"))
+        self.assertTrue(resp.data["data"]["user"]["is_google_account"])
+
+    def test_google_user_can_delete_own_account(self, verify):
+        user_id = self.user.id
+        self.assertSuccess(self._delete(verify))
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        # 프로필도 함께 사라진다
+        self.assertFalse(UserProfile.objects.filter(user_id=user_id).exists())
+
+    def test_logged_out_after_delete(self, verify):
+        self._delete(verify)
+        # 세션이 끊겨 프로필 조회가 빈 응답이 된다
+        resp = self.client.get(self.reverse("user_profile_api"))
+        self.assertIsNone(resp.data["data"])
+
+    def test_other_google_account_cannot_delete(self, verify):
+        self.assertFailed(self._delete(verify, sub="google-sub-other"),
+                          "지금 로그인한 계정과 다른 구글 계정입니다")
+        self.assertTrue(User.objects.filter(id=self.user.id).exists())
+
+    def test_invalid_credential(self, verify):
+        verify.return_value = None
+        self.assertFailed(self.client.post(self.url, data={"credential": "x"}),
+                          "구글 인증에 실패했습니다. 다시 시도해주세요")
+        self.assertTrue(User.objects.filter(id=self.user.id).exists())
+
+    def test_admin_cannot_delete_itself(self, verify):
+        # 관리자가 만든 문제·대회·공지가 함께 지워지므로 막는다
+        self.client.logout()
+        admin = self.create_super_admin("root2", "test123")
+        admin.google_sub = "google-sub-admin"
+        admin.save()
+        self.assertFailed(self.client.post(self.url, data={"credential": "x"}),
+                          "관리자 계정은 이 화면에서 탈퇴할 수 없습니다")
+        verify.assert_not_called()
+        self.assertTrue(User.objects.filter(id=admin.id).exists())
+
+    def test_password_account_cannot_delete(self, verify):
+        # 구글로 가입하지 않은 계정(교사가 만든 학생 등)은 대상이 아니다
+        self.client.logout()
+        self.create_user("일반계정", "test123")
+        self.assertFailed(self.client.post(self.url, data={"credential": "x"}),
+                          "구글로 가입한 계정만 탈퇴할 수 있습니다. 선생님이나 관리자에게 문의하세요")
+        verify.assert_not_called()
+
+    def test_anonymous_rejected(self, verify):
+        self.client.logout()
+        self.assertFailed(self.client.post(self.url, data={"credential": "x"}))
 
 
 class TeacherApplyAPITest(APITestCase):

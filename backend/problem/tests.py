@@ -15,11 +15,14 @@ from .models import Problem, ProblemRuleType
 from contest.models import Contest
 from contest.tests import DEFAULT_CONTEST_DATA
 
+from django.core.management import call_command
+
 from .views.admin import TestCaseAPI
-from .utils import parse_problem_template
+from .utils import filter_problem_tags_by_keyword, parse_problem_template
+from utils.management.commands.seed_problem_tags import DEFAULT_TAGS
 
 DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test</p>", "input_description": "test",
-                        "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "Low",
+                        "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
                         "visible": True, "tags": ["test"], "languages": ["C", "C++", "Java", "Python3"], "template": {},
                         "samples": [{"input": "test", "output": "test"}], "spj": False, "spj_language": "C",
                         "spj_code": "", "spj_compile_ok": True, "test_case_id": "499b26290cc7994e0b497212e842ea85",
@@ -80,12 +83,62 @@ class ProblemCreateTestBase(APITestCase):
         return problem
 
 
-class ProblemTagListAPITest(APITestCase):
+class ProblemTagListAPITest(ProblemCreateTestBase):
+    def setUp(self):
+        self.url = self.reverse("problem_tag_list_api")
+        self.admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="쓰이는태그")
+        ProblemTag.objects.create(name="안쓰이는태그")
+
     def test_get_tag_list(self):
-        ProblemTag.objects.create(name="name1")
-        ProblemTag.objects.create(name="name2")
-        resp = self.client.get(self.reverse("problem_tag_list_api"))
-        self.assertSuccess(resp)
+        self.assertSuccess(self.client.get(self.url))
+
+    def test_default_hides_tags_without_problems(self):
+        # 문제 목록의 태그 사이드바에 고를 수 없는 항목이 늘어나지 않게 한다
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["tags"] = ["쓰이는태그"]
+        self.add_problem(data, self.admin)
+
+        names = [t["name"] for t in self.client.get(self.url).data["data"]]
+        self.assertEqual(names, ["쓰이는태그"])
+
+    def test_all_flag_returns_every_tag(self):
+        # 출제 화면은 아직 문제가 없는 태그도 골라야 한다.
+        # 이게 빠지면 문제가 0개일 때 태그를 하나도 고를 수 없어 출제 자체가 막힌다.
+        names = {t["name"] for t in self.client.get(self.url + "?all=1").data["data"]}
+        # 정렬 순서는 DB 콜레이션에 달려 있어 집합으로 비교한다
+        self.assertEqual(names, {"쓰이는태그", "안쓰이는태그"})
+
+
+class SeedProblemTagsTest(APITestCase):
+    """기본 태그 시드. 배포할 때마다 실행되므로 여러 번 돌려도 안전해야 한다."""
+    def test_creates_default_tags(self):
+        call_command("seed_problem_tags")
+        self.assertEqual(ProblemTag.objects.count(), len(DEFAULT_TAGS))
+        # 교사가 고르는 개념 태그가 들어 있다
+        for name in ("입출력", "조건", "반복", "리스트", "문자열"):
+            self.assertTrue(ProblemTag.objects.filter(name=name).exists(), name)
+
+    def test_running_twice_changes_nothing(self):
+        call_command("seed_problem_tags")
+        before = list(ProblemTag.objects.order_by("name").values_list("name", "aliases"))
+        call_command("seed_problem_tags")
+        after = list(ProblemTag.objects.order_by("name").values_list("name", "aliases"))
+        self.assertEqual(before, after)
+
+    def test_fills_missing_aliases_without_dropping_existing(self):
+        # 관리자가 손으로 넣은 별칭은 남기고, 기본 별칭만 더한다
+        tag = ProblemTag.objects.create(name="반복", aliases=["직접넣은별칭"])
+        call_command("seed_problem_tags")
+        tag.refresh_from_db()
+        self.assertIn("직접넣은별칭", tag.aliases)
+        self.assertIn("loop", tag.aliases)
+
+    def test_alias_search_finds_tag_by_block_name(self):
+        # 학생 화면의 블록 이름("논리")으로 검색해도 교사 태그("조건")가 걸려야 한다
+        call_command("seed_problem_tags")
+        found = filter_problem_tags_by_keyword(ProblemTag.objects.all(), "논리")
+        self.assertEqual([t.name for t in found], ["조건"])
 
 
 class TestCaseUploadAPITest(APITestCase):
@@ -143,6 +196,38 @@ class TestCaseUploadAPITest(APITestCase):
                 name = item["input_name"]
                 with open(os.path.join(test_case_dir, name), "r", encoding="utf-8") as f:
                     self.assertEqual(f.read(), name + "\n" + name + "\n" + "end")
+
+
+class DisplayIdTest(ProblemCreateTestBase):
+    """공개 문제의 표시 번호는 서버가 매긴다."""
+    def setUp(self):
+        self.admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="test")
+
+    def test_first_problem_starts_at_1000(self):
+        self.assertEqual(Problem.next_display_id(), "1000")
+
+    def test_next_number_follows_the_largest(self):
+        for display_id in ("1000", "1001"):
+            data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+            data["_id"] = display_id
+            self.add_problem(data, self.admin)
+        self.assertEqual(Problem.next_display_id(), "1002")
+
+    def test_letters_are_ignored(self):
+        # 대회 문제는 A·B·C 를 쓰므로 숫자만 본다
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["_id"] = "A"
+        self.add_problem(data, self.admin)
+        self.assertEqual(Problem.next_display_id(), "1000")
+
+    def test_problems_are_ordered_by_number_not_text(self):
+        for display_id in ("1002", "999", "1000"):
+            data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+            data["_id"] = display_id
+            self.add_problem(data, self.admin)
+        # 문자열 정렬이면 1000, 1002, 999 순서가 된다
+        self.assertEqual([p._id for p in Problem.objects.all()], ["999", "1000", "1002"])
 
 
 class ProblemAdminAPITest(APITestCase):

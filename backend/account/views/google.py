@@ -7,15 +7,17 @@ import logging
 import re
 
 from django.contrib import auth
+from django.db import transaction
 from django.utils.timezone import now
 
 from options.options import SysOptions
 from utils.api import APIView, validate_serializer
 from ..decorators import login_required, super_admin_required
-from ..models import (AdminType, ProblemPermission, STUDENT_USERNAME_RE,
-                      TeacherApplication, TeacherApplicationStatus, User,
-                      UserProfile)
-from ..serializers import (GoogleLoginSerializer, ReviewTeacherApplicationSerializer,
+from ..models import (AdminType, ClassMembership, ProblemPermission, SchoolClass,
+                      STUDENT_USERNAME_RE, TeacherApplication, TeacherApplicationStatus,
+                      User, UserProfile)
+from ..serializers import (DeleteAccountSerializer, GoogleLoginSerializer,
+                           ReviewTeacherApplicationSerializer,
                            TeacherApplicationSerializer)
 
 logger = logging.getLogger(__name__)
@@ -112,6 +114,67 @@ class GoogleLoginAPI(APIView):
         # 교사 신청은 로그인 후 별도 화면에서 진행한다.
         auth.login(request, user)
         return self.success({"status": "logged_in"})
+
+
+class AccountDeleteAPI(APIView):
+    """회원 탈퇴. 구글로 가입한 사용자만 스스로 나갈 수 있다.
+
+    - 관리자(root 등)는 자기가 만든 문제·대회·공지가 함께 지워지므로 막는다.
+    - 수업용 학생은 교사가 만들어 준 계정이라 스스로 지우지 않는다.
+      교사가 지우거나, 교사가 탈퇴하면 함께 사라진다.
+    """
+    @login_required
+    def get(self, request):
+        """탈퇴하면 무엇이 함께 지워지는지 미리 보여준다"""
+        error = self._check_deletable(request.user)
+        if error:
+            return self.error(error)
+        classes = SchoolClass.objects.filter(teacher=request.user)
+        return self.success({
+            "class_count": classes.count(),
+            "student_count": ClassMembership.objects.filter(school_class__in=classes).count(),
+            "submission_count": request.user.submissions.count(),
+        })
+
+    @validate_serializer(DeleteAccountSerializer)
+    @login_required
+    def post(self, request):
+        user = request.user
+        error = self._check_deletable(user)
+        if error:
+            return self.error(error)
+
+        client_id = SysOptions.google_client_id
+        if not client_id:
+            return self.error("구글 로그인이 설정되지 않았습니다. 관리자에게 문의하세요")
+        claims = verify_google_token(request.data["credential"], client_id)
+        if not claims:
+            return self.error("구글 인증에 실패했습니다. 다시 시도해주세요")
+        # 남의 구글 계정으로는 지울 수 없다
+        if claims.get("sub") != user.google_sub:
+            return self.error("지금 로그인한 계정과 다른 구글 계정입니다")
+
+        with transaction.atomic():
+            # 학급을 지우면 소속(ClassMembership)만 사라지고 학생 계정은 남는다.
+            # 학급 삭제 API 와 같은 방식으로 남을 계정을 직접 정리한다.
+            classes = SchoolClass.objects.filter(teacher=user)
+            student_ids = list(ClassMembership.objects.filter(school_class__in=classes)
+                               .values_list("student_id", flat=True))
+            user.delete()
+            # delete() 가 돌려주는 첫 값은 UserProfile 처럼 함께 지워진 것까지 포함한
+            # 총 행 수다. 화면에 "학생 N명"으로 보여주므로 계정 수를 따로 센다.
+            orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
+            deleted_students = orphans.count()
+            orphans.delete()
+        auth.logout(request)
+        return self.success({"deleted_students": deleted_students})
+
+    @staticmethod
+    def _check_deletable(user):
+        if user.is_admin_role():
+            return "관리자 계정은 이 화면에서 탈퇴할 수 없습니다"
+        if not user.google_sub:
+            return "구글로 가입한 계정만 탈퇴할 수 있습니다. 선생님이나 관리자에게 문의하세요"
 
 
 class TeacherApplicationAPI(APIView):

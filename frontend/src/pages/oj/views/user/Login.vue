@@ -30,6 +30,7 @@ import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@oj/api'
 import StudentLogin from '@oj/views/user/StudentLogin.vue'
+import { renderGoogleButton } from '@/utils/google'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
 
@@ -42,26 +43,6 @@ const needNickname = ref(false)
 const nickname = ref('')
 let pendingCredential = null
 const btnLoginLoading = ref(false)
-
-// 구글 로그인 스크립트는 필요한 순간에만 불러온다.
-const GSI_SRC = 'https://accounts.google.com/gsi/client'
-let gsiScript = null
-
-function loadGsi () {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.id) return resolve()
-    gsiScript = document.querySelector(`script[src="${GSI_SRC}"]`)
-    if (!gsiScript) {
-      gsiScript = document.createElement('script')
-      gsiScript.src = GSI_SRC
-      gsiScript.async = true
-      gsiScript.defer = true
-      document.head.appendChild(gsiScript)
-    }
-    gsiScript.addEventListener('load', resolve, { once: true })
-    gsiScript.addEventListener('error', reject, { once: true })
-  })
-}
 
 async function googleLogin (credential, nick) {
   try {
@@ -81,10 +62,6 @@ async function googleLogin (credential, nick) {
   }
 }
 
-function handleGoogleCredential (response) {
-  googleLogin(response.credential)
-}
-
 async function submitNickname () {
   if (!nickname.value.trim()) {
     ElMessage.error('닉네임을 입력해주세요')
@@ -95,21 +72,8 @@ async function submitNickname () {
   btnLoginLoading.value = false
 }
 
-async function initGoogleButton () {
-  const clientId = appStore.website.google_client_id
-  if (!clientId || !googleBtnRef.value) return
-  try {
-    await loadGsi()
-  } catch (e) {
-    return
-  }
-  window.google.accounts.id.initialize({
-    client_id: clientId,
-    callback: handleGoogleCredential
-  })
-  window.google.accounts.id.renderButton(googleBtnRef.value, {
-    theme: 'outline', size: 'large', width: 280, text: 'signin_with', locale: 'ko'
-  })
+function initGoogleButton () {
+  return renderGoogleButton(googleBtnRef.value, appStore.website.google_client_id, googleLogin)
 }
 
 // 숨겨진 탭에서 그리면 버튼 폭이 0 이 되므로, 탭이 열릴 때 그린다.

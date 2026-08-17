@@ -15,13 +15,14 @@ from utils.api.tests import APITestCase
 from .models import Problem, ProblemSetAssignment, ProblemSetItem
 
 
-def create_problem(_id, created_by, contest=None, visible=True):
+def create_problem(_id, created_by, contest=None, visible=True, visibility="public"):
     return Problem.objects.create(
         _id=_id, title=f"문제 {_id}", description="d", input_description="i",
         output_description="o", samples=[], test_case_id="x", test_case_score=[],
         hint="", languages=["Python3"], template={}, time_limit=1000,
         memory_limit=256, spj=False, rule_type="ACM", visible=visible,
-        difficulty="Low", source="", created_by=created_by, contest=contest)
+        visibility=visibility, difficulty="L1", source="", created_by=created_by,
+        contest=contest)
 
 
 class ProblemSetTestBase(APITestCase):
@@ -377,3 +378,140 @@ class TeacherStudentSubmissionTest(ProblemSetTestBase):
         self.assertFailed(self.client.get(
             self.reverse("submission_api") + f"?id={self.submission.id}"),
             "이 제출 기록에 접근할 권한이 없습니다")
+
+
+class PrivateProblemAccessTest(ProblemSetTestBase):
+    """교사가 만든 비공개 문제는 공개 목록에 나오지 않지만,
+    문제집으로 배포한 학급 학생은 풀 수 있어야 한다."""
+    def setUp(self):
+        super().setUp()
+        self.private = create_problem("2000", self.teacher, visibility="private")
+        self.problem_url = self.reverse("problem_api")
+        self.submission_url = self.reverse("submission_api")
+        self.class_id = self._create_class()
+        self.student_pin = self._create_students(self.class_id, 1, 1).data["data"]["students"][0]["password"]
+        self.student_name = f"c{self.class_id}-01"
+
+    def _open_detail(self, problem):
+        return self.client.get(self.problem_url + f"?problem_id={problem._id}")
+
+    def _login_student(self):
+        self.client.logout()
+        self.client.login(username=self.student_name, password=self.student_pin)
+
+    def _assign_private(self):
+        set_id = self._create_set("비공개 묶음")
+        self._add_problems(set_id, [self.private.id])
+        self._assign(set_id, self.class_id)
+
+    def test_private_problem_is_not_in_the_public_list(self):
+        resp = self.client.get(self.problem_url + "?limit=100")
+        self.assertSuccess(resp)
+        ids = [p["_id"] for p in resp.data["data"]["results"]]
+        self.assertIn(self.problem._id, ids)
+        self.assertNotIn(self.private._id, ids)
+
+    def test_mine_flag_shows_public_and_my_own(self):
+        # 문제집에 담을 문제를 고르는 화면이 쓰는 경로다.
+        # 공개 문제와 내가 만든 비공개 문제가 함께 보여야 한다.
+        resp = self.client.get(self.problem_url + "?limit=100&mine=1")
+        self.assertSuccess(resp)
+        ids = [p["_id"] for p in resp.data["data"]["results"]]
+        self.assertIn(self.private._id, ids)
+        self.assertIn(self.problem._id, ids)
+
+    def test_mine_flag_does_not_show_another_teachers_private_problem(self):
+        other = self.create_teacher(username="박선생", login=False)
+        hidden = create_problem("3000", other, visibility="private")
+        ids = [p["_id"] for p in
+               self.client.get(self.problem_url + "?limit=100&mine=1").data["data"]["results"]]
+        self.assertNotIn(hidden._id, ids)
+
+    def test_owner_can_open_own_private_problem(self):
+        self.assertSuccess(self._open_detail(self.private))
+
+    def test_stranger_cannot_open_private_problem(self):
+        self.client.logout()
+        self.create_user("남", "test123")
+        self.assertFailed(self._open_detail(self.private), "문제가 존재하지 않습니다")
+
+    def test_student_can_open_it_once_the_set_is_assigned(self):
+        self._login_student()
+        self.assertFailed(self._open_detail(self.private), "문제가 존재하지 않습니다")
+
+        self.client.logout()
+        self.client.login(username=self.teacher.username, password="teacher")
+        self._assign_private()
+
+        self._login_student()
+        self.assertSuccess(self._open_detail(self.private))
+
+    def test_student_cannot_submit_before_assignment(self):
+        self._login_student()
+        resp = self.client.post(self.submission_url, data={
+            "problem_id": self.private.id, "language": "Python3", "code": "print(1)"})
+        self.assertFailed(resp, "문제가 존재하지 않습니다")
+
+
+class HiddenProblemInProblemSetTest(ProblemSetTestBase):
+    """문제집에 담긴 뒤 관리자가 문제를 감춘 경우.
+
+    감추는 이유는 대개 "문제가 잘못됐다"이므로 학생은 더 풀 수 없어야 한다.
+    다만 조용히 사라지면 이유를 알 수 없어, 목록에는 남기고 표시만 바꾼다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class()
+        self.student_pin = self._create_students(self.class_id, 1, 1).data["data"]["students"][0]["password"]
+        self.student_name = f"c{self.class_id}-01"
+        self.set_id = self._create_set()
+        self._add_problems(self.set_id, [self.problem.id])
+        self._assign(self.set_id, self.class_id)
+        self.problem_url = self.reverse("problem_api")
+        self.submission_url = self.reverse("submission_api")
+
+    def _hide(self):
+        Problem.objects.filter(id=self.problem.id).update(visible=False)
+
+    def _login_student(self):
+        self.client.logout()
+        self.client.login(username=self.student_name, password=self.student_pin)
+
+    def test_student_can_solve_while_visible(self):
+        self._login_student()
+        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"))
+
+    def test_hidden_problem_cannot_be_opened_by_student(self):
+        self._hide()
+        self._login_student()
+        self.assertFailed(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"),
+                          "문제가 존재하지 않습니다")
+
+    def test_hidden_problem_cannot_be_submitted(self):
+        self._hide()
+        self._login_student()
+        resp = self.client.post(self.submission_url, data={
+            "problem_id": self.problem.id, "language": "Python3", "code": "print(1)"})
+        self.assertFailed(resp, "문제가 존재하지 않습니다")
+
+    def test_problem_set_keeps_the_problem_but_marks_it_unavailable(self):
+        self._hide()
+        self._login_student()
+        resp = self.client.get(self.reverse("problem_set_api") + f"?id={self.set_id}")
+        self.assertSuccess(resp)
+        problems = resp.data["data"]["problems"]
+        # 목록에서 빠지지 않는다
+        self.assertEqual(len(problems), 1)
+        self.assertFalse(problems[0]["available"])
+
+    def test_owner_teacher_can_still_open_it(self):
+        # 고칠 수 있어야 하므로 만든 사람은 볼 수 있다
+        self._hide()
+        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"))
+
+    def test_teacher_problem_set_shows_the_state(self):
+        self._hide()
+        detail = self.client.get(self.set_url + f"?id={self.set_id}").data["data"]
+        item = detail["items"][0]
+        self.assertFalse(item["problem_visible"])
+        self.assertEqual(item["problem_visibility"], "public")

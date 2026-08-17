@@ -4,7 +4,7 @@ from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
 from judge.tasks import judge_task
 from options.options import SysOptions
-from problem.models import Problem, ProblemRuleType
+from problem.models import can_access_problem, Problem, ProblemRuleType
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.captcha import Captcha
@@ -57,6 +57,10 @@ class SubmissionAPI(APIView):
         try:
             problem = Problem.objects.get(id=data["problem_id"], contest_id=data.get("contest_id"), visible=True)
         except Problem.DoesNotExist:
+            return self.error("문제가 존재하지 않습니다")
+        # 비공개 문제에는 만든 교사와 배포받은 학급 학생만 제출할 수 있다.
+        # (대회 문제는 위에서 check_contest_permission 이 이미 판단했다)
+        if not data.get("contest_id") and not can_access_problem(problem, request.user):
             return self.error("문제가 존재하지 않습니다")
         if data["language"] == "Block Coding":
             if "Python3" not in problem.languages:

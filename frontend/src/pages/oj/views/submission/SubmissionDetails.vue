@@ -20,7 +20,8 @@
     </el-col>
 
     <el-col v-if="submission.info && !isCE" :span="20">
-      <el-table :data="submission.info.data" v-loading="loading" stripe>
+      <el-table :key="`${showScoreColumn}-${isAdminRole}`" :data="submission.info.data"
+                v-loading="loading" stripe>
         <el-table-column type="index" label="ID" align="center" />
         <el-table-column label="상태" align="center">
           <template #default="{ row }">

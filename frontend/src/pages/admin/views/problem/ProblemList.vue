@@ -22,9 +22,21 @@
         <el-table-column width="200" prop="create_time" label="생성 일시">
           <template #default="{ row }">{{ localtime(row.create_time) }}</template>
         </el-table-column>
-        <el-table-column width="100" prop="visible" label="공개">
+        <!-- "공개" 는 학생 문제 목록에 나오는지를 뜻한다.
+             교사가 만든 문제는 공개 승인 전까지 학생에게 보이지 않으므로,
+             스위치를 꺼진 상태로 잠가 실제와 어긋나지 않게 한다.
+             (DB 의 visible 은 True 라서 그대로 보여주면 "공개"로 읽힌다) -->
+        <el-table-column width="130" label="공개">
           <template #default="{ row }">
-            <el-switch v-model="row.visible" @change="updateProblem(row)" />
+            <el-switch v-if="row.visibility === 'public'" v-model="row.visible"
+                       @change="updateProblem(row)" />
+            <template v-else>
+              <el-tooltip :content="lockedReason(row)" placement="top">
+                <el-switch :model-value="false" disabled />
+              </el-tooltip>
+              <el-tag v-if="row.visibility === 'pending'" size="small" type="warning"
+                      class="state-tag">승인 대기</el-tag>
+            </template>
           </template>
         </el-table-column>
         <el-table-column fixed="right" label="관리" width="250">
@@ -89,6 +101,14 @@ const inlineEditDialogVisible = ref(false)
 const addProblemDialogVisible = ref(false)
 
 function localtime (val) { return time.utcToLocal(val) }
+
+// 스위치를 잠근 이유를 알려준다. 잠긴 채로 두면 관리자가 왜 못 켜는지 알 수 없다.
+function lockedReason (row) {
+  if (row.visibility === 'pending') {
+    return '교사가 공개를 신청했습니다. "문제 공개 신청" 에서 승인하면 켜집니다.'
+  }
+  return '교사가 만든 비공개 문제입니다. 공개 신청을 승인하면 켜집니다.'
+}
 
 function handleDblclick (row) { row.isEditing = true }
 
@@ -182,6 +202,10 @@ watch(keyword, () => { currentChange(1) })
 </script>
 
 <style scoped>
+.state-tag {
+  margin-left: 6px;
+}
+
 .full-width {
   width: 100%;
 }

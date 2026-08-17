@@ -48,10 +48,20 @@
           <el-col :span="8">
             <el-form-item label="난이도">
               <el-select class="difficulty-select" size="small" placeholder="난이도" v-model="problem.difficulty">
-                <el-option label="낮음" value="Low" />
-                <el-option label="중간" value="Mid" />
-                <el-option label="높음" value="High" />
+                <el-option v-for="d in DIFFICULTY" :key="d.value" :label="d.label" :value="d.value" />
               </el-select>
+              <!-- 기준이 없으면 출제자마다 단계가 흔들린다. 고르는 자리에서 바로 보이게 둔다. -->
+              <el-popover placement="right" :width="300" trigger="hover">
+                <template #reference>
+                  <el-icon class="difficulty-help"><QuestionFilled /></el-icon>
+                </template>
+                <p class="guide-title">난이도 기준</p>
+                <ul class="guide-list">
+                  <li v-for="d in DIFFICULTY" :key="d.value">
+                    <b :style="{ color: d.color }">{{ d.label }}</b> {{ DIFFICULTY_GUIDE[d.value] }}
+                  </li>
+                </ul>
+              </el-popover>
             </el-form-item>
           </el-col>
         </el-row>
@@ -211,11 +221,12 @@
 import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
 import Simditor from '../../components/Simditor.vue'
 import Accordion from '../../components/Accordion.vue'
 import CodeMirror from '../../components/CodeMirror.vue'
 import api from '../../api.js'
+import { DIFFICULTY, DIFFICULTY_GUIDE } from '@/utils/constants'
 const route = useRoute()
 const router = useRouter()
 
@@ -245,7 +256,7 @@ const error = reactive({ tags: '', spj: '', languages: '', testCase: '' })
 function defaultProblem () {
   return {
     _id: '', title: '', description: '', input_description: '', output_description: '',
-    time_limit: 1000, memory_limit: 256, difficulty: 'Low', visible: true,
+    time_limit: 1000, memory_limit: 256, difficulty: 'L1', visible: true,
     tags: [], languages: [], template: {}, samples: [{ input: '', output: '' }],
     spj: false, spj_language: '', spj_code: '', spj_compile_ok: false,
     test_case_id: '', test_case_score: [], rule_type: 'ACM', hint: '', source: '',
@@ -448,6 +459,25 @@ async function submit () {
 
 <style lang="less" scoped>
 .problem {
+  .difficulty-help {
+    margin-left: 6px;
+    color: #909399;
+    cursor: help;
+    vertical-align: middle;
+  }
+
+  .guide-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .guide-list {
+    margin: 0 0 0 4px;
+    padding-left: 12px;
+    line-height: 1.9;
+    font-size: 13px;
+  }
+
   .difficulty-select { width: 120px; }
   .spj-radio {
     margin-left: 10px;

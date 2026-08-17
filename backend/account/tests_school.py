@@ -305,6 +305,64 @@ class StudentChangePasswordTest(SchoolClassTestBase):
                           "학교에서 발급받은 계정만 사용할 수 있습니다")
 
 
+@mock.patch("account.views.google.verify_google_token")
+class TeacherAccountDeleteTest(SchoolClassTestBase):
+    """교사가 탈퇴하면 학급과 학생 계정이 함께 사라져야 한다.
+
+    학급을 지우면 소속(ClassMembership)만 CASCADE 로 사라지고 학생 계정은 남는다.
+    그 정리까지 되는지 확인한다.
+    """
+    def setUp(self):
+        super().setUp()
+        SysOptions.google_client_id = "test-client-id.apps.googleusercontent.com"
+        self.teacher.google_sub = "google-sub-teacher"
+        self.teacher.save()
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 3)
+        self.url = self.reverse("delete_account_api")
+
+    def _delete(self, verify):
+        verify.return_value = {"sub": "google-sub-teacher", "email": "t@school.kr",
+                               "email_verified": True}
+        return self.client.post(self.url, data={"credential": "x"})
+
+    def test_preview_shows_what_will_be_removed(self, verify):
+        resp = self.client.get(self.url)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["class_count"], 1)
+        self.assertEqual(resp.data["data"]["student_count"], 3)
+
+    def test_classes_and_students_are_removed(self, verify):
+        student_ids = list(ClassMembership.objects.values_list("student_id", flat=True))
+        self.assertEqual(len(student_ids), 3)
+
+        resp = self._delete(verify)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["deleted_students"], 3)
+
+        self.assertFalse(SchoolClass.objects.filter(id=self.class_id).exists())
+        self.assertFalse(ClassMembership.objects.exists())
+        # 고아 계정이 남지 않아야 한다
+        self.assertFalse(User.objects.filter(id__in=student_ids).exists())
+
+    def test_other_teacher_class_is_untouched(self, verify):
+        # 다른 교사의 학급·학생은 그대로 있어야 한다
+        self.client.logout()
+        other = self.create_teacher(username="박선생")
+        other_class = self._create_class(grade=5, class_no=1).data["data"]["id"]
+        self._create_students(other_class, 1, 2)
+        self.client.logout()
+        self.client.login(username=self.teacher.username, password="teacher")
+
+        # 삭제가 실제로 성공했는지 먼저 확인한다.
+        # 실패해도 "다른 교사 학급이 남아 있다" 는 통과해버리기 때문이다.
+        self.assertSuccess(self._delete(verify))
+
+        self.assertTrue(SchoolClass.objects.filter(id=other_class).exists())
+        self.assertEqual(ClassMembership.objects.filter(school_class_id=other_class).count(), 2)
+        self.assertTrue(User.objects.filter(id=other.id).exists())
+
+
 class PublicDisplayNameTest(SchoolClassTestBase):
     """학생의 내부 아이디가 공개 화면에 노출되면 안 된다"""
     def setUp(self):
@@ -332,7 +390,7 @@ class PublicDisplayNameTest(SchoolClassTestBase):
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
-            difficulty="Low", source="", created_by=self.teacher)
+            difficulty="L1", source="", created_by=self.teacher)
         Submission.objects.create(problem=problem, user=self.student,
                                   code="print(1)", language="Python3", result=0)
 
@@ -400,7 +458,7 @@ class MyStudentsFilterTest(SchoolClassTestBase):
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
-            difficulty="Low", source="", created_by=self.teacher)
+            difficulty="L1", source="", created_by=self.teacher)
         for user in (self.student, self.other_student):
             Submission.objects.create(problem=problem, user=user, code="print(1)",
                                       language="Python3", result=0)

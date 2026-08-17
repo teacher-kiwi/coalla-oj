@@ -25,16 +25,26 @@
       <el-table-column label="#" prop="_id" width="100" />
       <el-table-column label="제목">
         <template #default="{ row }">
-          <el-button link type="primary" @click="goProblem(row._id)">{{ row.title }}</el-button>
+          <el-button v-if="row.available !== false" link type="primary"
+                     @click="goProblem(row._id)">{{ row.title }}</el-button>
+          <template v-else>
+            <span class="unavailable">{{ row.title }}</span>
+            <!-- 관리자가 문제를 감춘 경우다. 목록에서 조용히 빼면 학생은 이유를 알 수 없다 -->
+            <el-tag size="small" type="info" class="unavailable-tag">지금 풀 수 없습니다</el-tag>
+          </template>
         </template>
       </el-table-column>
       <el-table-column label="난이도" width="100">
-        <template #default="{ row }">{{ DIFFICULTY_LABEL[row.difficulty] }}</template>
+        <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
       </el-table-column>
     </el-table>
 
     <p v-if="!loading && !info.problems.length" class="empty">
       아직 문제가 담기지 않은 문제집입니다.
+    </p>
+
+    <p v-if="hasUnavailable" class="notice">
+      "지금 풀 수 없습니다" 로 표시된 문제는 선생님께 문의해주세요.
     </p>
   </Panel>
 </template>
@@ -45,7 +55,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { DIFFICULTY_LABEL } from '@/utils/constants'
+import DifficultyTag from '@oj/components/DifficultyTag.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,6 +66,7 @@ const info = ref({ problems: [] })
 
 const solvedCount = computed(() => info.value.problems.filter(p => p.my_status === 0).length)
 const isOverdue = computed(() => !!info.value.due_at && new Date(info.value.due_at) < new Date())
+const hasUnavailable = computed(() => info.value.problems.some(p => p.available === false))
 
 function localtime (val) {
   return time.utcToLocal(val)
@@ -81,6 +92,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.unavailable {
+  color: #a8abb2;
+}
+
+.unavailable-tag {
+  margin-left: 6px;
+}
+
+.notice {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
 .full-width {
   width: 100%;
 }

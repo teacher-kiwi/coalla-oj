@@ -39,7 +39,8 @@
       <VChart ref="chart" :option="options" :loading="chartLoading" autoresize />
     </div>
 
-    <el-table :data="dataRank" height="600" stripe :cell-class-name="cellClassName">
+    <el-table :key="`${showRealName}-${contestProblems.length}`"
+              :data="dataRank" height="600" stripe :cell-class-name="cellClassName">
       <el-table-column align="center" width="50">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>

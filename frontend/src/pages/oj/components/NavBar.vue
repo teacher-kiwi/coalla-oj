@@ -30,6 +30,7 @@
           수업
         </template>
         <el-menu-item index="/teacher/class">내 학급</el-menu-item>
+        <el-menu-item index="/teacher/problem">내가 만든 문제</el-menu-item>
         <el-menu-item index="/teacher/problem-set">문제집</el-menu-item>
         <el-menu-item index="/teacher/progress">학습 현황</el-menu-item>
       </el-sub-menu>

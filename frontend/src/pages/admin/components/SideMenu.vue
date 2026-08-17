@@ -27,6 +27,7 @@
       <el-menu-item index="/problems">문제 목록</el-menu-item>
       <el-menu-item v-if="userStore.isSuperAdmin" index="/problem/tags">문제 태그</el-menu-item>
       <el-menu-item index="/problem/create">문제 생성</el-menu-item>
+      <el-menu-item index="/problem/publish-review">문제 공개 신청</el-menu-item>
       <el-menu-item index="/problem/batch_ops">문제 내보내기/가져오기</el-menu-item>
     </el-sub-menu>
     <el-sub-menu index="contest">

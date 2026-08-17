@@ -24,6 +24,12 @@ export default {
   logout () {
     return ajax('logout', 'get')
   },
+  getAccountDeleteInfo () {
+    return ajax('delete_account', 'get')
+  },
+  deleteAccount (credential) {
+    return ajax('delete_account', 'post', { data: { credential } })
+  },
   googleLogin (credential, nickname) {
     const data = { credential }
     if (nickname) data.nickname = nickname
@@ -78,6 +84,29 @@ export default {
   deleteStudent (id) {
     return ajax('teacher/student', 'delete', { params: { id } })
   },
+  // ---- 교사 출제 ----
+  getMyProblems () {
+    return ajax('teacher/problem', 'get')
+  },
+  getMyProblem (id) {
+    return ajax('teacher/problem', 'get', { params: { id } })
+  },
+  createProblem (data) {
+    return ajax('teacher/problem', 'post', { data })
+  },
+  editProblem (data) {
+    return ajax('teacher/problem', 'put', { data })
+  },
+  deleteProblem (id) {
+    return ajax('teacher/problem', 'delete', { params: { id } })
+  },
+  requestProblemPublish (id) {
+    return ajax('teacher/problem/publish', 'post', { data: { id } })
+  },
+  cancelProblemPublish (id) {
+    return ajax('teacher/problem/publish', 'delete', { params: { id } })
+  },
+
   getMyProblemSets () {
     return ajax('teacher/problem_set', 'get')
   },
@@ -162,6 +191,10 @@ export default {
   },
   getProblemTagList () {
     return ajax('problem/tags', 'get')
+  },
+  // 출제 화면에서 붙일 태그를 고를 때는 아직 문제가 없는 태그도 보여야 한다
+  getAllProblemTags () {
+    return ajax('problem/tags', 'get', { params: { all: 1 } })
   },
   getProblemList (offset, limit, searchParams) {
     let params = { paging: true, offset, limit }

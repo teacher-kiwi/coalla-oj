@@ -41,7 +41,7 @@
             </li>
           </ul>
         </template>
-        <el-table :data="submissions" v-loading="loadingTable" stripe>
+        <el-table :key="rejudgeColumnVisible" :data="submissions" v-loading="loadingTable" stripe>
           <el-table-column label="시간" align="center">
             <template #default="{ row }">{{ localtime(row.create_time) }}</template>
           </el-table-column>

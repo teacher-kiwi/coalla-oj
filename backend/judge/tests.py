@@ -18,7 +18,7 @@ from .dispatcher import JudgeDispatcher
 DEFAULT_PROBLEM_DATA = {
     "_id": "D-1", "title": "test", "description": "<p>test</p>",
     "input_description": "test", "output_description": "test",
-    "time_limit": 1000, "memory_limit": 256, "difficulty": "Low",
+    "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
     "visible": True, "languages": ["C", "Python3"], "template": {},
     "samples": [{"input": "test", "output": "test"}],
     "spj": False, "spj_language": None, "spj_code": None,

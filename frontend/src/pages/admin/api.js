@@ -127,6 +127,12 @@ export default {
   getProblemTagList (params) {
     return ajax('problem/tags', 'get', { params })
   },
+  getPendingProblems () {
+    return ajax('admin/problem/publish_review', 'get')
+  },
+  reviewProblemPublish (id, approve) {
+    return ajax('admin/problem/publish_review', 'post', { data: { id, approve } })
+  },
   getAdminProblemTagList (params) {
     params = utils.filterEmptyValue(params || {})
     return ajax('admin/problem/tags', 'get', { params })
