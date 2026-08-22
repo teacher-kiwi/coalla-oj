@@ -17,7 +17,7 @@ from problem.models import Problem
 from submission.models import Submission
 from utils.api import APIView, CSRFExemptAPIView, validate_serializer
 from utils.shortcuts import send_email, get_env
-from utils.xss_filter import XSSHtml
+from utils.xss_filter import clean_html
 from .models import JudgeServer
 from .serializers import (CreateEditWebsiteConfigSerializer,
                           CreateSMTPConfigSerializer, EditSMTPConfigSerializer,
@@ -97,8 +97,7 @@ class WebsiteConfigAPI(APIView):
     def post(self, request):
         for k, v in request.data.items():
             if k == "website_footer":
-                with XSSHtml() as parser:
-                    v = parser.clean(v)
+                v = clean_html(v)
             # 비밀 키는 빈 값으로 덮어쓰지 않는다(화면에 값을 내려주지 않으므로
             # 다른 설정만 바꿔 저장할 때 지워지면 안 된다)
             if k == "neis_api_key" and not v:

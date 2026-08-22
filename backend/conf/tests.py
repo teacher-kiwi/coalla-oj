@@ -71,7 +71,8 @@ class WebsiteConfigAPITest(APITestCase):
                 "allow_register": True, "submission_list_show_all": False}
         resp = self.client.post(url, data=data)
         self.assertSuccess(resp)
-        self.assertEqual(SysOptions.website_footer, '<img src="#" />')
+        # onerror 는 걸러지고 src 만 남는다(HTML5 라 void 요소에 닫는 사선을 붙이지 않는다)
+        self.assertEqual(SysOptions.website_footer, '<img src="#">')
 
     def test_set_google_client_id(self):
         self.create_super_admin()

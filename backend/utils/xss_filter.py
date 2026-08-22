@@ -1,208 +1,47 @@
-# -*- coding: utf-8 -*-
-"""
-Python 富文本XSS过滤类
-@package XssHtml
-@version 0.1
-@link http://phith0n.github.io/python-xss-filter
-@since 20150407
-@copyright (c) Phithon All Rights Reserved
+"""리치 텍스트에서 위험한 HTML 을 걷어낸다.
 
-Based on native Python module HTMLParser purifier of HTML, To Clear all javascript in html
-You can use it in all python web framework
-Written by Phithon <root@leavesongs.com> in 2015 and placed in the public domain.
-phithon <root@leavesongs.com> 编写于20150407
-From: XDSEC <www.xdsec.org> & 离别歌 <www.leavesongs.com>
-GitHub Pages: https://github.com/phith0n/python-xss-filter
-Usage:
-    parser = XssHtml()
-    parser.feed('<html code>')
-    parser.close()
-    html = parser.getHtml()
-    print html
+문제 설명·공지 같은 리치 텍스트는 HTML 로 저장하고 화면에서 v-html 로 그대로
+렌더한다. v-html 은 Vue 의 이스케이프를 건너뛰므로 저장 전에 여기서 거르는 것이
+사실상 유일한 방어선이다. RichTextField(utils/models.py) 가 저장 시점에 부른다.
 
-Requirements
-Python 2.6+ or 3.2+
-Cannot defense xss in browser which is belowed IE7
-浏览器版本：IE7+ 或其他浏览器，无法防御IE6及以下版本浏览器中的XSS
+nh3(러스트 ammonia 바인딩)를 쓴다. 브라우저와 같은 html5ever 파서로 파싱한 뒤
+다시 직렬화하므로, "필터가 본 문서"와 "브라우저가 본 문서"가 어긋나면서 생기는
+우회(mXSS)를 피한다. 예전에는 2015년에 멈춘 외부 코드를 그대로 들고 있었다.
 """
 import re
-import copy
-from html.parser import HTMLParser
+
+import nh3
+
+# 허용 태그는 nh3 기본값을 그대로 쓴다. 편집기(md-editor-v3)가 마크다운을 렌더해
+# 내보내는 태그와 기존 데이터의 태그가 모두 들어 있다.
+ALLOWED_TAGS = set(nh3.ALLOWED_TAGS)
+
+ALLOWED_ATTRIBUTES = {tag: set(attrs) for tag, attrs in nh3.ALLOWED_ATTRIBUTES.items()}
+# 코드 블록 문법 강조에 쓰는 class 다. markdown-it 이 lang-python 처럼 붙여준다.
+ALLOWED_ATTRIBUTES["pre"] = {"class"}
+ALLOWED_ATTRIBUTES["code"] = {"class"}
+# 본문 링크는 새 탭으로 연다. rel="noopener noreferrer" 는 nh3 가 알아서 붙인다.
+ALLOWED_ATTRIBUTES["a"] = ALLOWED_ATTRIBUTES.get("a", set()) | {"target"}
+
+# style 은 허용하지 않는다. 예전 필터는 expression 만 걸러서
+# position:fixed 로 화면 전체를 덮는 가짜 UI 를 만들 수 있었다. 실제 데이터의
+# style 은 color·margin-left·text-align 같은 장식뿐이라 잃는 것이 없다.
+
+# class 는 문법 강조용으로만 열어둔 것이라 값도 거기에 맞는 것만 통과시킨다.
+# 그러지 않으면 앱이 쓰는 아무 클래스나 붙여 화면을 흐트러뜨릴 수 있다.
+_LANG_CLASS = re.compile(r"^(lang|language)-[\w+#.-]+$")
 
 
-class XSSHtml(HTMLParser):
-    allow_tags = ['a', 'img', 'br', 'strong', 'b', 'code', 'pre',
-                  'p', 'div', 'em', 'span', 'h1', 'h2', 'h3', 'h4',
-                  'h5', 'h6', 'blockquote', 'ul', 'ol', 'tr', 'th', 'td',
-                  'hr', 'li', 'u', 'embed', 's', 'table', 'thead', 'tbody',
-                  'caption', 'small', 'q', 'sup', 'sub', 'font']
-    common_attrs = ["style", "class", "name"]
-    nonend_tags = ["img", "hr", "br", "embed"]
-    tags_own_attrs = {
-        "img": ["src", "width", "height", "alt", "align"],
-        "a": ["href", "target", "rel", "title"],
-        "embed": ["src", "width", "height", "type", "allowfullscreen", "loop", "play", "wmode", "menu"],
-        "table": ["border", "cellpadding", "cellspacing"],
-        "font": ["color"]
-    }
-
-    def __init__(self, allows=[]):
-        HTMLParser.__init__(self)
-        self.allow_tags = allows if allows else self.allow_tags
-        self.result = []
-        self.start = []
-        self.data = []
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        super().close()
-
-    def clean(self, content):
-        self.feed(content)
-        return self.get_html()
-
-    def get_html(self):
-        """
-        Get the safe html code
-        """
-        for i in range(0, len(self.result)):
-            if self.result[i].strip('\n'):
-                self.data.append(self.result[i])
-        return ''.join(self.data)
-
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-
-    def handle_starttag(self, tag, attrs):
-        if tag not in self.allow_tags:
-            return
-        end_diagonal = ' /' if tag in self.nonend_tags else ''
-        if not end_diagonal:
-            self.start.append(tag)
-        attdict = {}
-        for attr in attrs:
-            attdict[attr[0]] = attr[1]
-
-        attdict = self._wash_attr(attdict, tag)
-        if hasattr(self, "node_%s" % tag):
-            attdict = getattr(self, "node_%s" % tag)(attdict)
-        else:
-            attdict = self.node_default(attdict)
-
-        attrs = []
-        for (key, value) in attdict.items():
-            attrs.append('%s="%s"' % (key, self._htmlspecialchars(value)))
-        attrs = (' ' + ' '.join(attrs)) if attrs else ''
-        self.result.append('<' + tag + attrs + end_diagonal + '>')
-
-    def handle_endtag(self, tag):
-        if self.start and tag == self.start[len(self.start) - 1]:
-            self.result.append('</' + tag + '>')
-            self.start.pop()
-
-    def handle_data(self, data):
-        self.result.append(self._htmlspecialchars(data))
-
-    def handle_entityref(self, name):
-        if name.isalpha():
-            self.result.append("&%s;" % name)
-
-    def handle_charref(self, name):
-        if name.isdigit():
-            self.result.append("&#%s;" % name)
-
-    def node_default(self, attrs):
-        attrs = self._common_attr(attrs)
-        return attrs
-
-    def node_a(self, attrs):
-        attrs = self._common_attr(attrs)
-        attrs = self._get_link(attrs, "href")
-        attrs = self._set_attr_default(attrs, "target", "_blank")
-        attrs = self._limit_attr(attrs, {
-            "target": ["_blank", "_self"]
-        })
-        return attrs
-
-    def node_embed(self, attrs):
-        attrs = self._common_attr(attrs)
-        attrs = self._get_link(attrs, "src")
-        attrs = self._limit_attr(attrs, {
-            "type": ["application/x-shockwave-flash"],
-            "wmode": ["transparent", "window", "opaque"],
-            "play": ["true", "false"],
-            "loop": ["true", "false"],
-            "menu": ["true", "false"],
-            "allowfullscreen": ["true", "false"]
-        })
-        attrs["allowscriptaccess"] = "never"
-        attrs["allownetworking"] = "none"
-        return attrs
-
-    def _true_url(self, url):
-        prog = re.compile(r"(^(http|https|ftp)://.+)|(^/)", re.I | re.S)
-        if prog.match(url):
-            return url
-        else:
-            return "http://%s" % url
-
-    def _true_style(self, style):
-        if style:
-            style = re.sub(r"(\\|&#|/\*|\*/)", "_", style)
-            style = re.sub(r"e.*x.*p.*r.*e.*s.*s.*i.*o.*n", "_", style)
-        return style
-
-    def _get_style(self, attrs):
-        if "style" in attrs:
-            attrs["style"] = self._true_style(attrs.get("style"))
-        return attrs
-
-    def _get_link(self, attrs, name):
-        if name in attrs:
-            attrs[name] = self._true_url(attrs[name])
-        return attrs
-
-    def _wash_attr(self, attrs, tag):
-        if tag in self.tags_own_attrs:
-            other = self.tags_own_attrs.get(tag)
-        else:
-            other = []
-        if attrs:
-            for key, value in copy.deepcopy(attrs).items():
-                if key not in self.common_attrs + other:
-                    del attrs[key]
-        return attrs
-
-    def _common_attr(self, attrs):
-        attrs = self._get_style(attrs)
-        return attrs
-
-    def _set_attr_default(self, attrs, name, default=''):
-        if name not in attrs:
-            attrs[name] = default
-        return attrs
-
-    def _limit_attr(self, attrs, limit={}):
-        for (key, value) in limit.items():
-            if key in attrs and attrs[key] not in value:
-                del attrs[key]
-        return attrs
-
-    def _htmlspecialchars(self, html):
-        return html.replace("<", "&lt;") \
-            .replace(">", "&gt;") \
-            .replace('"', "&quot;") \
-            .replace("'", "&#039;")
+def _attribute_filter(tag, attr, value):
+    """속성별로 한 번 더 본다. None 을 주면 그 속성을 뺀다."""
+    if attr == "class":
+        return value if _LANG_CLASS.match(value) else None
+    return value
 
 
-if "__main__" == __name__:
-    with XSSHtml() as parser:
-        ret = parser.clean("""<p><img src=1 onerror=alert(/xss/)></p><div class="left">
-            <a href='javascript:prompt(1)'><br />hehe</a></div>
-            <p id="test" onmouseover="alert(1)">&gt;M<svg>
-            <a href="https://www.baidu.com" target="self">MM</a></p>
-            <embed src='javascript:alert(/hehe/)' allowscriptaccess=always />
-            <img onerror=alert(1) src=#>""")
-        print(ret)
+def clean_html(value):
+    """저장해도 되는 HTML 만 남겨서 돌려준다."""
+    return nh3.clean(value or "",
+                     tags=ALLOWED_TAGS,
+                     attributes=ALLOWED_ATTRIBUTES,
+                     attribute_filter=_attribute_filter)
