@@ -8,12 +8,9 @@
 </script>
 
 <style lang="less">
+  // 나머지 body 규칙(여백·글꼴)은 common.less 에 있다. 여기서는 관리자만 다른 것만 덮는다.
   body {
-    margin: 0;
-    padding: 0;
-    font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
     font-size: 14px;
-    -webkit-font-smoothing: antialiased;
     background-color: #324157;
   }
 

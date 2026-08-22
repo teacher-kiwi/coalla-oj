@@ -5,7 +5,10 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  // 운영체제가 기본으로 갖고 있는 한글 글꼴을 쓴다(웹폰트를 받지 않는다).
+  // macOS 는 -apple-system, 윈도우는 맑은 고딕, 그 밖은 본고딕 순.
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+               "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   background-color: #eee;
   min-width: 900px;
