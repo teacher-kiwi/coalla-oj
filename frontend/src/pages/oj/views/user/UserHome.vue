@@ -43,10 +43,6 @@
             </div>
           </div>
         </div>
-
-        <div v-if="profile.user.email" id="icons">
-          <a :href="'mailto:' + profile.user.email"><el-icon :size="30"><Message /></el-icon></a>
-        </div>
       </div>
     </el-card>
   </div>
@@ -56,7 +52,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { QuestionFilled, Message } from '@element-plus/icons-vue'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useAppStore } from '@/store/app'
 import { useUserStore } from '@/store/user'
@@ -165,15 +161,6 @@ watch(() => route.fullPath, init)
           display: inline-block;
           margin: 5px;
         }
-      }
-    }
-    #icons {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translate(-50%);
-      .icon {
-        padding-left: 20px;
       }
     }
   }

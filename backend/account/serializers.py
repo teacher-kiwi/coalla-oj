@@ -66,11 +66,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
-        self.show_real_name = kwargs.pop("show_real_name", False)
+        # 실명과 이메일은 본인에게만 내려준다. 프로필은 ?username= 으로 남의 것도
+        # 볼 수 있어서, 응답에 남겨두면 아이디만 알면 이메일을 긁어갈 수 있다.
+        self.show_private = kwargs.pop("show_private", False)
         super(UserProfileSerializer, self).__init__(*args, **kwargs)
 
     def get_real_name(self, obj):
-        return obj.real_name if self.show_real_name else None
+        return obj.real_name if self.show_private else None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.show_private:
+            data["user"].pop("email", None)
+        return data
 
 
 class EditUserSerializer(serializers.Serializer):

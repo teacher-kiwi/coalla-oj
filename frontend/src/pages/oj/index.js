@@ -6,7 +6,7 @@ import ko from 'element-plus/es/locale/lang/ko'
 // (템플릿에서 태그로 쓰거나, IconBtn/InfoCard 에 문자열 이름으로 넘기는 것들)
 import {
   ArrowDown, Grid, HomeFilled, InfoFilled, Medal, TrendCharts, Trophy,
-  Key, Lock, Message, User
+  Key, Lock, User
 } from '@element-plus/icons-vue'
 import VChart from 'vue-echarts'
 import 'element-plus/dist/index.css'
@@ -49,7 +49,7 @@ app.use(katex)
 
 for (const [key, component] of Object.entries({
   ArrowDown, Grid, HomeFilled, InfoFilled, Medal, TrendCharts, Trophy,
-  Key, Lock, Message, User
+  Key, Lock, User
 })) {
   app.component(key, component)
 }

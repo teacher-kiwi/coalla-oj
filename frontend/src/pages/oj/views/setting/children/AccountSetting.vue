@@ -1,6 +1,8 @@
 <template>
   <div class="setting-main">
-    <div class="password-section">
+    <!-- 구글로 가입한 계정은 비밀번호가 없어(set_unusable_password) 바꿀 것도 없다.
+         아이디와 비밀번호로 로그인하는 계정, 사실상 관리자에게만 보인다. -->
+    <div v-if="canChangePassword" class="password-section">
       <p class="section-title">비밀번호 변경</p>
       <el-form class="setting-content" ref="formPasswordRef" :model="formPassword" :rules="rulePassword" label-width="160px">
         <el-form-item label="기존 비밀번호" prop="old_password">
@@ -28,6 +30,11 @@
       </p>
       <el-button type="danger" plain @click="openDelete">회원 탈퇴</el-button>
     </div>
+
+    <!-- 구글로 가입한 관리자는 둘 다 해당이 없어 화면이 비어 버린다 -->
+    <el-alert v-if="nothingToSetting" type="info" :closable="false" show-icon>
+      이 계정은 구글로 로그인합니다. 따로 설정할 것이 없습니다.
+    </el-alert>
 
     <el-dialog v-model="deleteVisible" title="정말 탈퇴하시겠습니까?" width="460px"
                :close-on-click-modal="false">
@@ -76,6 +83,11 @@ const googleBtnRef = ref(null)
 const googleReady = ref(true)
 // 구글로 가입한 일반 사용자(교사·개인 학생)만 스스로 탈퇴할 수 있다
 const canDelete = computed(() => !!userStore.user.is_google_account && !userStore.isAdminRole)
+// 구글 계정은 비밀번호가 없다. 남는 대상은 관리자와 관리자가 만들어 준 계정뿐이다.
+// 프로필을 받기 전에는 판단할 수 없으므로 id 가 채워진 뒤에 본다(폼이 깜빡이지 않게).
+const canChangePassword = computed(() => !!userStore.user.id && !userStore.user.is_google_account)
+const nothingToSetting = computed(() =>
+  !!userStore.user.id && !canChangePassword.value && !canDelete.value)
 const visible = reactive({ passwordAlert: false })
 
 const formPassword = ref({ old_password: '', new_password: '', again_password: '' })

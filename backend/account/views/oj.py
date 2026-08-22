@@ -26,7 +26,7 @@ class UserProfileAPI(APIView):
         user = request.user
         if not user.is_authenticated:
             return self.success()
-        show_real_name = False
+        show_private = False
         username = request.GET.get("username")
         try:
             if username:
@@ -37,11 +37,11 @@ class UserProfileAPI(APIView):
                     return self.error("사용자가 존재하지 않습니다")
             else:
                 user = request.user
-                # 자기 정보를 돌려주는 경우라 real_name 도 포함한다
-                show_real_name = True
+                # 자기 정보를 돌려주는 경우라 실명과 이메일도 포함한다
+                show_private = True
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
-        return self.success(UserProfileSerializer(user.userprofile, show_real_name=show_real_name).data)
+        return self.success(UserProfileSerializer(user.userprofile, show_private=show_private).data)
 
     @validate_serializer(EditUserProfileSerializer)
     @login_required
@@ -51,7 +51,7 @@ class UserProfileAPI(APIView):
         for k, v in data.items():
             setattr(user_profile, k, v)
         user_profile.save()
-        return self.success(UserProfileSerializer(user_profile, show_real_name=True).data)
+        return self.success(UserProfileSerializer(user_profile, show_private=True).data)
 
 
 class AvatarUploadAPI(APIView):

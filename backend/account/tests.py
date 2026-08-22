@@ -157,6 +157,28 @@ class UserProfileAPITest(APITestCase):
         self.assertEqual(data["real_name"], "zemal")
         self.assertEqual(data["submission_number"], 0)
 
+    def test_own_profile_keeps_email(self):
+        user = self.create_user("test", "test123")
+        user.email = "me@test.com"
+        user.save()
+        resp = self.client.get(self.url)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["user"]["email"], "me@test.com")
+
+    def test_other_profile_hides_email_and_real_name(self):
+        """아이디만 알면 남의 이메일을 긁어갈 수 있으면 안 된다."""
+        other = self.create_user("other", "test123", login=False)
+        other.email = "other@test.com"
+        other.save()
+        other.userprofile.real_name = "홍길동"
+        other.userprofile.save()
+        self.create_user("me", "test123")
+
+        resp = self.client.get(self.url + "?username=other")
+        self.assertSuccess(resp)
+        self.assertNotIn("email", resp.data["data"]["user"])
+        self.assertIsNone(resp.data["data"]["real_name"])
+
 
 class UserChangePasswordAPITest(APITestCase):
     def setUp(self):
