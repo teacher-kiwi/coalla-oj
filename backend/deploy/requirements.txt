@@ -4,7 +4,7 @@
 # 실제로 아래 세 가지가 그렇게 깨졌다.
 #   - requests : django-cas-ng 을 제거하자 함께 사라짐 (코드는 직접 사용 중)
 #   - redis    : 재빌드 때 최신 버전이 깔려 Redis 4 서버와 RESP3 협상 실패
-#   - pytz     : Django 4 가 더는 의존하지 않아 사라짐 (코드는 직접 사용 중)
+#   - six      : python-dateutil 이 요구한다. 코드에서 직접 쓰지는 않는다
 #
 # 갱신 방법: 컨테이너에서 `pip freeze` 한 결과로 이 파일을 다시 만든다.
 
@@ -21,8 +21,10 @@ redis==5.2.1
 django-dbconn-retry==0.1.7
 
 # --- 비동기 작업 (채점 큐) ---
-dramatiq==1.16.0
-django-dramatiq==0.11.6
+dramatiq==2.2.0
+django-dramatiq==0.15.0
+# dramatiq 2 부터 프로메테우스는 선택 사항이다. 미들웨어를 쓰지 않으므로
+# 사실상 필요 없지만, 빼면 어디서 끌어 쓰는지 확인이 필요해 일단 둔다.
 prometheus_client==0.26.0
 
 # --- 웹 서버 ---
@@ -51,9 +53,7 @@ nh3==0.3.6
 pillow==10.2.0
 python-dateutil==2.8.2
 six==1.17.0
-XlsxWriter==3.1.9
-Envelopes==0.4
-entrypoints==0.4
+XlsxWriter==3.2.9
 
 # --- 개발/테스트 도구 (run_test.py 가 컨테이너 안에서 사용) ---
 coverage==6.5.0

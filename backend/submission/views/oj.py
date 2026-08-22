@@ -7,7 +7,6 @@ from options.options import SysOptions
 from problem.models import can_access_problem, Problem, ProblemRuleType
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
-from utils.captcha import Captcha
 from utils.throttling import TokenBucket
 from account.models import display_name_prefetch, my_student_ids
 from ..models import Submission
@@ -47,9 +46,6 @@ class SubmissionAPI(APIView):
             if not contest.problem_details_permission(request.user):
                 hide_id = True
 
-        if data.get("captcha"):
-            if not Captcha(request).check(data["captcha"]):
-                return self.error("보안 문자가 올바르지 않습니다")
         error = self.throttling(request)
         if error:
             return self.error(error)

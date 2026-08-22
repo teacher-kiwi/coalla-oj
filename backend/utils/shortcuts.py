@@ -1,11 +1,8 @@
 import os
 import re
 import random
-from base64 import b64encode
-from io import BytesIO
 
 from django.utils.crypto import get_random_string
-from envelopes import Envelope
 
 
 def rand_str(length=32, type="lower_hex"):
@@ -24,15 +21,6 @@ def rand_str(length=32, type="lower_hex"):
         return random.choice("123456789") + get_random_string(length - 1, allowed_chars="0123456789")
 
 
-def img2base64(img):
-    with BytesIO() as buf:
-        img.save(buf, "gif")
-        buf_str = buf.getvalue()
-    img_prefix = "data:image/png;base64,"
-    b64_str = img_prefix + b64encode(buf_str).decode("utf-8")
-    return b64_str
-
-
 def datetime2str(value, format="iso-8601"):
     if format.lower() == "iso-8601":
         value = value.isoformat()
@@ -45,18 +33,6 @@ def datetime2str(value, format="iso-8601"):
 def natural_sort_key(s, _nsre=re.compile(r"(\d+)")):
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(_nsre, s)]
-
-
-def send_email(smtp_config, from_name, to_email, to_name, subject, content):
-    envelope = Envelope(from_addr=(smtp_config["email"], from_name),
-                        to_addr=(to_email, to_name),
-                        subject=subject,
-                        html_body=content)
-    return envelope.send(smtp_config["server"],
-                         login=smtp_config["email"],
-                         password=smtp_config["password"],
-                         port=smtp_config["port"],
-                         tls=smtp_config["tls"])
 
 
 def get_env(name, default=""):

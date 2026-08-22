@@ -99,7 +99,6 @@ class OptionKeys:
     website_footer = "website_footer"
     allow_register = "allow_register"
     submission_list_show_all = "submission_list_show_all"
-    smtp_config = "smtp_config"
     judge_server_token = "judge_server_token"
     throttling = "throttling"
     languages = "languages"
@@ -117,7 +116,6 @@ class OptionDefaultValue:
     website_footer = "Online Judge Footer"
     allow_register = True
     submission_list_show_all = True
-    smtp_config = {}
     judge_server_token = default_token
     throttling = {"ip": {"capacity": 100, "fill_rate": 0.1, "default_capacity": 50},
                   "user": {"capacity": 20, "fill_rate": 0.03, "default_capacity": 10}}
@@ -237,14 +235,6 @@ class _SysOptionsMeta(type):
     @submission_list_show_all.setter
     def submission_list_show_all(cls, value):
         cls._set_option(OptionKeys.submission_list_show_all, value)
-
-    @my_property
-    def smtp_config(cls):
-        return cls._get_option(OptionKeys.smtp_config)
-
-    @smtp_config.setter
-    def smtp_config(cls, value):
-        cls._set_option(OptionKeys.smtp_config, value)
 
     @my_property
     def judge_server_token(cls):

@@ -8,7 +8,6 @@ class CreateSubmissionSerializer(serializers.Serializer):
     language = serializers.CharField()  # Block Coding 허용을 위해 CharField로 변경
     code = serializers.CharField(max_length=1024 * 1024)
     contest_id = serializers.IntegerField(required=False)
-    captcha = serializers.CharField(required=False)
     blockly_state = serializers.CharField(required=False, allow_blank=True)
 
 

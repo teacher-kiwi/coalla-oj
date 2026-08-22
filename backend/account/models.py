@@ -39,8 +39,6 @@ class User(AbstractBaseUser):
     # AdminType 중 하나
     admin_type = models.TextField(default=AdminType.REGULAR_USER)
     problem_permission = models.TextField(default=ProblemPermission.NONE)
-    reset_password_token = models.TextField(null=True)
-    reset_password_token_expire_time = models.DateTimeField(null=True)
     # SSO 인증 토큰
     auth_token = models.TextField(null=True)
     session_keys = JSONField(default=list)

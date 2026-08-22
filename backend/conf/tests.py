@@ -9,50 +9,6 @@ from utils.api.tests import APITestCase
 from .models import JudgeServer
 
 
-class SMTPConfigTest(APITestCase):
-    def setUp(self):
-        self.user = self.create_super_admin()
-        self.url = self.reverse("smtp_admin_api")
-        self.password = "testtest"
-
-    def test_create_smtp_config(self):
-        data = {"server": "smtp.test.com", "email": "test@test.com", "port": 465,
-                "tls": True, "password": self.password}
-        resp = self.client.post(self.url, data=data)
-        self.assertSuccess(resp)
-        self.assertTrue("password" not in resp.data)
-        return resp
-
-    def test_edit_without_password(self):
-        self.test_create_smtp_config()
-        data = {"server": "smtp1.test.com", "email": "test2@test.com", "port": 465,
-                "tls": True}
-        resp = self.client.put(self.url, data=data)
-        self.assertSuccess(resp)
-
-    def test_edit_without_password1(self):
-        self.test_create_smtp_config()
-        data = {"server": "smtp.test.com", "email": "test@test.com", "port": 465,
-                "tls": True, "password": ""}
-        resp = self.client.put(self.url, data=data)
-        self.assertSuccess(resp)
-
-    def test_edit_with_password(self):
-        self.test_create_smtp_config()
-        data = {"server": "smtp1.test.com", "email": "test2@test.com", "port": 465,
-                "tls": True, "password": "newpassword"}
-        resp = self.client.put(self.url, data=data)
-        self.assertSuccess(resp)
-
-    @mock.patch("conf.views.send_email")
-    def test_test_smtp(self, mocked_send_email):
-        url = self.reverse("smtp_test_api")
-        self.test_create_smtp_config()
-        resp = self.client.post(url, data={"email": "test@test.com"})
-        self.assertSuccess(resp)
-        mocked_send_email.assert_called_once()
-
-
 class WebsiteConfigAPITest(APITestCase):
     def test_create_website_config(self):
         self.create_super_admin()

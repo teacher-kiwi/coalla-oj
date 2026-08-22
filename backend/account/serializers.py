@@ -12,19 +12,9 @@ class UserLoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
 
-class UsernameOrEmailCheckSerializer(serializers.Serializer):
-    username = serializers.CharField(required=False)
-    email = serializers.EmailField(required=False)
-
-
 class UserChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
     new_password = serializers.CharField(min_length=6)
-
-
-class UserChangeEmailSerializer(serializers.Serializer):
-    password = serializers.CharField()
-    new_email = serializers.EmailField(max_length=64)
 
 
 class GenerateUserSerializer(serializers.Serializer):
@@ -98,17 +88,6 @@ class EditUserSerializer(serializers.Serializer):
 class EditUserProfileSerializer(serializers.Serializer):
     real_name = serializers.CharField(max_length=32, allow_null=True, required=False)
     avatar = serializers.CharField(max_length=256, allow_blank=True, required=False)
-
-
-class ApplyResetPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    captcha = serializers.CharField()
-
-
-class ResetPasswordSerializer(serializers.Serializer):
-    token = serializers.CharField()
-    password = serializers.CharField(min_length=6)
-    captcha = serializers.CharField()
 
 
 class SSOSerializer(serializers.Serializer):

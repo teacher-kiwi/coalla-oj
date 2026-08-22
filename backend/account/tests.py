@@ -1,14 +1,9 @@
-import time
-
 from unittest import mock
-from datetime import timedelta
 from copy import deepcopy
 
 from django.contrib import auth
-from django.utils.timezone import now
 
 from utils.api.tests import APITestCase
-from utils.shortcuts import rand_str
 from options.options import SysOptions
 
 from problem.models import Problem, ProblemTag
@@ -47,36 +42,6 @@ class PermissionDecoratorTest(APITestCase):
         pass
 
 
-class DuplicateUserCheckAPITest(APITestCase):
-    def setUp(self):
-        user = self.create_user("test", "test123", login=False)
-        user.email = "test@test.com"
-        user.save()
-        self.url = self.reverse("check_username_or_email")
-
-    def test_duplicate_username(self):
-        resp = self.client.post(self.url, data={"username": "test"})
-        data = resp.data["data"]
-        self.assertEqual(data["username"], True)
-        resp = self.client.post(self.url, data={"username": "Test"})
-        self.assertEqual(resp.data["data"]["username"], True)
-
-    def test_ok_username(self):
-        resp = self.client.post(self.url, data={"username": "test1"})
-        data = resp.data["data"]
-        self.assertFalse(data["username"])
-
-    def test_duplicate_email(self):
-        resp = self.client.post(self.url, data={"email": "test@test.com"})
-        self.assertEqual(resp.data["data"]["email"], True)
-        resp = self.client.post(self.url, data={"email": "Test@Test.com"})
-        self.assertTrue(resp.data["data"]["email"])
-
-    def test_ok_email(self):
-        resp = self.client.post(self.url, data={"email": "aa@test.com"})
-        self.assertFalse(resp.data["data"]["email"])
-
-
 class UserLoginAPITest(APITestCase):
     def setUp(self):
         self.username = self.password = "test"
@@ -113,15 +78,6 @@ class UserLoginAPITest(APITestCase):
         self.assertDictEqual(resp.data, {"error": "error", "data": "비활성화된 계정입니다"})
 
 
-class CaptchaTest(APITestCase):
-    def _set_captcha(self, session):
-        captcha = rand_str(4)
-        session["_django_captcha_key"] = captcha
-        session["_django_captcha_expires_time"] = int(time.time()) + 30
-        session.save()
-        return captcha
-
-
 class UserRegisterAPITest(APITestCase):
     """옛 회원가입 경로는 닫혀 있어야 한다. 가입은 구글로만 받는다."""
     def setUp(self):
@@ -130,7 +86,7 @@ class UserRegisterAPITest(APITestCase):
     def test_register_is_closed(self):
         resp = self.client.post(self.register_url, data={
             "username": "test_user", "password": "testuserpassword",
-            "email": "test@qduoj.com", "captcha": "1234"})
+            "email": "test@qduoj.com"})
         self.assertFailed(resp, "구글 계정으로 가입해주세요")
         self.assertFalse(User.objects.filter(username="test_user").exists())
 
@@ -200,112 +156,6 @@ class UserProfileAPITest(APITestCase):
         data = resp.data["data"]
         self.assertEqual(data["real_name"], "zemal")
         self.assertEqual(data["submission_number"], 0)
-
-
-@mock.patch("account.views.oj.send_email_async.send")
-class ApplyResetPasswordAPITest(CaptchaTest):
-    def setUp(self):
-        self.create_user("test", "test123", login=False)
-        user = User.objects.first()
-        user.email = "test@oj.com"
-        user.save()
-        self.url = self.reverse("apply_reset_password_api")
-        self.data = {"email": "test@oj.com", "captcha": self._set_captcha(self.client.session)}
-
-    def _refresh_captcha(self):
-        self.data["captcha"] = self._set_captcha(self.client.session)
-
-    def test_apply_reset_password(self, send_email_send):
-        resp = self.client.post(self.url, data=self.data)
-        self.assertSuccess(resp)
-        send_email_send.assert_called()
-
-    def test_apply_reset_password_twice_in_20_mins(self, send_email_send):
-        self.test_apply_reset_password()
-        send_email_send.reset_mock()
-        self._refresh_captcha()
-        resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "비밀번호 재설정은 20분에 한 번만 요청할 수 있습니다"})
-        send_email_send.assert_not_called()
-
-    def test_apply_reset_password_again_after_20_mins(self, send_email_send):
-        self.test_apply_reset_password()
-        user = User.objects.first()
-        user.reset_password_token_expire_time = now() - timedelta(minutes=21)
-        user.save()
-        self._refresh_captcha()
-        self.test_apply_reset_password()
-
-    def test_google_account_blocked(self, send_email_send):
-        user = User.objects.first()
-        user.google_sub = "google-sub-1"
-        user.save()
-        resp = self.client.post(self.url, data={"email": "test@oj.com",
-                                                "captcha": self._set_captcha(self.client.session)})
-        self.assertFailed(resp, "구글 계정으로 가입하셨습니다. 구글로 로그인해주세요")
-
-    def test_student_account_blocked(self, send_email_send):
-        teacher = self.create_teacher(login=False)
-        user = User.objects.get(username="test")
-        user.created_by = teacher
-        user.save()
-        resp = self.client.post(self.url, data={"email": "test@oj.com",
-                                                "captcha": self._set_captcha(self.client.session)})
-        self.assertFailed(resp, "학교에서 발급받은 계정입니다. 선생님께 문의하세요")
-
-
-class ResetPasswordAPITest(CaptchaTest):
-    def setUp(self):
-        self.create_user("test", "test123", login=False)
-        self.url = self.reverse("reset_password_api")
-        user = User.objects.first()
-        user.reset_password_token = "online_judge?"
-        user.reset_password_token_expire_time = now() + timedelta(minutes=20)
-        user.save()
-        self.data = {"token": user.reset_password_token,
-                     "captcha": self._set_captcha(self.client.session),
-                     "password": "test456"}
-
-    def test_reset_password_with_correct_token(self):
-        resp = self.client.post(self.url, data=self.data)
-        self.assertSuccess(resp)
-        self.assertTrue(self.client.login(username="test", password="test456"))
-
-    def test_reset_password_with_invalid_token(self):
-        self.data["token"] = "aaaaaaaaaaa"
-        resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "토큰이 존재하지 않습니다"})
-
-    def test_reset_password_with_expired_token(self):
-        user = User.objects.first()
-        user.reset_password_token_expire_time = now() - timedelta(seconds=30)
-        user.save()
-        resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "토큰이 만료되었습니다"})
-
-
-class UserChangeEmailAPITest(APITestCase):
-    def setUp(self):
-        self.url = self.reverse("user_change_email_api")
-        self.user = self.create_user("test", "test123")
-        self.new_mail = "test@oj.com"
-        self.data = {"password": "test123", "new_email": self.new_mail}
-
-    def test_change_email_success(self):
-        resp = self.client.post(self.url, data=self.data)
-        self.assertSuccess(resp)
-
-    def test_wrong_password(self):
-        self.data["password"] = "aaaa"
-        resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "비밀번호가 올바르지 않습니다"})
-
-    def test_duplicate_email(self):
-        u = self.create_user("aa", "bb", login=False)
-        u.email = self.new_mail
-        u.save()
-        resp = self.client.post(self.url, data=self.data)
-        self.assertDictEqual(resp.data, {"error": "error", "data": "다른 계정이 사용 중인 이메일입니다"})
 
 
 class UserChangePasswordAPITest(APITestCase):

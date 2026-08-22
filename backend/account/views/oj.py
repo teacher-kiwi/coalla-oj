@@ -1,30 +1,22 @@
 import os
-from datetime import timedelta
 from importlib import import_module
 
 from django.conf import settings
 from django.contrib import auth
-from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
-from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
 from problem.models import Problem
 from utils.constants import ContestRuleType
-from options.options import SysOptions
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
-from utils.captcha import Captcha
 from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
 from ..models import (display_name_prefetch, has_public_profile, my_student_ids,
                       User, UserProfile, AdminType)
-from ..serializers import (ApplyResetPasswordSerializer, ResetPasswordSerializer,
-                           UserChangePasswordSerializer, UserLoginSerializer,
-                           UsernameOrEmailCheckSerializer,
-                           RankInfoSerializer, UserChangeEmailSerializer, SSOSerializer)
+from ..serializers import (UserChangePasswordSerializer, UserLoginSerializer,
+                           RankInfoSerializer, SSOSerializer)
 from ..serializers import (UserProfileSerializer,
                            EditUserProfileSerializer, ImageUploadForm)
-from ..tasks import send_email_async
 
 
 class UserProfileAPI(APIView):
@@ -109,22 +101,6 @@ class UserLogoutAPI(APIView):
         return self.success()
 
 
-class UsernameOrEmailCheck(APIView):
-    @validate_serializer(UsernameOrEmailCheckSerializer)
-    def post(self, request):
-        data = request.data
-        # True 면 이미 사용 중이라는 뜻
-        result = {
-            "username": False,
-            "email": False
-        }
-        if data.get("username"):
-            result["username"] = User.objects.filter(username=data["username"].lower()).exists()
-        if data.get("email"):
-            result["email"] = User.objects.filter(email=data["email"].lower()).exists()
-        return self.success(result)
-
-
 class UserRegisterAPI(APIView):
     """옛 아이디/비밀번호 회원가입. 더 이상 사용하지 않는다.
 
@@ -134,23 +110,6 @@ class UserRegisterAPI(APIView):
     """
     def post(self, request):
         return self.error("구글 계정으로 가입해주세요")
-
-
-class UserChangeEmailAPI(APIView):
-    @validate_serializer(UserChangeEmailSerializer)
-    @login_required
-    def post(self, request):
-        data = request.data
-        user = auth.authenticate(username=request.user.username, password=data["password"])
-        if user:
-            data["new_email"] = data["new_email"].lower()
-            if User.objects.filter(email=data["new_email"]).exists():
-                return self.error("다른 계정이 사용 중인 이메일입니다")
-            user.email = data["new_email"]
-            user.save()
-            return self.success("Succeeded")
-        else:
-            return self.error("비밀번호가 올바르지 않습니다")
 
 
 class UserChangePasswordAPI(APIView):
@@ -166,62 +125,6 @@ class UserChangePasswordAPI(APIView):
             return self.success("Succeeded")
         else:
             return self.error("기존 비밀번호가 올바르지 않습니다")
-
-
-class ApplyResetPasswordAPI(APIView):
-    @validate_serializer(ApplyResetPasswordSerializer)
-    def post(self, request):
-        if request.user.is_authenticated:
-            return self.error("이미 로그인되어 있습니다")
-        data = request.data
-        captcha = Captcha(request)
-        if not captcha.check(data["captcha"]):
-            return self.error("보안 문자가 올바르지 않습니다")
-        try:
-            user = User.objects.get(email__iexact=data["email"])
-        except User.DoesNotExist:
-            return self.error("사용자가 존재하지 않습니다")
-        if user.google_sub:
-            return self.error("구글 계정으로 가입하셨습니다. 구글로 로그인해주세요")
-        if user.created_by_id is not None:
-            return self.error("학교에서 발급받은 계정입니다. 선생님께 문의하세요")
-        if user.reset_password_token_expire_time and 0 < int(
-                (user.reset_password_token_expire_time - now()).total_seconds()) < 20 * 60:
-            return self.error("비밀번호 재설정은 20분에 한 번만 요청할 수 있습니다")
-        user.reset_password_token = rand_str()
-        user.reset_password_token_expire_time = now() + timedelta(minutes=20)
-        user.save()
-        render_data = {
-            "username": user.username,
-            "website_name": SysOptions.website_name,
-            "link": f"{SysOptions.website_base_url}/reset-password/{user.reset_password_token}"
-        }
-        email_html = render_to_string("reset_password_email.html", render_data)
-        send_email_async.send(from_name=SysOptions.website_name_shortcut,
-                              to_email=user.email,
-                              to_name=user.username,
-                              subject="비밀번호 재설정 안내",
-                              content=email_html)
-        return self.success("Succeeded")
-
-
-class ResetPasswordAPI(APIView):
-    @validate_serializer(ResetPasswordSerializer)
-    def post(self, request):
-        data = request.data
-        captcha = Captcha(request)
-        if not captcha.check(data["captcha"]):
-            return self.error("보안 문자가 올바르지 않습니다")
-        try:
-            user = User.objects.get(reset_password_token=data["token"])
-        except User.DoesNotExist:
-            return self.error("토큰이 존재하지 않습니다")
-        if user.reset_password_token_expire_time < now():
-            return self.error("토큰이 만료되었습니다")
-        user.reset_password_token = None
-        user.set_password(data["password"])
-        user.save()
-        return self.success("Succeeded")
 
 
 class SessionManagementAPI(APIView):

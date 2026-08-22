@@ -11,8 +11,6 @@ const SubmissionList = () => import('@oj/views/submission/SubmissionList.vue')
 const SubmissionDetails = () => import('@oj/views/submission/SubmissionDetails.vue')
 const ACMRank = () => import('@oj/views/rank/ACMRank.vue')
 const OIRank = () => import('@oj/views/rank/OIRank.vue')
-const ApplyResetPassword = () => import('@oj/views/user/ApplyResetPassword.vue')
-const ResetPassword = () => import('@oj/views/user/ResetPassword.vue')
 const Problem = () => import('@oj/views/problem/Problem.vue')
 
 const ContestList = () => import('@oj/views/contest/ContestList.vue')
@@ -50,18 +48,6 @@ export default [
     path: '/logout',
     meta: { title: '로그아웃' },
     component: Logout
-  },
-  {
-    name: 'apply-reset-password',
-    path: '/apply-reset-password',
-    meta: { title: '비밀번호 재설정 요청' },
-    component: ApplyResetPassword
-  },
-  {
-    name: 'reset-password',
-    path: '/reset-password/:token',
-    meta: { title: '비밀번호 재설정' },
-    component: ResetPassword
   },
   {
     name: 'problem-list',

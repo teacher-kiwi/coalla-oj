@@ -1,31 +1,5 @@
 <template>
   <div class="view">
-    <Panel title="SMTP 설정">
-      <el-form label-position="left" label-width="70px" :model="smtp">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="서버" required><el-input v-model="smtp.server" placeholder="SMTP 서버 주소" /></el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="포트" required><el-input type="number" v-model="smtp.port" placeholder="SMTP 서버 포트" /></el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="이메일" required><el-input v-model="smtp.email" placeholder="발신 계정" /></el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="비밀번호" label-width="90px" required>
-              <el-input v-model="smtp.password" type="password" placeholder="SMTP 서버 비밀번호" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="TLS"><el-switch v-model="smtp.tls" /></el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-      <el-button type="primary" @click="saveSMTPConfig">저장</el-button>
-      <el-button type="warning" @click="testSMTPConfig" v-if="saved" :loading="loadingBtnTest">테스트 메일 발송</el-button>
-    </Panel>
-
     <Panel title="웹사이트 설정">
       <el-form label-position="left" label-width="100px" :model="websiteConfig">
         <el-row :gutter="20">
@@ -91,14 +65,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
 import api from '../../api.js'
 
-const isInit = ref(false)
-const saved = ref(false)
-const loadingBtnTest = ref(false)
-const smtp = reactive({ server: 'smtp.example.com', port: 25, password: '', email: 'email@example.com', tls: true })
 const websiteConfig = ref({})
 const sync = ref({})
 const syncing = ref(false)
@@ -139,14 +109,6 @@ function startSync () {
 }
 
 onMounted(() => {
-  api.getSMTPConfig().then(res => {
-    if (res.data.data) {
-      Object.assign(smtp, res.data.data)
-    } else {
-      isInit.value = true
-      ElNotification.warning({ title: '경고', message: '먼저 SMTP 설정을 완료하세요' })
-    }
-  })
   api.getWebsiteConfig().then(res => {
     websiteConfig.value = res.data.data
     // 저장된 키는 화면에 내려주지 않으므로 입력란은 항상 비워둔다
@@ -156,24 +118,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => clearTimeout(syncTimer))
-
-function saveSMTPConfig () {
-  if (!isInit.value) {
-    api.editSMTPConfig(smtp).then(() => { saved.value = true }, () => {})
-  } else {
-    api.createSMTPConfig(smtp).then(() => { saved.value = true }, () => {})
-  }
-}
-
-function testSMTPConfig () {
-  ElMessageBox.prompt('이메일을 입력하세요', '', {
-    inputPattern: /[\w!#$%&'*+/=?^_`{|}~-]+(?:\.[\w!#$%&'*+/=?^_`{|}~-]+)*@(?:[\w](?:[\w-]*[\w])?\.)+[\w](?:[\w-]*[\w])?/,
-    inputErrorMessage: 'Error email format'
-  }).then(({ value }) => {
-    loadingBtnTest.value = true
-    api.testSMTPConfig(value).then(() => { loadingBtnTest.value = false }, () => { loadingBtnTest.value = false })
-  }).catch(() => {})
-}
 
 function saveWebsiteConfig () {
   // 서버가 모르는 표시용 필드는 빼고 보낸다

@@ -65,18 +65,6 @@ export default {
   getLanguages () {
     return ajax('languages', 'get')
   },
-  getSMTPConfig () {
-    return ajax('admin/smtp', 'get')
-  },
-  createSMTPConfig (data) {
-    return ajax('admin/smtp', 'post', { data })
-  },
-  editSMTPConfig (data) {
-    return ajax('admin/smtp', 'put', { data })
-  },
-  testSMTPConfig (email) {
-    return ajax('admin/smtp_test', 'post', { data: { email } })
-  },
   getWebsiteConfig () {
     return ajax('admin/website', 'get')
   },

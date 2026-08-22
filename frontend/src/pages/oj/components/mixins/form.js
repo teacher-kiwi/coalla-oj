@@ -1,10 +1,6 @@
-import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import api from '@oj/api'
 
 export function useForm () {
-  const captchaSrc = ref('')
-
   function validateForm (formRef) {
     return new Promise((resolve) => {
       if (!formRef) {
@@ -22,11 +18,5 @@ export function useForm () {
     })
   }
 
-  function getCaptchaSrc () {
-    api.getCaptcha().then((res) => {
-      captchaSrc.value = res.data.data
-    })
-  }
-
-  return { captchaSrc, validateForm, getCaptchaSrc }
+  return { validateForm }
 }

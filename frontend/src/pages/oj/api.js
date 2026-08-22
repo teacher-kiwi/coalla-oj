@@ -15,9 +15,6 @@ export default {
   login (data) {
     return ajax('login', 'post', { data })
   },
-  checkUsernameOrEmail (username, email) {
-    return ajax('check_username_or_email', 'post', { data: { username, email } })
-  },
   register (data) {
     return ajax('register', 'post', { data })
   },
@@ -156,9 +153,6 @@ export default {
   getAssignedProblemSet (id) {
     return ajax('problem_set', 'get', { params: { id } })
   },
-  getCaptcha () {
-    return ajax('captcha', 'get')
-  },
   getUserInfo (username = undefined) {
     return ajax('profile', 'get', { params: { username } })
   },
@@ -174,17 +168,8 @@ export default {
   deleteSession (sessionKey) {
     return ajax('sessions', 'delete', { params: { session_key: sessionKey } })
   },
-  applyResetPassword (data) {
-    return ajax('apply_reset_password', 'post', { data })
-  },
-  resetPassword (data) {
-    return ajax('reset_password', 'post', { data })
-  },
   changePassword (data) {
     return ajax('change_password', 'post', { data })
-  },
-  changeEmail (data) {
-    return ajax('change_email', 'post', { data })
   },
   getLanguages () {
     return ajax('languages', 'get')

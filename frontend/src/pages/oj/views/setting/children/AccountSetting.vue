@@ -1,42 +1,22 @@
 <template>
   <div class="setting-main">
-    <div class="flex-container">
-      <div class="left">
-        <p class="section-title">비밀번호 변경</p>
-        <el-form class="setting-content" ref="formPasswordRef" :model="formPassword" :rules="rulePassword" label-width="160px">
-          <el-form-item label="기존 비밀번호" prop="old_password">
-            <el-input v-model="formPassword.old_password" type="password" />
-          </el-form-item>
-          <el-form-item label="새 비밀번호" prop="new_password">
-            <el-input v-model="formPassword.new_password" type="password" />
-          </el-form-item>
-          <el-form-item label="새 비밀번호 확인" prop="again_password">
-            <el-input v-model="formPassword.again_password" type="password" />
-          </el-form-item>
-          <el-form-item v-if="visible.passwordAlert">
-            <el-alert type="success" :closable="false">잠시 후 자동으로 로그아웃됩니다. 새 비밀번호로 다시 로그인해주세요.</el-alert>
-          </el-form-item>
-          <el-button type="primary" :loading="loading.btnPassword" @click="changePassword">비밀번호 업데이트</el-button>
-        </el-form>
-      </div>
-
-      <div class="middle separator" />
-
-      <div class="right">
-        <p class="section-title">이메일 변경</p>
-        <el-form class="setting-content" ref="formEmailRef" :model="formEmail" :rules="ruleEmail" label-width="160px">
-          <el-form-item label="현재 비밀번호" prop="password">
-            <el-input v-model="formEmail.password" type="password" />
-          </el-form-item>
-          <el-form-item label="기존 이메일">
-            <el-input v-model="formEmail.old_email" disabled />
-          </el-form-item>
-          <el-form-item label="새 이메일" prop="new_email">
-            <el-input v-model="formEmail.new_email" />
-          </el-form-item>
-          <el-button type="primary" :loading="loading.btnEmail" @click="changeEmail">이메일 변경</el-button>
-        </el-form>
-      </div>
+    <div class="password-section">
+      <p class="section-title">비밀번호 변경</p>
+      <el-form class="setting-content" ref="formPasswordRef" :model="formPassword" :rules="rulePassword" label-width="160px">
+        <el-form-item label="기존 비밀번호" prop="old_password">
+          <el-input v-model="formPassword.old_password" type="password" />
+        </el-form-item>
+        <el-form-item label="새 비밀번호" prop="new_password">
+          <el-input v-model="formPassword.new_password" type="password" />
+        </el-form-item>
+        <el-form-item label="새 비밀번호 확인" prop="again_password">
+          <el-input v-model="formPassword.again_password" type="password" />
+        </el-form-item>
+        <el-form-item v-if="visible.passwordAlert">
+          <el-alert type="success" :closable="false">잠시 후 자동으로 로그아웃됩니다. 새 비밀번호로 다시 로그인해주세요.</el-alert>
+        </el-form-item>
+        <el-button type="primary" :loading="loading.btnPassword" @click="changePassword">비밀번호 업데이트</el-button>
+      </el-form>
     </div>
 
     <!-- 구글로 가입한 사용자만 스스로 탈퇴할 수 있다.
@@ -74,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted } from 'vue'
+import { ref, reactive, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@oj/api'
@@ -88,19 +68,17 @@ const appStore = useAppStore()
 const { validateForm } = useForm()
 
 const formPasswordRef = ref(null)
-const formEmailRef = ref(null)
 
-const loading = reactive({ btnPassword: false, btnEmail: false })
+const loading = reactive({ btnPassword: false })
 const deleteVisible = ref(false)
 const deleteInfo = ref({ class_count: 0, student_count: 0, submission_count: 0 })
 const googleBtnRef = ref(null)
 const googleReady = ref(true)
 // 구글로 가입한 일반 사용자(교사·개인 학생)만 스스로 탈퇴할 수 있다
 const canDelete = computed(() => !!userStore.user.is_google_account && !userStore.isAdminRole)
-const visible = reactive({ passwordAlert: false, emailAlert: false })
+const visible = reactive({ passwordAlert: false })
 
 const formPassword = ref({ old_password: '', new_password: '', again_password: '' })
-const formEmail = ref({ password: '', old_email: '', new_email: '' })
 
 const CheckAgainPassword = (rule, value, callback) => {
   if (value !== formPassword.value.new_password) callback(new Error('password does not match'))
@@ -128,11 +106,6 @@ const rulePassword = {
   ]
 }
 
-const ruleEmail = {
-  password: oldPasswordCheck,
-  new_email: [{ required: true, type: 'email', trigger: 'change' }]
-}
-
 async function changePassword () {
   const valid = await validateForm(formPasswordRef.value)
   if (!valid) return
@@ -150,22 +123,6 @@ async function changePassword () {
     }, 5000)
   } catch (res) {
     loading.btnPassword = false
-  }
-}
-
-async function changeEmail () {
-  const valid = await validateForm(formEmailRef.value)
-  if (!valid) return
-  loading.btnEmail = true
-  const data = { ...formEmail.value }
-  try {
-    await api.changeEmail(data)
-    loading.btnEmail = false
-    visible.emailAlert = true
-    ElMessage.success('이메일을 변경했습니다')
-    formEmailRef.value?.resetFields()
-  } catch (res) {
-    loading.btnEmail = false
   }
 }
 
@@ -200,9 +157,6 @@ async function confirmDelete (credential) {
   router.push({ name: 'home' })
 }
 
-onMounted(() => {
-  formEmail.value.old_email = userStore.user.email || ''
-})
 </script>
 
 <style lang="less" scoped>
@@ -240,20 +194,7 @@ onMounted(() => {
     padding: 10px 0;
   }
 
-  .flex-container {
-    display: flex;
-    justify-content: flex-start;
-    .left {
-      flex: 1 0;
-      width: 250px;
-      padding-right: 5%;
-    }
-    > .middle {
-      flex: none;
-    }
-    .right {
-      flex: 1 0;
-      width: 250px;
-    }
+  .password-section {
+    max-width: 520px;
   }
 </style>

@@ -98,14 +98,6 @@
           </el-col>
 
           <el-col :span="12">
-            <template v-if="captchaRequired">
-              <div class="captcha-container">
-                <el-tooltip v-if="captchaRequired" content="클릭하면 새로고침" placement="top">
-                  <img :src="captchaSrc" @click="getCaptchaSrc" />
-                </el-tooltip>
-                <el-input v-model="captchaCode" class="captcha-code" />
-              </div>
-            </template>
             <el-button type="warning" :loading="submitting" @click="submitCode"
                        :disabled="problemSubmitDisabled || submitted" class="fl-right">
               <span v-if="submitting">제출 중</span>
@@ -213,7 +205,6 @@ const BlocklyEditor = defineAsyncComponent(() => import('@oj/components/BlocklyE
 import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import storage from '@/utils/storage'
-import { useForm } from '@oj/components/mixins'
 import { JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey, DIFFICULTY_LABEL } from '@/utils/constants'
 import api from '@oj/api'
 import { pie as pieData, largePie as largePieData } from './chartData'
@@ -236,13 +227,10 @@ const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
 const appStore = useAppStore()
-const { captchaSrc, getCaptchaSrc } = useForm()
 
 const statusVisible = ref(false)
-const captchaRequired = ref(false)
 const graphVisible = ref(false)
 const submissionExists = ref(false)
-const captchaCode = ref('')
 const contestID = ref('')
 const problemID = ref('')
 const submitting = ref(false)
@@ -450,9 +438,6 @@ function submitCode () {
   if (contestID.value) {
     data.contest_id = contestID.value
   }
-  if (captchaRequired.value) {
-    data.captcha = captchaCode.value
-  }
 
   const submitFunc = (d, detailsVisible) => {
     statusVisible.value = true
@@ -466,11 +451,7 @@ function submitCode () {
       }
       submitted.value = true
       checkSubmissionStatus()
-    }, res => {
-      getCaptchaSrc()
-      if (res.data?.data?.startsWith('보안 문자')) {
-        captchaRequired.value = true
-      }
+    }, () => {
       submitting.value = false
       statusVisible.value = false
     })
@@ -575,14 +556,6 @@ watch(() => route.fullPath, () => {
     span {
       margin-right: 10px;
       margin-left: 10px;
-    }
-  }
-  .captcha-container {
-    display: inline-block;
-    .captcha-code {
-      width: auto;
-      margin-top: -20px;
-      margin-left: 20px;
     }
   }
 }

@@ -2,7 +2,6 @@ import hashlib
 import os
 import re
 import shutil
-import smtplib
 from datetime import datetime, timezone as dt_timezone
 
 from django.conf import settings
@@ -16,70 +15,12 @@ from options.options import SysOptions
 from problem.models import Problem
 from submission.models import Submission
 from utils.api import APIView, CSRFExemptAPIView, validate_serializer
-from utils.shortcuts import send_email, get_env
+from utils.shortcuts import get_env
 from utils.xss_filter import clean_html
 from .models import JudgeServer
 from .serializers import (CreateEditWebsiteConfigSerializer,
-                          CreateSMTPConfigSerializer, EditSMTPConfigSerializer,
                           JudgeServerHeartbeatSerializer,
-                          JudgeServerSerializer, TestSMTPConfigSerializer, EditJudgeServerSerializer)
-
-
-class SMTPAPI(APIView):
-    @super_admin_required
-    def get(self, request):
-        smtp = SysOptions.smtp_config
-        if not smtp:
-            return self.success(None)
-        smtp.pop("password")
-        return self.success(smtp)
-
-    @super_admin_required
-    @validate_serializer(CreateSMTPConfigSerializer)
-    def post(self, request):
-        SysOptions.smtp_config = request.data
-        return self.success()
-
-    @super_admin_required
-    @validate_serializer(EditSMTPConfigSerializer)
-    def put(self, request):
-        smtp = SysOptions.smtp_config
-        data = request.data
-        for item in ["server", "port", "email", "tls"]:
-            smtp[item] = data[item]
-        if "password" in data:
-            smtp["password"] = data["password"]
-        SysOptions.smtp_config = smtp
-        return self.success()
-
-
-class SMTPTestAPI(APIView):
-    @super_admin_required
-    @validate_serializer(TestSMTPConfigSerializer)
-    def post(self, request):
-        if not SysOptions.smtp_config:
-            return self.error("먼저 SMTP 설정을 완료하세요")
-        try:
-            send_email(smtp_config=SysOptions.smtp_config,
-                       from_name=SysOptions.website_name_shortcut,
-                       to_name=request.user.username,
-                       to_email=request.data["email"],
-                       subject="SMTP 설정이 완료되었습니다",
-                       content="SMTP 설정이 정상적으로 완료되었습니다.")
-        except smtplib.SMTPResponseException as e:
-            # 오류 메시지 인코딩을 추측한다
-            msg = b"Failed to send email"
-            try:
-                msg = e.smtp_error
-                # QQ 메일
-                msg = msg.decode("gbk")
-            except Exception:
-                msg = msg.decode("utf-8", "ignore")
-            return self.error(msg)
-        except Exception as e:
-            msg = str(e)
-            return self.error(msg)
-        return self.success()
+                          JudgeServerSerializer, EditJudgeServerSerializer)
 
 
 class WebsiteConfigAPI(APIView):
