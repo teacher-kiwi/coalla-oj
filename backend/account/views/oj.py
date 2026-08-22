@@ -11,7 +11,7 @@ from utils.constants import ContestRuleType
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
-from ..models import (display_name_prefetch, has_public_profile, my_student_ids,
+from ..models import (my_student_ids, my_student_nicknames,
                       User, UserProfile, AdminType)
 from ..serializers import (UserChangePasswordSerializer, UserLoginSerializer,
                            RankInfoSerializer, SSOSerializer)
@@ -30,11 +30,10 @@ class UserProfileAPI(APIView):
         username = request.GET.get("username")
         try:
             if username:
+                # 학생 아이디는 무작위라 조회해도 학교·학년·반·번호가 드러나지 않는다.
+                # 그래서 수업용 학생 프로필도 함께 연다. 대신 공개 응답에는
+                # 아이디와 풀이 통계만 싣는다(UserProfileSerializer 참고).
                 user = User.objects.get(username=username, is_disabled=False)
-                # 수업용 학생의 프로필은 남에게 열지 않는다. 표시 이름("○○학교 학생")으로는
-                # 애초에 찾을 수 없고, 내부 아이디를 알아내 조회하면 학교·반·번호가 드러난다.
-                if not has_public_profile(user) and user.id != request.user.id:
-                    return self.error("사용자가 존재하지 않습니다")
             else:
                 user = request.user
                 # 자기 정보를 돌려주는 경우라 실명과 이메일도 포함한다
@@ -183,8 +182,7 @@ class UserRankAPI(APIView):
         if rule_type not in ContestRuleType.choices():
             rule_type = ContestRuleType.ACM
         profiles = UserProfile.objects.filter(user__admin_type=AdminType.REGULAR_USER, user__is_disabled=False) \
-            .select_related("user") \
-            .prefetch_related(display_name_prefetch("user"))
+            .select_related("user")
         # 교사가 자기 학생들끼리의 순위를 볼 수 있게 한다. 학생은 같은 학교 학생끼리
         # 서로 구분되지 않으므로(표시 이름이 학교명뿐) 공개 순위는 그대로 둔다.
         if request.GET.get("my_students") == "1" and request.user.is_authenticated \
@@ -194,7 +192,12 @@ class UserRankAPI(APIView):
             profiles = profiles.filter(submission_number__gt=0).order_by("-accepted_number", "submission_number")
         else:
             profiles = profiles.filter(total_score__gt=0).order_by("-total_score")
-        return self.success(self.paginate_data(request, profiles, RankInfoSerializer))
+        data = self.paginate_data(request, profiles)
+        # 담당 교사에게만 학생 닉네임을 함께 보여준다
+        data["results"] = RankInfoSerializer(
+            data["results"], many=True,
+            nicknames=my_student_nicknames(request.user)).data
+        return self.success(data)
 
 
 class ProfileProblemDisplayIDRefreshAPI(APIView):

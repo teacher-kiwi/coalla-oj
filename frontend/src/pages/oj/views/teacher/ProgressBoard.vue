@@ -23,8 +23,11 @@
 
     <el-table v-if="board" v-loading="loading" :data="board.students" class="full-width" size="small">
       <el-table-column label="번호" width="70" fixed>
+        <template #default="{ row }">{{ row.number }}</template>
+      </el-table-column>
+      <el-table-column label="이름" width="130" fixed>
         <template #default="{ row }">
-          <el-button link type="primary" @click="goStudent(row)">{{ row.number }}</el-button>
+          <el-button link type="primary" @click="goStudent(row)">{{ row.nickname }}</el-button>
         </template>
       </el-table-column>
       <el-table-column v-for="(problem, index) in board.problems" :key="problem.id"
@@ -100,7 +103,7 @@ function download () {
 
 function goStudent (row) {
   router.push({ name: 'teacher-student-detail', params: { membershipId: row.membership },
-                query: { number: row.number } })
+                query: { number: row.number, nickname: row.nickname } })
 }
 
 onMounted(() => {

@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Camera } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
@@ -53,6 +53,16 @@ const activeName = computed(() => route.path)
 // 학교에서 발급받은 계정(학생)은 이메일·구글 연동이 없어 다른 설정이 의미 없다
 const isStudent = computed(() => !!userStore.user.created_by)
 const showTeacherMenu = computed(() => !isStudent.value)
+
+// 학생 메뉴에는 비밀번호 변경만 있다. 메뉴에서 감추는 것만으로는 주소창으로
+// 직접 들어오는 것을 막지 못하므로 되돌린다.
+// (프로필이 도착하기 전에는 학생인지 알 수 없어 기다린다)
+watchEffect(() => {
+  if (!userStore.profileReady) return
+  if (isStudent.value && route.path !== '/setting/password') {
+    router.replace('/setting/password')
+  }
+})
 
 function goRoute (path) {
   router.push(path)

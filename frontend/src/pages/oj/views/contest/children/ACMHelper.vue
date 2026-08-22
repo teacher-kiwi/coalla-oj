@@ -30,11 +30,6 @@
           </a>
         </template>
       </el-table-column>
-      <el-table-column label="실명" align="center">
-        <template #default="{ row }">
-          <span class="truncate">{{ row.real_name }}</span>
-        </template>
-      </el-table-column>
       <el-table-column label="상태" align="center">
         <template #default="{ row }">
           <el-tag :type="row.checked ? 'success' : 'warning'">

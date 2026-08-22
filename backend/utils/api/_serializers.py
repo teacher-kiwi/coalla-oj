@@ -4,28 +4,20 @@ from rest_framework import serializers
 class UsernameSerializer(serializers.Serializer):
     """공개 화면에 사용자를 표시할 때 쓴다(순위, 대회 순위 등).
 
-    username 은 계정 식별자를 그대로 내보내지 않고 표시용 이름을 계산해서 넣는다.
-    수업용 학생 계정의 내부 아이디(예: kim3-01)가 노출되면
-    학교·학년·반·번호가 그대로 드러나기 때문이다.
+    학생 계정 아이디는 무작위라("학생12345678") 학급도 번호도 드러나지 않는다.
+    그래서 아이디를 그대로 내보낸다. 예전에는 "○○학교 학생"으로 감췄는데,
+    그 방식은 학교를 노출하면서도 학생끼리 구분은 안 되는 절충이었다.
+
+    담당 교사가 볼 때만 nickname 을 함께 실어 자기 학생을 알아보게 한다.
     """
     id = serializers.IntegerField()
-    username = serializers.SerializerMethodField()
-    real_name = serializers.SerializerMethodField()
-    # 표시 이름이 조회 키가 아닌 계정(수업용 학생)에는 화면에서 링크를 걸지 않는다
-    profile_visible = serializers.SerializerMethodField()
+    username = serializers.CharField()
+    nickname = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
-        self.need_real_name = kwargs.pop("need_real_name", False)
+        # {student_id: nickname}. 담당 교사가 목록을 볼 때만 채워서 넘긴다.
+        self.nicknames = kwargs.pop("nicknames", None) or {}
         super().__init__(*args, **kwargs)
 
-    def get_username(self, obj):
-        # 순환 임포트를 피하려고 지역 임포트한다
-        from account.models import public_display_name
-        return public_display_name(obj)
-
-    def get_profile_visible(self, obj):
-        from account.models import has_public_profile
-        return has_public_profile(obj)
-
-    def get_real_name(self, obj):
-        return obj.userprofile.real_name if self.need_real_name else None
+    def get_nickname(self, obj):
+        return self.nicknames.get(obj.id)

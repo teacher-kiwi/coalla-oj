@@ -5,7 +5,7 @@ from django.contrib import auth
 from options.options import SysOptions
 from utils.api.tests import APITestCase
 from .login_throttle import MAX_FAILURES, clear_login_failures
-from .models import ClassMembership, School, SchoolClass, User
+from .models import ClassMembership, STUDENT_USERNAME_RE, School, SchoolClass, User
 
 
 class SchoolClassTestBase(APITestCase):
@@ -49,10 +49,11 @@ class SchoolClassAPITest(SchoolClassTestBase):
         self.assertEqual(resp.data["data"]["school_name"], "코알라초등학교")
 
     def test_username_is_generated(self):
-        """아이디는 교사가 정하지 않고 학급 id 로 자동 생성된다"""
+        """아이디는 교사가 정하지 않고 서버가 무작위로 만든다"""
         class_id = self._create_class().data["data"]["id"]
         self._create_students(class_id, 1, 1)
-        self.assertTrue(User.objects.filter(username=f"c{class_id}-01").exists())
+        student = ClassMembership.objects.get(school_class_id=class_id, number=1).student
+        self.assertRegex(student.username, STUDENT_USERNAME_RE)
 
     def test_duplicate_class_rejected(self):
         self._create_class()
@@ -92,9 +93,32 @@ class StudentAccountAPITest(SchoolClassTestBase):
             self.assertRegex(item["password"], r"^\d{4}$")
 
         self.assertEqual(ClassMembership.objects.count(), 3)
-        student = ClassMembership.objects.get(number=1).student
-        self.assertEqual(student.username, f"c{self.class_id}-01")
-        self.assertEqual(student.created_by, self.teacher)
+        membership = ClassMembership.objects.get(number=1)
+        # 아이디는 무작위다. 학급 id 나 번호를 담으면 공개 화면에서 드러난다
+        self.assertRegex(membership.student.username, STUDENT_USERNAME_RE)
+        self.assertEqual(membership.nickname, "학생1")
+        self.assertEqual(membership.student.created_by, self.teacher)
+        # 한 번에 만들어도 서로 겹치지 않아야 한다
+        usernames = {m.student.username for m in ClassMembership.objects.all()}
+        self.assertEqual(len(usernames), 3)
+
+    def test_teacher_can_edit_nickname(self):
+        self._create_students(self.class_id, 1, 1)
+        membership = ClassMembership.objects.get(number=1)
+        url = self.reverse("teacher_student_nickname_api")
+        resp = self.client.put(url, data={"membership": membership.id, "nickname": "홍길동"})
+        self.assertSuccess(resp)
+        membership.refresh_from_db()
+        self.assertEqual(membership.nickname, "홍길동")
+
+    def test_other_teacher_cannot_edit_nickname(self):
+        self._create_students(self.class_id, 1, 1)
+        membership = ClassMembership.objects.get(number=1)
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        url = self.reverse("teacher_student_nickname_api")
+        resp = self.client.put(url, data={"membership": membership.id, "nickname": "홍길동"})
+        self.assertFailed(resp, "학생이 존재하지 않습니다")
 
     def test_duplicate_number_rejected(self):
         self._create_students(self.class_id, 1, 3)
@@ -120,7 +144,8 @@ class StudentAccountAPITest(SchoolClassTestBase):
         self.assertSuccess(resp)
         pin = resp.data["data"]["password"]
         self.assertRegex(pin, r"^\d{4}$")
-        self.assertIsNotNone(auth.authenticate(username=f"c{self.class_id}-01", password=pin))
+        student = ClassMembership.objects.get(school_class_id=self.class_id, number=1).student
+        self.assertIsNotNone(auth.authenticate(username=student.username, password=pin))
 
     def test_other_teacher_cannot_reset(self):
         self._create_students(self.class_id, 1, 1)
@@ -283,7 +308,8 @@ class StudentChangePasswordTest(SchoolClassTestBase):
         resp = self.client.post(self.url, data={"old_password": self.pin,
                                                 "new_password": new_pin})
         self.assertSuccess(resp)
-        self.assertIsNotNone(auth.authenticate(username=f"c{self.class_id}-01", password=new_pin))
+        student = ClassMembership.objects.get(school_class_id=self.class_id, number=1).student
+        self.assertIsNotNone(auth.authenticate(username=student.username, password=new_pin))
         # 세션을 끊어 화면이 "다시 로그인" 안내를 띄울 수 있게 한다
         self.assertFailed(self.client.post(self.url, data={"old_password": new_pin,
                                                            "new_password": self.pin}))
@@ -363,26 +389,63 @@ class TeacherAccountDeleteTest(SchoolClassTestBase):
         self.assertTrue(User.objects.filter(id=other.id).exists())
 
 
-class PublicDisplayNameTest(SchoolClassTestBase):
-    """학생의 내부 아이디가 공개 화면에 노출되면 안 된다"""
+class StudentIdentityTest(SchoolClassTestBase):
+    """공개 화면에는 무작위 아이디만 나가고, 닉네임은 담당 교사에게만 보인다"""
     def setUp(self):
         super().setUp()
-        class_id = self._create_class().data["data"]["id"]
-        self._create_students(class_id, 1, 1)
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 1)
         self.student = ClassMembership.objects.get(number=1).student
 
-    def test_student_shows_school_only(self):
-        from .models import public_display_name
-        self.assertEqual(public_display_name(self.student), "코알라초등학교 학생")
-        self.assertNotIn(self.student.username, public_display_name(self.student))
+    def test_student_username_is_opaque(self):
+        """학생 아이디는 학급도 번호도 학교도 담지 않는다."""
+        self.assertRegex(self.student.username, STUDENT_USERNAME_RE)
+        self.assertNotIn("코알라", self.student.username)
 
-    def test_google_user_shows_nickname(self):
-        from .models import public_display_name
-        learner = self.create_user("코딩왕", "pass123", login=False)
-        self.assertEqual(public_display_name(learner), "코딩왕")
+        # 같은 학급에서 한 번에 만들어도 서로 겹치지 않고, 번호와 무관해야 한다
+        self._create_students(self.class_id, 10, 12)
+        made = {m.number: m.student.username for m in
+                ClassMembership.objects.filter(number__in=[10, 11, 12])}
+        self.assertEqual(len(set(made.values())), 3)
+        for number, username in made.items():
+            self.assertRegex(username, STUDENT_USERNAME_RE)
+            self.assertNotEqual(username, f"학생{number:08d}")
 
-    def test_submission_list_hides_internal_username(self):
-        """제출 목록 경로도 표시 이름을 거쳐야 한다(prefetch 경로 포함)"""
+    def test_student_nickname_defaults_to_number(self):
+        membership = ClassMembership.objects.get(student=self.student)
+        self.assertEqual(membership.nickname, "학생1")
+
+    def test_submission_list_shows_username_without_nickname(self):
+        """공개 목록에는 무작위 아이디만 나가고 닉네임은 빠진다."""
+        self._make_submission()
+
+        self.client.logout()
+        resp = self.client.get(self.reverse("submission_list_api") + "?limit=10")
+        self.assertSuccess(resp)
+        rows = resp.data["data"]["results"]
+        self.assertIn(self.student.username, [r["username"] for r in rows])
+        self.assertIsNone(rows[0]["nickname"])
+
+    def test_submission_list_shows_nickname_to_owning_teacher(self):
+        """담당 교사에게만 닉네임을 함께 보여준다."""
+        self._make_submission()
+        membership = ClassMembership.objects.get(student=self.student)
+        membership.nickname = "홍길동"
+        membership.save()
+
+        resp = self.client.get(self.reverse("submission_list_api") + "?limit=10")
+        self.assertSuccess(resp)
+        rows = resp.data["data"]["results"]
+        self.assertEqual(rows[0]["nickname"], "홍길동")
+
+    def test_rank_shows_username_and_hides_nickname_from_others(self):
+        self.client.logout()
+        resp = self.client.get(self.reverse("user_rank_api") + "?offset=0&limit=10")
+        self.assertSuccess(resp)
+        for row in resp.data["data"]["results"]:
+            self.assertIsNone(row["user"]["nickname"])
+
+    def _make_submission(self):
         from problem.models import Problem
         from submission.models import Submission
         problem = Problem.objects.create(
@@ -391,26 +454,8 @@ class PublicDisplayNameTest(SchoolClassTestBase):
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
             difficulty="L1", source="", created_by=self.teacher)
-        Submission.objects.create(problem=problem, user=self.student,
-                                  code="print(1)", language="Python3", result=0)
-
-        self.client.logout()
-        resp = self.client.get(self.reverse("submission_list_api") + "?limit=10")
-        self.assertSuccess(resp)
-        rows = resp.data["data"]["results"]
-        names = [r["username"] for r in rows]
-        self.assertIn("코알라초등학교 학생", names)
-        self.assertNotIn(self.student.username, names)
-        # 표시 이름으로는 프로필을 찾을 수 없으므로 화면에서 링크를 걸면 안 된다
-        self.assertFalse(rows[0]["profile_visible"])
-
-    def test_rank_api_hides_internal_username(self):
-        self.client.logout()
-        resp = self.client.get(self.reverse("user_rank_api") + "?offset=0&limit=10")
-        self.assertSuccess(resp)
-        for row in resp.data["data"]["results"]:
-            self.assertNotIn(self.student.username, row["user"]["username"])
-            self.assertFalse(row["user"]["profile_visible"])
+        return Submission.objects.create(problem=problem, user=self.student,
+                                         code="print(1)", language="Python3", result=0)
 
     def test_profile_link_allowed_for_google_user(self):
         learner = self.create_user("코딩왕", "pass123")
@@ -418,12 +463,16 @@ class PublicDisplayNameTest(SchoolClassTestBase):
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"]["user"]["username"], learner.username)
 
-    def test_student_profile_not_readable_by_others(self):
-        """내부 아이디를 알아내도 남의 학생 프로필은 열리지 않는다"""
+    def test_student_profile_readable_but_minimal(self):
+        """아이디가 아무것도 드러내지 않으므로 학생 프로필도 연다.
+
+        대신 남이 보는 응답에는 아이디와 풀이 통계만 싣는다.
+        """
         self.create_user("코딩왕", "pass123")
         resp = self.client.get(self.reverse("user_profile_api")
                                + f"?username={self.student.username}")
-        self.assertFailed(resp, "사용자가 존재하지 않습니다")
+        self.assertSuccess(resp)
+        self.assertEqual(set(resp.data["data"]["user"]), {"id", "username"})
 
     def test_student_can_read_own_profile(self):
         self.student.set_password("1234")

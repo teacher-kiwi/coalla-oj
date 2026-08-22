@@ -20,6 +20,22 @@
 
     <el-table v-loading="loading" :data="students" class="full-width">
       <el-table-column label="번호" prop="number" width="80" />
+      <el-table-column label="이름" width="220">
+        <template #default="{ row }">
+          <!-- 학생을 알아보기 위한 이름. 공개 화면에는 나가지 않는다. -->
+          <el-input v-if="editing === row.id" v-model="editingName" size="small"
+                    maxlength="32" @keyup.enter="saveNickname(row)" @blur="saveNickname(row)" />
+          <span v-else class="nickname" @click="startEdit(row)">
+            {{ row.nickname }} <el-icon class="edit-hint"><Edit /></el-icon>
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="공개 아이디" prop="username" width="150">
+        <template #default="{ row }">
+          <!-- 순위·채점 현황에는 이 아이디로 나온다 -->
+          <span class="username">{{ row.username }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="마지막 로그인">
         <template #default="{ row }">{{ row.last_login ? localtime(row.last_login) : '접속 기록 없음' }}</template>
       </el-table-column>
@@ -61,7 +77,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Edit, Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
 
@@ -80,13 +96,32 @@ let sheetFileId = null
 
 const form = reactive({ number_from: 1, number_to: 20 })
 
+// 이름 칸을 눌러 그 자리에서 고친다. 학생 수가 많아 별도 화면을 열면 번거롭다.
+const editing = ref(null)
+const editingName = ref('')
+
+function startEdit (row) {
+  editing.value = row.id
+  editingName.value = row.nickname
+}
+
+function saveNickname (row) {
+  if (editing.value !== row.id) return
+  const nickname = editingName.value.trim()
+  editing.value = null
+  if (!nickname || nickname === row.nickname) return
+  api.editStudentNickname(row.id, nickname).then(res => {
+    row.nickname = res.data.data.nickname
+  }, () => {})
+}
+
 function goList () {
   router.push({ name: 'teacher-class-list' })
 }
 
 function goSubmissions (row) {
   router.push({ name: 'teacher-student-detail', params: { membershipId: row.id },
-                query: { number: row.number } })
+                query: { number: row.number, nickname: row.nickname } })
 }
 
 function localtime (val) {
@@ -131,7 +166,7 @@ function downloadSheet () {
 }
 
 function resetPassword (row) {
-  ElMessageBox.confirm(`${row.number}번 학생의 비밀번호를 새로 발급합니다.`, '비밀번호 초기화', {
+  ElMessageBox.confirm(`${row.number}번 ${row.nickname} 학생의 비밀번호를 새로 발급합니다.`, '비밀번호 초기화', {
     confirmButtonText: '초기화', cancelButtonText: '취소'
   }).then(() => {
     api.resetStudentPassword(row.id).then(res => {
@@ -183,5 +218,20 @@ onMounted(load)
   text-align: center;
   color: #909399;
   padding: 30px 0;
+}
+
+.nickname {
+  cursor: pointer;
+}
+.nickname .edit-hint {
+  color: #c0c4cc;
+  vertical-align: -2px;
+}
+.nickname:hover .edit-hint {
+  color: #409eff;
+}
+.username {
+  color: #909399;
+  font-size: 13px;
 }
 </style>

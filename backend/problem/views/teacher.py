@@ -235,6 +235,7 @@ class ProblemSetProgressAPI(APIView):
             students.append({
                 "membership": membership.id,
                 "number": membership.number,
+                "nickname": membership.nickname,
                 "solved_count": sum(1 for cell in row if cell["solved"]),
                 "cells": row,
             })
@@ -284,21 +285,24 @@ def _progress_xlsx(data):
     workbook = xlsxwriter.Workbook(output, {"in_memory": True})
     worksheet = workbook.add_worksheet()
     worksheet.set_column("A:A", 8)
+    worksheet.set_column("B:B", 16)
     worksheet.write(0, 0, "번호")
+    worksheet.write(0, 1, "이름")
     for index, problem in enumerate(data["problems"]):
-        worksheet.write(0, 1 + index, "{} {}".format(problem["_id"], problem["title"]))
-    worksheet.write(0, 1 + len(data["problems"]), "해결")
+        worksheet.write(0, 2 + index, "{} {}".format(problem["_id"], problem["title"]))
+    worksheet.write(0, 2 + len(data["problems"]), "해결")
 
     for row, student in enumerate(data["students"], start=1):
         worksheet.write_number(row, 0, student["number"])
+        worksheet.write_string(row, 1, student["nickname"])
         for index, cell in enumerate(student["cells"]):
             if cell["solved"]:
-                worksheet.write_string(row, 1 + index, "O")
+                worksheet.write_string(row, 2 + index, "O")
             elif cell["attempts"]:
-                worksheet.write_string(row, 1 + index, "△({})".format(cell["attempts"]))
+                worksheet.write_string(row, 2 + index, "△({})".format(cell["attempts"]))
             else:
-                worksheet.write_string(row, 1 + index, "")
-        worksheet.write_string(row, 1 + len(data["problems"]),
+                worksheet.write_string(row, 2 + index, "")
+        worksheet.write_string(row, 2 + len(data["problems"]),
                                "{}/{}".format(student["solved_count"], len(data["problems"])))
     workbook.close()
 

@@ -12,7 +12,6 @@
 
       <el-table v-loading="loading" :data="applications" class="full-width">
         <el-table-column prop="username" label="사용자명" width="160" />
-        <el-table-column prop="real_name" label="이름" width="120" />
         <el-table-column prop="email" label="이메일" />
         <el-table-column prop="applied_at" label="신청 일시" width="180">
           <template #default="{ row }">{{ localtime(row.applied_at) }}</template>

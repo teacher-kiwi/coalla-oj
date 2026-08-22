@@ -140,10 +140,12 @@ export default [
     component: Settings,
     children: [
       {
+        // 설정 첫 화면. 메뉴가 사용자 종류에 따라 다르므로(학생은 비밀번호만)
+        // Settings 가 자기 메뉴의 첫 항목으로 보낸다.
         name: 'default-setting',
         path: '',
         meta: { requiresAuth: true, title: '설정' },
-        component: ProfileSetting
+        redirect: () => ({ name: 'profile-setting' })
       },
       {
         name: 'profile-setting',

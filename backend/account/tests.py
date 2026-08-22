@@ -150,11 +150,10 @@ class UserProfileAPITest(APITestCase):
     def test_update_profile(self):
         self.create_user("test", "test123")
         # submission_number 는 집계값이라 수정 요청에 실려도 반영되지 않아야 한다
-        update_data = {"real_name": "zemal", "submission_number": 233}
-        resp = self.client.put(self.url, data=update_data)
+        resp = self.client.put(self.url, data={"avatar": "/x.png", "submission_number": 233})
         self.assertSuccess(resp)
         data = resp.data["data"]
-        self.assertEqual(data["real_name"], "zemal")
+        self.assertEqual(data["avatar"], "/x.png")
         self.assertEqual(data["submission_number"], 0)
 
     def test_own_profile_keeps_email(self):
@@ -165,19 +164,24 @@ class UserProfileAPITest(APITestCase):
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"]["user"]["email"], "me@test.com")
 
-    def test_other_profile_hides_email_and_real_name(self):
-        """아이디만 알면 남의 이메일을 긁어갈 수 있으면 안 된다."""
+    def test_other_profile_exposes_only_public_fields(self):
+        """남의 프로필에는 아이디와 풀이 통계만 실린다.
+
+        created_by 가 나가면 학생들을 담당 교사 단위로 묶어볼 수 있고,
+        email 이 나가면 아이디만 알면 주소를 긁어갈 수 있다.
+        """
         other = self.create_user("other", "test123", login=False)
         other.email = "other@test.com"
         other.save()
-        other.userprofile.real_name = "홍길동"
-        other.userprofile.save()
         self.create_user("me", "test123")
 
         resp = self.client.get(self.url + "?username=other")
         self.assertSuccess(resp)
-        self.assertNotIn("email", resp.data["data"]["user"])
-        self.assertIsNone(resp.data["data"]["real_name"])
+        data = resp.data["data"]
+        self.assertEqual(set(data["user"]), {"id", "username"})
+        self.assertEqual(set(data),
+                         {"user", "avatar", "accepted_number", "submission_number",
+                          "total_score", "acm_problems_status", "oi_problems_status"})
 
 
 class UserChangePasswordAPITest(APITestCase):
@@ -319,7 +323,7 @@ class AdminUserTest(APITestCase):
         self.username = self.password = "test"
         self.regular_user = self.create_user(username=self.username, password=self.password, login=False)
         self.url = self.reverse("user_admin_api")
-        self.data = {"id": self.regular_user.id, "username": self.username, "real_name": "test_name",
+        self.data = {"id": self.regular_user.id, "username": self.username,
                      "email": "test@qq.com", "admin_type": AdminType.REGULAR_USER,
                      "problem_permission": ProblemPermission.OWN, "is_disabled": False}
 
@@ -349,16 +353,16 @@ class AdminUserTest(APITestCase):
         self.assertTrue(user.check_password(new_password))
 
     def test_import_users(self):
-        data = {"users": [["user1", "pass1", "eami1@e.com", "user1"],
-                          ["user2", "pass3", "eamil3@e.com", "user2"]]
+        data = {"users": [["user1", "pass1", "eami1@e.com"],
+                          ["user2", "pass3", "eamil3@e.com"]]
                 }
         resp = self.client.post(self.url, data)
         self.assertSuccess(resp)
         self.assertEqual(User.objects.all().count(), 4)
 
     def test_import_duplicate_user(self):
-        data = {"users": [["user1", "pass1", "eami1@e.com", "user1"],
-                          ["user1", "pass1", "eami1@e.com", "user1"]]
+        data = {"users": [["user1", "pass1", "eami1@e.com"],
+                          ["user1", "pass1", "eami1@e.com"]]
                 }
         resp = self.client.post(self.url, data)
         self.assertFailed(resp, "이미 사용 중인 사용자명이 있습니다")
@@ -462,12 +466,13 @@ class GoogleLoginAPITest(APITestCase):
         resp = self.client.post(self.url, data={"credential": "x", "nickname": "코딩선생"})
         self.assertFailed(resp, "이미 사용 중인 닉네임입니다")
 
-    def test_student_username_pattern_reserved(self, verify):
-        """학생 계정 아이디 형태(c12-01)는 닉네임으로 선점할 수 없다"""
+    def test_student_username_prefix_reserved(self, verify):
+        """"학생"으로 시작하는 닉네임은 수업용 계정과 헷갈려 막는다"""
         verify.return_value = self._claims()
         self.client.post(self.url, data={"credential": "x"})
-        resp = self.client.post(self.url, data={"credential": "x", "nickname": "c12-01"})
-        self.assertFailed(resp, "사용할 수 없는 닉네임입니다")
+        for nickname in ("학생12345678", "학생회장"):
+            resp = self.client.post(self.url, data={"credential": "x", "nickname": nickname})
+            self.assertFailed(resp, "학생 계정 구분을 위해 \'학생\'으로 시작할 수 없습니다")
 
     def test_invalid_nickname_rejected(self, verify):
         verify.return_value = self._claims()

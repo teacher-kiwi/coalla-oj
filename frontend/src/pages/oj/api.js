@@ -75,6 +75,9 @@ export default {
   createStudents (data) {
     return ajax('teacher/student', 'post', { data })
   },
+  editStudentNickname (membership, nickname) {
+    return ajax('teacher/student/nickname', 'put', { data: { membership, nickname } })
+  },
   resetStudentPassword (membership) {
     return ajax('teacher/student', 'put', { data: { membership } })
   },

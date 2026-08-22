@@ -1,6 +1,6 @@
 <template>
   <Panel shadow>
-    <template #title>{{ number !== null ? `${number}번 학생 제출 기록` : '학생 제출 기록' }}</template>
+    <template #title>{{ title }}</template>
     <template #extra>
       <el-button @click="router.back()">뒤로</el-button>
     </template>
@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@oj/api'
 import time from '@/utils/time'
@@ -48,8 +48,14 @@ const submissions = ref([])
 const total = ref(0)
 const page = ref(1)
 const limit = 15
-// 진도표에서 넘어오면 번호를 함께 받아 제목에 쓴다(한 번 더 조회하지 않기 위해)
+// 앞 화면에서 번호와 이름을 함께 받아 제목에 쓴다(한 번 더 조회하지 않기 위해)
 const number = ref(route.query.number ? parseInt(route.query.number) : null)
+const nickname = ref(route.query.nickname || '')
+const title = computed(() => {
+  if (number.value === null) return '학생 제출 기록'
+  const who = nickname.value ? `${number.value}번 ${nickname.value}` : `${number.value}번`
+  return `${who} 학생 제출 기록`
+})
 
 function localtime (val) {
   return time.utcToLocal(val)

@@ -20,12 +20,7 @@
         </el-table-column>
         <el-table-column label="사용자" align="center">
           <template #default="{ row }">
-            <!-- 수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 아니다. 링크를 걸지 않는다. -->
-            <a v-if="row.user.profile_visible" class="link-text truncate"
-               @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
-              {{ row.user.username }}
-            </a>
-            <span v-else class="truncate">{{ row.user.username }}</span>
+            <UserLabel :username="row.user.username" :nickname="row.user.nickname" />
           </template>
         </el-table-column>
         <el-table-column label="정답" align="center" prop="accepted_number" />
@@ -43,13 +38,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import UserLabel from '@oj/components/UserLabel.vue'
 import api from '@oj/api'
 import Pagination from '@oj/components/Pagination.vue'
 import utils from '@/utils/utils'
 import { RULE_TYPE } from '@/utils/constants'
 import { useUserStore } from '@/store/user'
-const router = useRouter()
 const userStore = useUserStore()
 const myStudents = ref(false)
 

@@ -21,8 +21,7 @@ export const useContestStore = defineStore('contest', {
     contestProblems: [],
     itemVisible: {
       menu: true,
-      chart: true,
-      realName: false
+      chart: true
     }
   }),
   getters: {
@@ -123,7 +122,7 @@ export const useContestStore = defineStore('contest', {
       this.contest = { created_by: {} }
       this.contestProblems = []
       this.access = false
-      this.itemVisible = { menu: true, chart: true, realName: false }
+      this.itemVisible = { menu: true, chart: true }
       this.forceUpdate = false
     },
     updateNow () {

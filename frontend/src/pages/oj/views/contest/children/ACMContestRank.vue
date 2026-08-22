@@ -20,10 +20,6 @@
           </p>
           <template v-if="isContestAdmin">
             <p>
-              <span>실명</span>
-              <el-switch v-model="showRealName" />
-            </p>
-            <p>
               <span>강제 업데이트</span>
               <el-switch :disabled="refreshDisabled" v-model="forceUpdate" />
             </p>
@@ -39,23 +35,15 @@
       <VChart ref="chart" :option="options" :loading="chartLoading" autoresize />
     </div>
 
-    <el-table :key="`${showRealName}-${contestProblems.length}`"
+    <el-table :key="contestProblems.length"
               :data="dataRank" height="600" stripe :cell-class-name="cellClassName">
       <el-table-column align="center" width="50">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
       <el-table-column label="사용자" align="center" width="150">
         <template #default="{ row }">
-          <!-- 수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 아니다. 링크를 걸지 않는다. -->
-          <a v-if="row.user.profile_visible" class="link-text truncate"
-             @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
-            {{ row.user.username }}
-          </a>
-          <span v-else class="truncate">{{ row.user.username }}</span>
+          <UserLabel :username="row.user.username" :nickname="row.user.nickname" />
         </template>
-      </el-table-column>
-      <el-table-column v-if="showRealName" label="실명" align="center" width="150">
-        <template #default="{ row }">{{ row.user.real_name }}</template>
       </el-table-column>
       <el-table-column label="AC / 총 제출" align="center" width="100">
         <template #default="{ row }">
@@ -94,6 +82,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import UserLabel from '@oj/components/UserLabel.vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import duration from 'dayjs/plugin/duration'
@@ -110,7 +99,7 @@ const router = useRouter()
 
 const {
   contest, contestProblems, isContestAdmin,
-  showChart, showMenu, showRealName, forceUpdate, limit, refreshDisabled,
+  showChart, showMenu, forceUpdate, limit, refreshDisabled,
   chartLoading, getContestRankData, handleAutoRefresh, getContestProblems
 } = useContestRank()
 

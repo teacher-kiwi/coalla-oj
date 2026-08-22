@@ -30,6 +30,16 @@ export const useUserStore = defineStore('user', {
     },
     hasProblemPermission () {
       return this.user.problem_permission !== PROBLEM_PERMISSION.NONE
+    },
+    // 화면에 보여줄 내 이름.
+    //
+    // 수업용 학생의 아이디는 무작위라("학생12345678") 그것만으로는 자기인 줄
+    // 모른다. 그래서 교사가 붙여준 닉네임과 함께 보여준다. 순위·채점 목록에는
+    // 아이디만 나오므로, 여기서 자기 아이디를 알아둬야 자기를 찾을 수 있다.
+    displayName () {
+      const { username } = this.user
+      const nickname = this.profile.nickname
+      return nickname ? `${nickname}(${username})` : username
     }
   },
   actions: {

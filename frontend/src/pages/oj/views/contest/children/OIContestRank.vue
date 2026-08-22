@@ -18,10 +18,6 @@
             <span>자동 새로고침(10s)</span>
             <el-switch :disabled="refreshDisabled" @change="onAutoRefresh" />
           </p>
-          <p v-if="isContestAdmin">
-            <span>실명</span>
-            <el-switch v-model="showRealName" />
-          </p>
           <p>
             <el-button type="primary" size="small" @click="downloadRankCSV">CSV 다운로드</el-button>
           </p>
@@ -33,22 +29,14 @@
       <VChart ref="chart" :option="options" :loading="chartLoading" autoresize />
     </div>
 
-    <el-table :key="`${showRealName}-${contestProblems.length}`" :data="dataRank" stripe>
+    <el-table :key="contestProblems.length" :data="dataRank" stripe>
       <el-table-column align="center" width="60">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
       <el-table-column label="사용자" align="center">
         <template #default="{ row }">
-          <!-- 수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 아니다. 링크를 걸지 않는다. -->
-          <a v-if="row.user.profile_visible" class="link-text truncate"
-             @click="router.push({ name: 'user-home', query: { username: row.user.username } })">
-            {{ row.user.username }}
-          </a>
-          <span v-else class="truncate">{{ row.user.username }}</span>
+          <UserLabel :username="row.user.username" :nickname="row.user.nickname" />
         </template>
-      </el-table-column>
-      <el-table-column v-if="showRealName" label="실명" align="center" width="150">
-        <template #default="{ row }">{{ row.user.real_name }}</template>
       </el-table-column>
       <el-table-column label="총점" align="center">
         <template #default="{ row }">
@@ -78,6 +66,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import UserLabel from '@oj/components/UserLabel.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Setting } from '@element-plus/icons-vue'
 import Pagination from '@oj/components/Pagination.vue'
@@ -88,8 +77,8 @@ const route = useRoute()
 const router = useRouter()
 
 const {
-  contest, contestProblems, isContestAdmin,
-  showChart, showMenu, showRealName, forceUpdate, limit, refreshDisabled,
+  contest, contestProblems,
+  showChart, showMenu, forceUpdate, limit, refreshDisabled,
   chartLoading, getContestRankData, handleAutoRefresh, getContestProblems
 } = useContestRank()
 

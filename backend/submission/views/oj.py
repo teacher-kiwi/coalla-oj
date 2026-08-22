@@ -8,7 +8,7 @@ from problem.models import can_access_problem, Problem, ProblemRuleType
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.throttling import TokenBucket
-from account.models import display_name_prefetch, my_student_ids
+from account.models import my_student_ids
 from ..models import Submission
 from ..serializers import CreateSubmissionSerializer, SubmissionModelSerializer
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
@@ -105,8 +105,7 @@ class SubmissionListAPI(APIView):
             return self.error("잘못된 요청입니다")
 
         submissions = Submission.objects.filter(contest_id__isnull=True)\
-            .select_related("problem__created_by", "user")\
-            .prefetch_related(display_name_prefetch("user"))
+            .select_related("problem__created_by", "user")
         problem_id = request.GET.get("problem_id")
         myself = request.GET.get("myself")
         result = request.GET.get("result")
@@ -140,8 +139,7 @@ class ContestSubmissionListAPI(APIView):
 
         contest = self.contest
         submissions = Submission.objects.filter(contest_id=contest.id)\
-            .select_related("problem__created_by", "user")\
-            .prefetch_related(display_name_prefetch("user"))
+            .select_related("problem__created_by", "user")
         problem_id = request.GET.get("problem_id")
         myself = request.GET.get("myself")
         result = request.GET.get("result")

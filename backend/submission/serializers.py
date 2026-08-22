@@ -1,4 +1,4 @@
-from account.models import has_public_profile, my_student_ids, public_display_name
+from account.models import my_student_nicknames
 from .models import Submission
 from utils.api import serializers
 
@@ -11,62 +11,61 @@ class CreateSubmissionSerializer(serializers.Serializer):
     blockly_state = serializers.CharField(required=False, allow_blank=True)
 
 
-class SubmissionModelSerializer(serializers.ModelSerializer):
+class _AuthorMixin:
+    """작성자 표시. 학생 아이디는 무작위라 그대로 내보내도 아무것도 드러나지 않는다.
+
+    담당 교사가 볼 때만 nickname 을 함께 실어 자기 학생을 알아보게 한다.
+    """
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_nickname(self, obj):
+        return self._nicknames.get(obj.user_id)
+
+
+class SubmissionModelSerializer(_AuthorMixin, serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
-    profile_visible = serializers.SerializerMethodField()
+    nickname = serializers.SerializerMethodField()
+    _nicknames = {}
 
     class Meta:
         model = Submission
         fields = "__all__"
 
-    def get_username(self, obj):
-        return public_display_name(obj.user)
-
-    def get_profile_visible(self, obj):
-        return has_public_profile(obj.user)
-
 
 # 채점 상세(info)를 감추는 직렬화기. ACM 규칙에서 쓴다.
-class SubmissionSafeModelSerializer(serializers.ModelSerializer):
+class SubmissionSafeModelSerializer(_AuthorMixin, serializers.ModelSerializer):
     problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
     username = serializers.SerializerMethodField()
-    profile_visible = serializers.SerializerMethodField()
+    nickname = serializers.SerializerMethodField()
+    _nicknames = {}
 
     class Meta:
         model = Submission
         exclude = ("info", "contest", "ip")
 
-    def get_username(self, obj):
-        return public_display_name(obj.user)
 
-    def get_profile_visible(self, obj):
-        return has_public_profile(obj.user)
-
-
-class SubmissionListSerializer(serializers.ModelSerializer):
+class SubmissionListSerializer(_AuthorMixin, serializers.ModelSerializer):
     problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
     show_link = serializers.SerializerMethodField()
     username = serializers.SerializerMethodField()
-    profile_visible = serializers.SerializerMethodField()
+    nickname = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         # 교사가 목록을 볼 때 행마다 "내 학생인가"를 묻지 않도록 한 번만 모아둔다.
         # (Submission.check_user_permission 은 단건용이라 행마다 쿼리를 낸다)
         self._my_student_ids = None
-        if self.user is not None and self.user.is_authenticated and self.user.is_teacher():
-            self._my_student_ids = set(my_student_ids(self.user))
+        self._nicknames = my_student_nicknames(self.user)
+        if self._nicknames:
+            self._my_student_ids = set(self._nicknames)
         super().__init__(*args, **kwargs)
 
     class Meta:
         model = Submission
-        exclude = ("info", "contest", "code", "ip")
-
-    def get_username(self, obj):
-        return public_display_name(obj.user)
-
-    def get_profile_visible(self, obj):
-        return has_public_profile(obj.user)
+        # 필요한 것만 싣는다. exclude 로 두면 모델에 필드가 늘 때마다 따라 나간다.
+        fields = ("id", "problem", "create_time", "result", "language",
+                  "statistic_info", "username", "nickname", "show_link")
 
     def get_show_link(self, obj):
         if self.user is None or not self.user.is_authenticated:

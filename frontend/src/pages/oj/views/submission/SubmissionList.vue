@@ -74,12 +74,7 @@
           <el-table-column label="언어" align="center" prop="language" />
           <el-table-column label="작성자" align="center">
             <template #default="{ row }">
-              <!-- 수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 아니다. 링크를 걸지 않는다. -->
-              <a v-if="row.profile_visible" class="link-text truncate"
-                 @click="router.push({ name: 'user-home', query: { username: row.username } })">
-                {{ row.username }}
-              </a>
-              <span v-else class="truncate">{{ row.username }}</span>
+              <UserLabel :username="row.username" :nickname="row.nickname" />
             </template>
           </el-table-column>
           <el-table-column v-if="rejudgeColumnVisible" label="옵션" align="center" width="90">
@@ -98,6 +93,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import UserLabel from '@oj/components/UserLabel.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, Refresh } from '@element-plus/icons-vue'

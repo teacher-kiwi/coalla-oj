@@ -13,39 +13,18 @@
       <el-icon :size="52" class="upload-icon"><UploadFilled /></el-icon>
       <div>이미지를 끌어다 놓거나 클릭해서 선택하세요 (최대 2MB)</div>
     </el-upload>
-
-    <div class="section-title">프로필 설정</div>
-    <el-form ref="formRef" :model="formProfile">
-      <el-row type="flex" :gutter="30" justify="space-around">
-        <el-col :span="11">
-          <el-form-item label="실명">
-            <el-input v-model="formProfile.real_name" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="loadingSaveBtn" @click="updateProfile">모두 저장</el-button>
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElNotification } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
-import api from '@oj/api'
-import utils from '@/utils/utils'
 import { useUserStore } from '@/store/user'
 const userStore = useUserStore()
 
-const loadingSaveBtn = ref(false)
-// 실명은 교사가 학생을 알아보기 위한 것이고, 나머지 프로필 항목(학교·전공·블로그·
-// GitHub·기분)은 6단계에서 제거했다.
-const formProfile = ref({
-  real_name: ''
-})
+// 남은 프로필 항목은 사진뿐이다. 학교·전공·블로그·GitHub·기분은 6단계에서,
+// 실명은 학급 닉네임(ClassMembership.nickname)으로 옮기면서 없앴다.
 
 function checkFileType (file) {
   if (!/\.(gif|jpg|jpeg|png|bmp|GIF|JPG|PNG)$/.test(file.name)) {
@@ -80,27 +59,6 @@ function uploadAvatar ({ file }) {
     userStore.getProfile()
   }).catch(() => {})
 }
-
-function updateProfile () {
-  loadingSaveBtn.value = true
-  const updateData = utils.filterEmptyValue({ ...formProfile.value })
-  api.updateProfile(updateData).then((res) => {
-    ElMessage.success('성공')
-    userStore.changeProfile(res.data.data)
-    loadingSaveBtn.value = false
-  }, () => {
-    loadingSaveBtn.value = false
-  })
-}
-
-onMounted(() => {
-  const profile = userStore.profile
-  Object.keys(formProfile.value).forEach((key) => {
-    if (profile[key] !== undefined) {
-      formProfile.value[key] = profile[key]
-    }
-  })
-})
 </script>
 
 <style scoped>

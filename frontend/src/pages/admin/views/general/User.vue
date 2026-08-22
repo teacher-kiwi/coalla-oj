@@ -22,7 +22,6 @@
         <el-table-column prop="last_login" label="마지막 로그인">
           <template #default="{ row }">{{ localtime(row.last_login) }}</template>
         </el-table-column>
-        <el-table-column prop="real_name" label="실명" />
         <el-table-column prop="email" label="이메일" />
         <el-table-column prop="admin_type" label="사용자 유형" />
         <el-table-column fixed="right" label="옵션" width="200">
@@ -54,7 +53,6 @@
           <el-table-column label="사용자명"><template #default="{ row }">{{ row[0] }}</template></el-table-column>
           <el-table-column label="비밀번호"><template #default="{ row }">{{ row[1] }}</template></el-table-column>
           <el-table-column label="이메일"><template #default="{ row }">{{ row[2] }}</template></el-table-column>
-          <el-table-column label="실명"><template #default="{ row }">{{ row[3] }}</template></el-table-column>
         </el-table>
         <div class="panel-options">
           <el-button type="primary" size="small" :icon="Upload" @click="handleUsersUpload">전체 가져오기</el-button>
@@ -114,7 +112,6 @@
       <el-form :model="editingUser" label-width="120px" label-position="left">
         <el-row :gutter="20">
           <el-col :span="12"><el-form-item label="사용자명" required><el-input v-model="editingUser.username" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="실명" required><el-input v-model="editingUser.real_name" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="이메일" required><el-input v-model="editingUser.email" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="새 비밀번호"><el-input v-model="editingUser.password" /></el-form-item></el-col>
           <el-col :span="12">
@@ -232,7 +229,7 @@ function generateUser () {
 function handleUsersCSV (file) {
   papa.parse(file, {
     complete: (results) => {
-      const data = results.data.filter(user => user[0] && user[1] && user[2] && user[3])
+      const data = results.data.filter(user => user[0] && user[1] && user[2])
       const delta = results.data.length - data.length
       if (delta > 0) ElNotification.warning({ title: '경고', message: delta + '명이 빈 값으로 인해 제외되었습니다' })
       uploadUsersCurrentPage.value = 1

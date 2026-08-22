@@ -1,4 +1,5 @@
 import re
+import secrets
 
 from django.contrib.auth.models import AbstractBaseUser
 from django.conf import settings
@@ -88,8 +89,8 @@ class UserProfile(models.Model):
     oi_problems_status = JSONField(default=dict)
 
     # 학교·전공·블로그·GitHub·기분은 6단계에서 제거했다. 입력률이 0이었고,
-    # 학교 정보는 학급(SchoolClass)이 대신한다.
-    real_name = models.TextField(null=True)
+    # 학교 정보는 학급(SchoolClass)이 대신한다. 실명도 함께 없앴다.
+    # 교사가 학생을 알아보는 일은 ClassMembership.nickname 이 대신한다.
     avatar = models.TextField(default=f"{settings.AVATAR_URI_PREFIX}/default.png")
     accepted_number = models.IntegerField(default=0)
     total_score = models.BigIntegerField(default=0)
@@ -128,10 +129,45 @@ class TeacherApplication(models.Model):
         ordering = ["-applied_at"]
 
 
-# 학생 계정 아이디는 "c{학급id}-{번호}" 형태다. 구글 가입자가 이 형태의 닉네임을
-# 선점하면 이후 학생 계정과 충돌하므로 닉네임에서 예약어로 막는다.
-STUDENT_USERNAME_PREFIX = "c"
-STUDENT_USERNAME_RE = re.compile(rf"^{STUDENT_USERNAME_PREFIX}\d+-\d+$")
+# 학생 계정 아이디는 "학생12345678" 형태다.
+#
+# 이 값은 순위·채점 목록 등 공개 화면에 그대로 나온다. 그래서 학급이나 번호를
+# 담지 않는다. 예전에는 "c{학급id}-{번호}" 였는데, 노출되면 같은 학급 학생이
+# 묶이고 번호 순서까지 드러났다. 무작위라 옆 번호를 추측할 수도 없다.
+#
+# 학생은 이 아이디로 로그인하지 않는다(학교·학년·반·번호 + PIN).
+# 사람이 외울 필요가 없으므로 자릿수를 넉넉히 잡아 충돌을 피한다.
+STUDENT_USERNAME_PREFIX = "학생"
+STUDENT_USERNAME_DIGITS = 8
+STUDENT_USERNAME_RE = re.compile(rf"^{STUDENT_USERNAME_PREFIX}\d{{{STUDENT_USERNAME_DIGITS}}}$")
+
+# 구글 가입자가 학생 계정을 사칭하지 못하게 접두어 자체를 막는다.
+# 자릿수까지 맞춘 것만 막으면 "학생1" 같은 값이 통과해 헷갈린다.
+RESERVED_USERNAME_PREFIX_MESSAGE = "학생 계정 구분을 위해 '학생'으로 시작할 수 없습니다"
+
+
+def is_reserved_username(value):
+    return (value or "").strip().startswith(STUDENT_USERNAME_PREFIX)
+
+
+def generate_student_usernames(count, taken=None):
+    """겹치지 않는 학생 아이디를 count 개 만든다.
+
+    한 학급을 한 번에 만들기 때문에(bulk_create) 서로 간의 충돌도 함께 걸러야 한다.
+    DB 의 유니크 제약이 최종 방어선이고, 여기서는 재시도 횟수를 줄이는 정도만 한다.
+    """
+    pool = set(taken or ())
+    pool.update(User.objects.filter(username__startswith=STUDENT_USERNAME_PREFIX)
+                .values_list("username", flat=True))
+    made = []
+    upper = 10 ** STUDENT_USERNAME_DIGITS
+    while len(made) < count:
+        candidate = f"{STUDENT_USERNAME_PREFIX}{secrets.randbelow(upper):0{STUDENT_USERNAME_DIGITS}d}"
+        if candidate in pool:
+            continue
+        pool.add(candidate)
+        made.append(candidate)
+    return made
 
 
 class School(models.Model):
@@ -176,14 +212,6 @@ class SchoolClass(models.Model):
     def display_name(self):
         return f"{self.year}학년도 {self.grade}학년 {self.class_no}반"
 
-    def student_username(self, number):
-        """학생 계정 아이디. 학급 id 로 만들어 전역에서 유일하다.
-
-        교사도 학생도 이 값을 입력하지 않는다(학생은 학교·반·번호로 로그인).
-        내부 식별용이므로 사람이 정하게 하지 않는다.
-        """
-        return f"{STUDENT_USERNAME_PREFIX}{self.id}-{number:02d}"
-
     def __str__(self):
         return f"{self.school.name} {self.display_name}"
 
@@ -193,33 +221,16 @@ class ClassMembership(models.Model):
     school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name="memberships")
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="class_memberships")
     number = models.IntegerField()
+    # 교사가 학생을 알아보기 위한 이름. 공개 화면에는 나가지 않는다.
+    # 담당 교사와 본인만 본다. 학급마다 따로 붙이는 값이라 여기에 둔다.
+    # 실명을 적을 수도 있어 중복을 막지 않는다(같은 이름이 여러 학급에 있을 수 있다).
+    nickname = models.TextField()
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "class_membership"
         unique_together = (("school_class", "number"), ("school_class", "student"))
         ordering = ["number"]
-
-
-def _first_membership(user):
-    # 학급 소속은 표시 이름과 프로필 공개 여부를 함께 가르는 기준이라 한 곳에서 읽는다.
-    # prefetch(display_name_prefetch)가 걸려 있으면 추가 쿼리가 나가지 않는다.
-    return next(iter(user.class_memberships.all()), None)
-
-
-def public_display_name(user):
-    """공개 화면(순위·제출 목록)에 표시할 이름.
-
-    - 구글 가입자(교사·개인학생): 본인이 정한 닉네임
-    - 수업용 학생: 학교명까지만. 학년·반·번호는 노출하지 않는다.
-      같은 학교 학생이 여럿이면 서로 구분되지 않는데, 그것이 의도다.
-    """
-    if user is None:
-        return "(삭제된 사용자)"
-    membership = _first_membership(user)
-    if membership is not None:
-        return f"{membership.school_class.school.name} 학생"
-    return user.username
 
 
 def my_student_ids(teacher):
@@ -231,27 +242,14 @@ def my_student_ids(teacher):
                                   .values_list("student_id", flat=True)
 
 
-def has_public_profile(user):
-    """사용자 홈(공개 프로필)을 열 수 있는 계정인지.
+def my_student_nicknames(user):
+    """{학생 id: 닉네임}. 담당 교사가 아니면 빈 dict.
 
-    수업용 학생은 표시 이름이 "○○학교 학생"이라 조회 키가 될 수 없고
-    (링크를 걸면 "사용자가 존재하지 않습니다"로 끝난다), 실제 아이디를 키로 쓰면
-    학교·학년·반·번호가 드러난다. 아동 프로필은 공개하지 않는 것이 맞다.
+    공개 목록(순위·채점 현황)에서 교사가 자기 학생만 알아볼 수 있게 한다.
+    행마다 조회하지 않도록 한 번에 모아 온다.
     """
-    if user is None:
-        return False
-    return _first_membership(user) is None
-
-
-# 표시 이름 계산 시 N+1 을 막기 위한 prefetch 경로 (User 기준)
-_DISPLAY_NAME_PATH = "class_memberships__school_class__school"
-
-
-def display_name_prefetch(user_path=""):
-    """표시 이름 계산용 prefetch 경로를 만든다.
-
-    경로가 User 기준이라 어디서 출발하는지 호출부에서 명시해야 한다.
-        User 쿼리셋        -> display_name_prefetch()
-        Submission 쿼리셋  -> display_name_prefetch("user")
-    """
-    return f"{user_path}__{_DISPLAY_NAME_PATH}" if user_path else _DISPLAY_NAME_PATH
+    if not (user is not None and user.is_authenticated and user.is_teacher()):
+        return {}
+    rows = ClassMembership.objects.filter(school_class__teacher=user) \
+                                  .values_list("student_id", "nickname")
+    return dict(rows)

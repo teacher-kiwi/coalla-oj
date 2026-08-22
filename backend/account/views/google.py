@@ -13,9 +13,10 @@ from django.utils.timezone import now
 from options.options import SysOptions
 from utils.api import APIView, validate_serializer
 from ..decorators import login_required, super_admin_required
-from ..models import (AdminType, ClassMembership, ProblemPermission, SchoolClass,
-                      STUDENT_USERNAME_RE, TeacherApplication, TeacherApplicationStatus,
-                      User, UserProfile)
+from ..models import (AdminType, ClassMembership, ProblemPermission,
+                      RESERVED_USERNAME_PREFIX_MESSAGE, SchoolClass,
+                      TeacherApplication, TeacherApplicationStatus,
+                      User, UserProfile, is_reserved_username)
 from ..serializers import (DeleteAccountSerializer, GoogleLoginSerializer,
                            ReviewTeacherApplicationSerializer,
                            TeacherApplicationSerializer)
@@ -31,9 +32,10 @@ def validate_nickname(nickname):
     nickname = (nickname or "").strip()
     if not NICKNAME_RE.match(nickname):
         return None, "닉네임은 2~20자의 한글·영문·숫자로 입력해주세요"
-    if STUDENT_USERNAME_RE.match(nickname):
-        # 학생 계정 아이디 형태(c12-01)를 선점하면 이후 학생 계정과 충돌한다
-        return None, "사용할 수 없는 닉네임입니다"
+    if is_reserved_username(nickname):
+        # 접두어 전체를 막는다. 자릿수까지 맞춘 것만 막으면 "학생1" 같은 값이
+        # 통과해 수업용 학생 계정과 헷갈린다.
+        return None, RESERVED_USERNAME_PREFIX_MESSAGE
     if User.objects.filter(username__iexact=nickname).exists():
         return None, "이미 사용 중인 닉네임입니다"
     return nickname, None

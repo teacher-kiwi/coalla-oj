@@ -25,11 +25,6 @@ export function useContestRank () {
     set: (value) => contestStore.changeContestItemVisible({ menu: value })
   })
 
-  const showRealName = computed({
-    get: () => contestStore.itemVisible.realName,
-    set: (value) => contestStore.changeContestItemVisible({ realName: value })
-  })
-
   const forceUpdate = computed({
     get: () => contestStore.forceUpdate,
     set: (value) => contestStore.changeRankForceUpdate(value)
@@ -88,7 +83,6 @@ export function useContestRank () {
     isContestAdmin,
     showChart,
     showMenu,
-    showRealName,
     forceUpdate,
     limit,
     refreshDisabled,

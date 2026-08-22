@@ -20,9 +20,10 @@ from utils.shortcuts import int_or_none, rand_str
 from ..decorators import teacher_required
 from ..login_throttle import clear_login_failures
 from ..models import (AdminType, ClassMembership, School, SchoolClass, User,
-                      UserProfile)
+                      UserProfile, generate_student_usernames)
 from ..serializers import (ClassMembershipSerializer, CreateSchoolClassSerializer,
                            CreateStudentsSerializer, EditSchoolClassSerializer,
+                           EditStudentNicknameSerializer,
                            ResetStudentPasswordSerializer, SchoolClassSerializer,
                            SchoolSerializer)
 
@@ -189,16 +190,18 @@ class StudentAPI(APIView):
         # 한 학급이 30명이면 한 명씩 만들 때 90번의 INSERT 가 나간다. 세 번으로 끝낸다.
         # (PostgreSQL 은 bulk_create 가 만든 객체에 pk 를 채워주므로 이어서 참조할 수 있다)
         created = [(number, generate_pin()) for number in numbers]
-        students = [User(username=school_class.student_username(number),
+        usernames = generate_student_usernames(len(created))
+        students = [User(username=username,
                          admin_type=AdminType.REGULAR_USER,
                          created_by=school_class.teacher,
                          password=make_password(pin))
-                    for number, pin in created]
+                    for (number, pin), username in zip(created, usernames)]
         with transaction.atomic():
             User.objects.bulk_create(students)
             UserProfile.objects.bulk_create([UserProfile(user=student) for student in students])
             ClassMembership.objects.bulk_create(
-                [ClassMembership(school_class=school_class, student=student, number=number)
+                [ClassMembership(school_class=school_class, student=student, number=number,
+                                 nickname=f"학생{number}")
                  for (number, _), student in zip(created, students)])
 
         # 초기 PIN 은 해시로 저장되어 다시 조회할 수 없다. 교사가 배부해야 하므로
@@ -212,12 +215,8 @@ class StudentAPI(APIView):
     @teacher_required
     def put(self, request):
         """학생 비밀번호 초기화. 새 PIN 을 돌려주므로 교사가 학생에게 알려준다."""
-        try:
-            membership = ClassMembership.objects.select_related(
-                "school_class", "student").get(id=request.data["membership"])
-        except ClassMembership.DoesNotExist:
-            return self.error("학생이 존재하지 않습니다")
-        if not owned_class(request.user, membership.school_class_id):
+        membership = self._owned_membership(request.user, request.data["membership"])
+        if membership is None:
             return self.error("학생이 존재하지 않습니다")
 
         pin = generate_pin()
@@ -231,14 +230,41 @@ class StudentAPI(APIView):
         membership_id = int_or_none(request.GET.get("id"))
         if membership_id is None:
             return self.error("잘못된 요청입니다. id가 필요합니다")
-        membership = ClassMembership.objects.select_related("school_class").filter(
-            id=membership_id).first()
-        if not membership:
-            return self.error("학생이 존재하지 않습니다")
-        if not owned_class(request.user, membership.school_class_id):
+        membership = self._owned_membership(request.user, membership_id)
+        if membership is None:
             return self.error("학생이 존재하지 않습니다")
         membership.student.delete()   # 소속과 제출 기록도 함께 삭제된다
         return self.success()
+
+    @staticmethod
+    def _owned_membership(teacher, membership_id):
+        if membership_id is None:
+            return None
+        membership = ClassMembership.objects.select_related(
+            "school_class", "student").filter(id=membership_id).first()
+        if membership is None or not owned_class(teacher, membership.school_class_id):
+            return None
+        return membership
+
+
+class StudentNicknameAPI(APIView):
+    """학생 닉네임. 교사가 자기 학생을 알아보기 위한 이름이다.
+
+    공개 화면에는 나가지 않는다(순위·채점 목록은 무작위 아이디로 표시된다).
+    학급마다 붙이는 값이라 다른 학급과 겹쳐도 막지 않는다.
+    """
+    @validate_serializer(EditStudentNicknameSerializer)
+    @teacher_required
+    def put(self, request):
+        membership = StudentAPI._owned_membership(request.user, request.data["membership"])
+        if membership is None:
+            return self.error("학생이 존재하지 않습니다")
+        nickname = request.data["nickname"].strip()
+        if not nickname:
+            return self.error("닉네임을 입력해주세요")
+        membership.nickname = nickname
+        membership.save(update_fields=["nickname"])
+        return self.success(ClassMembershipSerializer(membership).data)
 
 
 class StudentSubmissionAPI(APIView):

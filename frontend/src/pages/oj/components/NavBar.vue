@@ -60,7 +60,7 @@
       </div>
       <el-dropdown v-else class="drop-menu" trigger="click" @command="handleRoute">
         <el-button text class="drop-menu-title">
-          {{ userStore.user.username }}
+          {{ userStore.displayName }}
           <el-icon><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>

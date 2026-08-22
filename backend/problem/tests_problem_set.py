@@ -390,7 +390,9 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
         self.submission_url = self.reverse("submission_api")
         self.class_id = self._create_class()
         self.student_pin = self._create_students(self.class_id, 1, 1).data["data"]["students"][0]["password"]
-        self.student_name = f"c{self.class_id}-01"
+        # 학생 아이디는 서버가 무작위로 만든다. 형식을 가정하지 않는다.
+        self.student_name = ClassMembership.objects.get(
+            school_class_id=self.class_id, number=1).student.username
 
     def _open_detail(self, problem):
         return self.client.get(self.problem_url + f"?problem_id={problem._id}")
@@ -463,7 +465,9 @@ class HiddenProblemInProblemSetTest(ProblemSetTestBase):
         super().setUp()
         self.class_id = self._create_class()
         self.student_pin = self._create_students(self.class_id, 1, 1).data["data"]["students"][0]["password"]
-        self.student_name = f"c{self.class_id}-01"
+        # 학생 아이디는 서버가 무작위로 만든다. 형식을 가정하지 않는다.
+        self.student_name = ClassMembership.objects.get(
+            school_class_id=self.class_id, number=1).student.username
         self.set_id = self._create_set()
         self._add_problems(self.set_id, [self.problem.id])
         self._assign(self.set_id, self.class_id)

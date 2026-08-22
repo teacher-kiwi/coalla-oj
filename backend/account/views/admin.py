@@ -7,7 +7,6 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.contrib.auth.hashers import make_password
 
-from submission.models import Submission
 from utils.api import APIView, validate_serializer
 from utils.shortcuts import rand_str
 
@@ -25,14 +24,14 @@ class UserAdminAPI(APIView):
 
         user_list = []
         for user_data in data:
-            if len(user_data) != 4 or len(user_data[0]) > 32:
+            if len(user_data) != 3 or len(user_data[0]) > 32:
                 return self.error(f"데이터 처리 중 오류가 발생했습니다: '{user_data}'")
             user_list.append(User(username=user_data[0], password=make_password(user_data[1]), email=user_data[2]))
 
         try:
             with transaction.atomic():
                 ret = User.objects.bulk_create(user_list)
-                UserProfile.objects.bulk_create([UserProfile(user=ret[i], real_name=data[i][3]) for i in range(len(ret))])
+                UserProfile.objects.bulk_create([UserProfile(user=u) for u in ret])
             return self.success()
         except IntegrityError:
             # 원본은 DB 예외 메시지(DETAIL: Key (username)=(root11) already exists.)를
@@ -52,7 +51,6 @@ class UserAdminAPI(APIView):
         if User.objects.filter(email=data["email"].lower()).exclude(id=user.id).exists():
             return self.error("이미 사용 중인 이메일입니다")
 
-        pre_username = user.username
         user.username = data["username"].lower()
         user.email = data["email"].lower()
         user.admin_type = data["admin_type"]
@@ -69,10 +67,6 @@ class UserAdminAPI(APIView):
             user.set_password(data["password"])
 
         user.save()
-        if pre_username != user.username:
-            Submission.objects.filter(username=pre_username).update(username=user.username)
-
-        UserProfile.objects.filter(user=user).update(real_name=data["real_name"])
         return self.success(UserAdminSerializer(user).data)
 
     @super_admin_required
@@ -90,7 +84,6 @@ class UserAdminAPI(APIView):
         keyword = request.GET.get("keyword", None)
         if keyword:
             user = user.filter(Q(username__icontains=keyword) |
-                               Q(userprofile__real_name__icontains=keyword) |
                                Q(email__icontains=keyword))
         return self.success(self.paginate_data(request, user, UserAdminSerializer))
 
