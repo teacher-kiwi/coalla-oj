@@ -7,6 +7,8 @@ from datetime import timedelta
 from zipfile import ZipFile
 
 from django.conf import settings
+from django.db import IntegrityError, transaction
+from django.utils.timezone import now
 
 from utils.api.tests import APITestCase
 
@@ -490,3 +492,36 @@ ddd
         self.assertEqual(ret["prepend"], "aaa\n")
         self.assertEqual(ret["template"], "")
         self.assertEqual(ret["append"], "ccc\n")
+
+
+class PublicDisplayIdUniqueTest(APITestCase):
+    """공개 문제의 표시 번호는 DB 가 유일하게 지킨다.
+
+    unique_together(("_id", "contest")) 는 contest 가 NULL 인 공개 문제를 막지 못한다
+    (유니크 인덱스에서 NULL 은 서로 다른 값으로 취급된다). 같은 번호가 둘 생기면
+    _id 로 조회하는 제출 경로에서 MultipleObjectsReturned 가 난다.
+    """
+    def setUp(self):
+        self.admin = self.create_super_admin()
+
+    def _create(self, display_id, contest=None):
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data.pop("tags")
+        data["_id"] = display_id
+        return Problem.objects.create(created_by=self.admin, contest=contest, **data)
+
+    def test_duplicate_public_display_id_is_rejected(self):
+        self._create("1000")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._create("1000")
+
+    def test_same_display_id_allowed_in_different_contests(self):
+        """대회 안의 A·B·C 는 대회마다 따로 쓴다. 제약이 그것까지 막으면 안 된다."""
+        for i in range(2):
+            contest = Contest.objects.create(
+                title=f"c{i}", description="d", rule_type="ACM", real_time_rank=True,
+                start_time=now(), end_time=now() + timedelta(days=1),
+                created_by=self.admin)
+            self._create("A", contest=contest)
+        self.assertEqual(Problem.objects.filter(_id="A").count(), 2)

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.db.models.functions import Length
 from utils.models import JSONField
 
@@ -109,6 +110,14 @@ class Problem(models.Model):
     class Meta:
         db_table = "problem"
         unique_together = (("_id", "contest"),)
+        constraints = [
+            # unique_together 는 공개 문제를 못 막는다. contest 가 NULL 인데
+            # 유니크 인덱스에서 NULL 은 서로 다른 값으로 취급되어, ("1000", NULL) 이
+            # 몇 개든 들어간다. 그러면 조회(_id 로 get)에서 MultipleObjectsReturned 가
+            # 나는데, 만든 사람이 아니라 나중에 제출하는 학생에게서 터진다.
+            models.UniqueConstraint(fields=["_id"], condition=Q(contest__isnull=True),
+                                    name="uniq_public_display_id"),
+        ]
         # 표시 번호는 문자열이라 그냥 정렬하면 12 가 2 보다 앞에 온다.
         # 길이를 먼저 보면 숫자 순서가 되고, 대회의 A·B·C 도 자연스럽게 정렬된다.
         ordering = (Length("_id"), "_id")

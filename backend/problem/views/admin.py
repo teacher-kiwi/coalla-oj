@@ -394,7 +394,12 @@ class ProblemAPI(ProblemBase):
         if error:
             return self.error(error)
         data["created_by"] = request.user
-        problem = Problem.objects.create(**data)
+        try:
+            problem = Problem.objects.create(**data)
+        except IntegrityError:
+            # 위 검사와 저장 사이에 다른 요청이 같은 번호를 먼저 쓴 경우다.
+            # DB 제약(uniq_public_display_id)이 막아준 것이라 안내만 하면 된다.
+            return self.error("이미 사용 중인 표시 ID입니다")
         problem.tags.set(tag_objs)
         return self.success(ProblemAdminSerializer(problem).data)
 
