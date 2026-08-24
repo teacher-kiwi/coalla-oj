@@ -124,7 +124,10 @@ class EditUserSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=32, validators=[reject_reserved_username])
     password = serializers.CharField(min_length=6, allow_blank=True, required=False, default=None)
     email = serializers.EmailField(max_length=64)
-    admin_type = serializers.ChoiceField(choices=(AdminType.REGULAR_USER, AdminType.ADMIN, AdminType.SUPER_ADMIN))
+    # Teacher 가 빠져 있으면 교사 계정을 저장만 해도 강등된다(선택지에 값이 없어서
+    # 화면이 아무거나 보내게 된다).
+    admin_type = serializers.ChoiceField(choices=(AdminType.REGULAR_USER, AdminType.TEACHER,
+                                                  AdminType.ADMIN, AdminType.SUPER_ADMIN))
     problem_permission = serializers.ChoiceField(choices=(ProblemPermission.NONE, ProblemPermission.OWN,
                                                           ProblemPermission.ALL))
     is_disabled = serializers.BooleanField()

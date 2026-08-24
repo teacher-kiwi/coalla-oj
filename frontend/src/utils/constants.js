@@ -162,10 +162,25 @@ export const USER_TYPE = {
   SUPER_ADMIN: 'Super Admin'
 }
 
+// 화면에 보여줄 이름. DB 에 저장되는 값은 영어라 그대로 찍으면 관리자 화면만 영어가 된다.
+// 목록과 선택 상자가 같은 표를 쓰게 해서 표기가 갈라지지 않게 한다.
+export const USER_TYPE_LABEL = {
+  [USER_TYPE.REGULAR_USER]: '일반 사용자',
+  [USER_TYPE.TEACHER]: '교사',
+  [USER_TYPE.ADMIN]: '관리자',
+  [USER_TYPE.SUPER_ADMIN]: '최고 관리자'
+}
+
 export const PROBLEM_PERMISSION = {
   NONE: 'None',
   OWN: 'Own',
   ALL: 'All'
+}
+
+export const PROBLEM_PERMISSION_LABEL = {
+  [PROBLEM_PERMISSION.NONE]: '없음',
+  [PROBLEM_PERMISSION.OWN]: '본인 문제',
+  [PROBLEM_PERMISSION.ALL]: '전체'
 }
 
 export const STORAGE_KEY = {

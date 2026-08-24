@@ -371,6 +371,27 @@ class TeacherAccountDeleteTest(SchoolClassTestBase):
         # 고아 계정이 남지 않아야 한다
         self.assertFalse(User.objects.filter(id__in=student_ids).exists())
 
+    def test_private_problems_go_but_public_ones_stay(self, verify):
+        """비공개 문제는 아무도 손댈 수 없게 되므로 함께 지운다. 공개 문제는 남긴다."""
+        from problem.models import Problem, ProblemVisibility
+        private = self._make_problem("9001", ProblemVisibility.private)
+        public = self._make_problem("9002", ProblemVisibility.public)
+
+        self.assertSuccess(self._delete(verify))
+
+        self.assertFalse(Problem.objects.filter(id=private.id).exists())
+        public.refresh_from_db()
+        self.assertIsNone(public.created_by_id)
+
+    def _make_problem(self, display_id, visibility):
+        from problem.models import Problem
+        return Problem.objects.create(
+            _id=display_id, title="t", description="d", input_description="i",
+            output_description="o", samples=[], test_case_id="x", test_case_score=[],
+            hint="", languages=["Python3"], template={}, time_limit=1000,
+            memory_limit=256, spj=False, rule_type="ACM", visible=True,
+            difficulty="L1", source="", created_by=self.teacher, visibility=visibility)
+
     def test_other_teacher_class_is_untouched(self, verify):
         # 다른 교사의 학급·학생은 그대로 있어야 한다
         self.client.logout()
@@ -661,3 +682,73 @@ class NeisSyncTest(APITestCase):
         SysOptions.neis_api_key = ""
         self.assertFailed(self.client.post(self.reverse("school_sync_api"), data={}),
                           "먼저 나이스 API 키를 저장하세요")
+
+
+class TeacherDataCleanupTest(SchoolClassTestBase):
+    """관리자는 교육 데이터를 먼저 정리해야 교사를 지우거나 유형을 바꿀 수 있다.
+
+    본인 탈퇴와 달리 남의 데이터라, 무엇이 지워지는지 한 번 보게 만든다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 2)
+        self.client.logout()
+        self.admin = self.create_super_admin()
+        self.user_url = self.reverse("user_admin_api")
+        self.data_url = self.reverse("teacher_data_api")
+
+    def _edit_payload(self, admin_type):
+        return {"id": self.teacher.id, "username": self.teacher.username,
+                "email": "t@school.kr", "admin_type": admin_type,
+                "problem_permission": "None", "is_disabled": False}
+
+    def test_summary_lists_what_will_be_removed(self):
+        resp = self.client.get(self.data_url + f"?id={self.teacher.id}")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["class_count"], 1)
+        self.assertEqual(resp.data["data"]["student_count"], 2)
+
+    def test_demote_blocked_while_data_remains(self):
+        resp = self.client.put(self.user_url, data=self._edit_payload("Regular User"))
+        self.assertFailed(resp)
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.admin_type, "Teacher")
+
+    def test_delete_blocked_while_data_remains(self):
+        resp = self.client.delete(self.user_url + f"?id={self.teacher.id}")
+        self.assertFailed(resp)
+        self.assertTrue(User.objects.filter(id=self.teacher.id).exists())
+
+    def test_editing_a_teacher_keeps_the_type(self):
+        """Teacher 가 선택지에 없어 저장만 해도 강등되던 문제."""
+        resp = self.client.put(self.user_url, data=self._edit_payload("Teacher"))
+        self.assertSuccess(resp)
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.admin_type, "Teacher")
+
+    def test_demote_allowed_after_cleanup(self):
+        self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
+        self.assertFalse(SchoolClass.objects.filter(teacher=self.teacher).exists())
+        self.assertFalse(ClassMembership.objects.exists())
+
+        resp = self.client.put(self.user_url, data=self._edit_payload("Regular User"))
+        self.assertSuccess(resp)
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.admin_type, "Regular User")
+
+    def test_cleanup_keeps_the_teachers_own_submissions(self):
+        """교사 본인이 푼 기록은 일반 사용자도 갖는 데이터라 남긴다."""
+        from problem.models import Problem
+        from submission.models import Submission
+        problem = Problem.objects.create(
+            _id="9100", title="t", description="d", input_description="i",
+            output_description="o", samples=[], test_case_id="x", test_case_score=[],
+            hint="", languages=["Python3"], template={}, time_limit=1000,
+            memory_limit=256, spj=False, rule_type="ACM", visible=True,
+            difficulty="L1", source="", created_by=None)
+        mine = Submission.objects.create(problem=problem, user=self.teacher,
+                                         code="print(1)", language="Python3", result=0)
+
+        self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
+        self.assertTrue(Submission.objects.filter(id=mine.id).exists())

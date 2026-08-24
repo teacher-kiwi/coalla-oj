@@ -23,10 +23,14 @@
           <template #default="{ row }">{{ localtime(row.last_login) }}</template>
         </el-table-column>
         <el-table-column prop="email" label="이메일" />
-        <el-table-column prop="admin_type" label="사용자 유형" />
+        <el-table-column prop="admin_type" label="사용자 유형">
+          <template #default="{ row }">{{ USER_TYPE_LABEL[row.admin_type] || row.admin_type }}</template>
+        </el-table-column>
         <el-table-column fixed="right" label="옵션" width="200">
           <template #default="{ row }">
             <icon-btn name="수정" icon="Edit" @click="openUserDialog(row.id)" />
+            <icon-btn v-if="row.admin_type === 'Teacher'" name="교육 데이터 정리"
+                      icon="Delete" @click="openTeacherCleanup(row)" />
             <icon-btn name="삭제" icon="Delete" @click="deleteUsers([row.id])" />
           </template>
         </el-table-column>
@@ -108,6 +112,28 @@
       </el-form>
     </Panel>
 
+    <el-dialog title="교육 데이터 정리" v-model="showCleanupDialog" width="520px"
+               :close-on-click-modal="false">
+      <el-alert type="error" :closable="false" show-icon>
+        <p><b>{{ cleanup.username }}</b> 선생님의 다음 데이터를 삭제합니다.
+          <b>되돌릴 수 없습니다.</b></p>
+        <ul class="cleanup-list">
+          <li>학급 {{ cleanup.class_count }}개</li>
+          <li>학생 계정 {{ cleanup.student_count }}개</li>
+          <li>학생 제출 기록 {{ cleanup.student_submission_count }}건</li>
+          <li>문제집 {{ cleanup.problem_set_count }}개</li>
+          <li>비공개 문제 {{ cleanup.private_problem_count }}개</li>
+        </ul>
+        <p>공개 문제와 선생님 본인의 제출 기록은 남습니다.</p>
+      </el-alert>
+      <template #footer>
+        <el-button @click="showCleanupDialog = false">취소</el-button>
+        <el-button type="danger" :loading="loadingCleanup" @click="runTeacherCleanup">
+          삭제
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog title="사용자" v-model="showUserDialog" :close-on-click-modal="false">
       <el-form :model="editingUser" label-width="120px" label-position="left">
         <el-row :gutter="20">
@@ -117,16 +143,16 @@
           <el-col :span="12">
             <el-form-item label="사용자 유형">
               <el-select v-model="editingUser.admin_type">
-                <el-option label="일반 사용자" value="Regular User" />
-                <el-option label="관리자" value="Admin" />
-                <el-option label="최고 관리자" value="Super Admin" />
+                <el-option v-for="(label, value) in USER_TYPE_LABEL" :key="value"
+                           :label="label" :value="value" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="문제 권한">
               <el-select v-model="editingUser.problem_permission" :disabled="editingUser.admin_type !== 'Admin'">
-                <el-option label="없음" value="None" /><el-option label="본인 문제" value="Own" /><el-option label="전체" value="All" />
+                <el-option v-for="(label, value) in PROBLEM_PERMISSION_LABEL" :key="value"
+                           :label="label" :value="value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -155,6 +181,7 @@ import papa from 'papaparse'
 import api from '../../api.js'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
+import { USER_TYPE_LABEL, PROBLEM_PERMISSION_LABEL } from '@/utils/constants'
 
 const pageSize = 10
 const total = ref(0)
@@ -168,6 +195,10 @@ const showUserDialog = ref(false)
 const editingUser = ref({})
 const loadingTable = ref(false)
 const loadingGenerate = ref(false)
+const showCleanupDialog = ref(false)
+const loadingCleanup = ref(false)
+const cleanup = ref({})
+const cleanupUserId = ref(null)
 const currentPage = ref(0)
 const selectedUsers = ref([])
 const formGenerateUserRef = ref(null)
@@ -210,6 +241,28 @@ function deleteUsers (ids) {
 }
 
 function handleSelectionChange (val) { selectedUsers.value = val }
+
+// 교사를 지우거나 유형을 바꾸려면 딸린 교육 데이터를 먼저 비워야 한다.
+// 되돌릴 수 없어서 무엇이 지워지는지 보여주고 확인받는다.
+function openTeacherCleanup (row) {
+  api.getTeacherData(row.id).then(res => {
+    cleanup.value = res.data.data
+    cleanupUserId.value = row.id
+    showCleanupDialog.value = true
+  }, () => {})
+}
+
+function runTeacherCleanup () {
+  loadingCleanup.value = true
+  api.purgeTeacherData(cleanupUserId.value).then(() => {
+    loadingCleanup.value = false
+    showCleanupDialog.value = false
+    ElMessage.success('교육 데이터를 정리했습니다')
+    getUserList(currentPage.value)
+  }, () => {
+    loadingCleanup.value = false
+  })
+}
 
 function generateUser () {
   formGenerateUserRef.value.validate((valid) => {
@@ -265,4 +318,9 @@ watch(uploadUsersCurrentPage, (page) => {
   .userPreview { padding-left: 10px; }
   .full-width { width: 100%; }
   .help-icon { margin-left: 4px; }
+
+.cleanup-list {
+  margin: 8px 0 8px 18px;
+  line-height: 1.7;
+}
 </style>

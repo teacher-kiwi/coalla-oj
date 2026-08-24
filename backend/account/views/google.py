@@ -13,10 +13,11 @@ from django.utils.timezone import now
 from options.options import SysOptions
 from utils.api import APIView, validate_serializer
 from ..decorators import login_required, super_admin_required
-from ..models import (AdminType, ClassMembership, ProblemPermission,
-                      RESERVED_USERNAME_PREFIX_MESSAGE, SchoolClass,
+from ..models import (AdminType, ProblemPermission,
+                      RESERVED_USERNAME_PREFIX_MESSAGE,
                       TeacherApplication, TeacherApplicationStatus,
                       User, UserProfile, is_reserved_username)
+from ..teaching import purge_teaching_data, teaching_data_summary
 from ..serializers import (DeleteAccountSerializer, GoogleLoginSerializer,
                            ReviewTeacherApplicationSerializer,
                            TeacherApplicationSerializer)
@@ -131,10 +132,8 @@ class AccountDeleteAPI(APIView):
         error = self._check_deletable(request.user)
         if error:
             return self.error(error)
-        classes = SchoolClass.objects.filter(teacher=request.user)
         return self.success({
-            "class_count": classes.count(),
-            "student_count": ClassMembership.objects.filter(school_class__in=classes).count(),
+            **teaching_data_summary(request.user),
             "submission_count": request.user.submissions.count(),
         })
 
@@ -157,19 +156,12 @@ class AccountDeleteAPI(APIView):
             return self.error("지금 로그인한 계정과 다른 구글 계정입니다")
 
         with transaction.atomic():
-            # 학급을 지우면 소속(ClassMembership)만 사라지고 학생 계정은 남는다.
-            # 학급 삭제 API 와 같은 방식으로 남을 계정을 직접 정리한다.
-            classes = SchoolClass.objects.filter(teacher=user)
-            student_ids = list(ClassMembership.objects.filter(school_class__in=classes)
-                               .values_list("student_id", flat=True))
+            # 본인이 확인 화면에서 내용을 보고 누른 것이라 여기서 바로 지운다.
+            # (관리자가 남의 계정을 지울 때는 정리 기능을 먼저 거치게 한다)
+            summary = purge_teaching_data(user)
             user.delete()
-            # delete() 가 돌려주는 첫 값은 UserProfile 처럼 함께 지워진 것까지 포함한
-            # 총 행 수다. 화면에 "학생 N명"으로 보여주므로 계정 수를 따로 센다.
-            orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
-            deleted_students = orphans.count()
-            orphans.delete()
         auth.logout(request)
-        return self.success({"deleted_students": deleted_students})
+        return self.success({"deleted_students": summary["student_count"]})
 
     @staticmethod
     def _check_deletable(user):
@@ -203,6 +195,14 @@ class TeacherApplicationAPI(APIView):
                 return self.error("이미 신청하셨습니다. 승인을 기다려주세요")
             if application.status == TeacherApplicationStatus.REJECTED:
                 return self.error("신청이 반려되었습니다. 관리자에게 문의하세요")
+            # 승인받았다가 관리자가 유형을 되돌린 경우다. user 가 OneToOne 이라
+            # 새로 만들면 IntegrityError 로 500 이 난다. 기존 신청을 다시 세운다.
+            application.status = TeacherApplicationStatus.PENDING
+            application.reviewed_at = None
+            application.reviewed_by = None
+            application.note = ""
+            application.save(update_fields=["status", "reviewed_at", "reviewed_by", "note"])
+            return self.success(TeacherApplicationSerializer(application).data)
 
         application = TeacherApplication.objects.create(user=user)
         return self.success(TeacherApplicationSerializer(application).data)

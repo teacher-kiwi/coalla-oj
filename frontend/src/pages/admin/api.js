@@ -28,6 +28,12 @@ export default {
   createAnnouncement (data) {
     return ajax('admin/announcement', 'post', { data })
   },
+  getTeacherData (id) {
+    return ajax('admin/teacher_data', 'get', { params: { id } })
+  },
+  purgeTeacherData (id) {
+    return ajax('admin/teacher_data', 'delete', { params: { id } })
+  },
   getUserList (offset, limit, keyword) {
     let params = { paging: true, offset, limit }
     if (keyword) params.keyword = keyword

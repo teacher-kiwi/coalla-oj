@@ -151,7 +151,8 @@
           <li><p>시간 제한</p><p>{{ problem.time_limit }}MS</p></li>
           <li><p>메모리 제한</p><p>{{ problem.memory_limit }}MB</p></li>
           <li><p>IO 모드</p><p>{{ problem.io_mode.io_mode }}</p></li>
-          <li><p>작성자</p><p>{{ problem.created_by.username }}</p></li>
+          <!-- 출제 교사가 탈퇴해도 공개 문제는 남는다(created_by 가 null 이 된다) -->
+          <li><p>작성자</p><p>{{ problem.created_by?.username || '(삭제된 사용자)' }}</p></li>
           <li v-if="problem.difficulty"><p>난이도</p><p>{{ DIFFICULTY_LABEL[problem.difficulty] }}</p></li>
           <li v-if="problem.total_score"><p>점수</p><p>{{ problem.total_score }}</p></li>
           <li>
@@ -249,7 +250,7 @@ const problem = ref({
   my_status: '',
   template: {},
   languages: [],
-  created_by: { username: '' },
+  created_by: null,
   tags: [],
   io_mode: { io_mode: 'Standard IO' }
 })

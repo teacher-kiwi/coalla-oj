@@ -7,7 +7,8 @@ from utils.api.tests import APITestCase
 from options.options import SysOptions
 
 from problem.models import Problem, ProblemTag
-from .models import AdminType, ProblemPermission, TeacherApplication, User, UserProfile
+from .models import (AdminType, ProblemPermission, TeacherApplication,
+                     TeacherApplicationStatus, User, UserProfile)
 from utils.constants import ContestRuleType
 
 # 표시 ID 새로고침 테스트에서만 쓰는 최소 문제 데이터
@@ -473,6 +474,21 @@ class GoogleLoginAPITest(APITestCase):
         for nickname in ("학생12345678", "학생회장"):
             resp = self.client.post(self.url, data={"credential": "x", "nickname": nickname})
             self.assertFailed(resp, "학생 계정 구분을 위해 \'학생\'으로 시작할 수 없습니다")
+
+    def test_reapply_after_demotion(self, verify):
+        """승인받았다가 관리자가 유형을 되돌리면 다시 신청할 수 있어야 한다.
+
+        TeacherApplication.user 가 OneToOne 이라 새로 만들면 500 이 났다.
+        """
+        self._signup(verify, nickname="코딩선생")
+        user = User.objects.get(username="코딩선생")
+        TeacherApplication.objects.create(user=user,
+                                          status=TeacherApplicationStatus.APPROVED)
+
+        resp = self.client.post(self.reverse("teacher_application_api"), data={})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["status"], TeacherApplicationStatus.PENDING)
+        self.assertEqual(TeacherApplication.objects.filter(user=user).count(), 1)
 
     def test_invalid_nickname_rejected(self, verify):
         verify.return_value = self._claims()
