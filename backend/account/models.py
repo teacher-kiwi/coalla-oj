@@ -14,6 +14,14 @@ class AdminType(object):
     SUPER_ADMIN = "Super Admin"
 
 
+# 순위(공개 순위·대회 순위)에 이름이 오르는 계정.
+#
+# 관리자는 운영자라 뺀다. 교사는 학생과 함께 문제를 푸는 사용자이므로 넣는다.
+# 상위 OJ 에는 교사 유형이 없어 "일반 사용자"만 담았고, 교사를 추가한 뒤로
+# 교사가 문제를 풀어도 어느 순위에도 나오지 않았다.
+RANKED_ADMIN_TYPES = (AdminType.REGULAR_USER, AdminType.TEACHER)
+
+
 class TeacherApplicationStatus(object):
     PENDING = "pending"
     APPROVED = "approved"

@@ -232,6 +232,37 @@ class UserRankAPITest(APITestCase):
         profile2.total_score = 700
         profile2.save()
 
+    def test_teacher_is_included(self):
+        """교사도 학생과 함께 문제를 푸는 사용자라 순위에 나와야 한다.
+
+        상위 OJ 에는 교사 유형이 없어 "일반 사용자"만 담았고, 교사를 추가한 뒤로
+        교사가 아무리 풀어도 순위에 나오지 않았다.
+        """
+        teacher = self.create_teacher(username="코딩선생", login=False)
+        profile = teacher.userprofile
+        profile.submission_number = 5
+        profile.accepted_number = 5
+        profile.total_score = 100
+        profile.save()
+
+        resp = self.client.get(self.url, data={"rule": ContestRuleType.ACM})
+        self.assertSuccess(resp)
+        names = [row["user"]["username"] for row in resp.data["data"]["results"]]
+        self.assertIn("코딩선생", names)
+
+    def test_admin_is_excluded(self):
+        """관리자는 운영자라 순위에 넣지 않는다."""
+        admin = self.create_super_admin(username="root", login=False)
+        profile = admin.userprofile
+        profile.submission_number = 99
+        profile.accepted_number = 99
+        profile.save()
+
+        resp = self.client.get(self.url, data={"rule": ContestRuleType.ACM})
+        self.assertSuccess(resp)
+        names = [row["user"]["username"] for row in resp.data["data"]["results"]]
+        self.assertNotIn("root", names)
+
     def test_get_acm_rank(self):
         resp = self.client.get(self.url, data={"rule": ContestRuleType.ACM})
         self.assertSuccess(resp)

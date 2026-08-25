@@ -16,7 +16,7 @@
           </p>
           <p>
             <span>자동 새로고침(10s)</span>
-            <el-switch :disabled="refreshDisabled" @change="onAutoRefresh" />
+            <el-switch v-model="autoRefresh" :disabled="refreshDisabled" @change="onAutoRefresh" />
           </p>
           <p>
             <el-button type="primary" size="small" @click="downloadRankCSV">CSV 다운로드</el-button>
@@ -151,6 +151,10 @@ function onPageChange (newPage) {
 function onPageSizeChange () {
   getData(1)
 }
+
+// el-switch 는 modelValue 로 표시가 정해진다. v-model 이 없으면 눌러도
+// 꺼진 모습 그대로라 켰는지 껐는지 알 수 없고 끌 수도 없다.
+const autoRefresh = ref(false)
 
 function onAutoRefresh (status) {
   handleAutoRefresh(status, page.value, getData)

@@ -11,8 +11,8 @@ from utils.constants import ContestRuleType
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.shortcuts import rand_str, datetime2str
 from ..decorators import login_required
-from ..models import (my_student_ids, my_student_nicknames,
-                      User, UserProfile, AdminType)
+from ..models import (RANKED_ADMIN_TYPES, my_student_ids, my_student_nicknames,
+                      User, UserProfile)
 from ..serializers import (UserChangePasswordSerializer, UserLoginSerializer,
                            RankInfoSerializer, SSOSerializer)
 from ..serializers import (UserProfileSerializer,
@@ -181,7 +181,8 @@ class UserRankAPI(APIView):
         rule_type = request.GET.get("rule")
         if rule_type not in ContestRuleType.choices():
             rule_type = ContestRuleType.ACM
-        profiles = UserProfile.objects.filter(user__admin_type=AdminType.REGULAR_USER, user__is_disabled=False) \
+        profiles = UserProfile.objects.filter(user__admin_type__in=RANKED_ADMIN_TYPES,
+                                              user__is_disabled=False) \
             .select_related("user")
         # 교사가 자기 학생들끼리의 순위를 볼 수 있게 한다. 학생은 같은 학교 학생끼리
         # 서로 구분되지 않으므로(표시 이름이 학교명뿐) 공개 순위는 그대로 둔다.

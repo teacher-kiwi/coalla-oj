@@ -16,7 +16,7 @@ import 'element-plus/dist/index.css'
 import { use } from 'echarts/core'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import {
-  TooltipComponent, LegendComponent, GridComponent,
+  TitleComponent, TooltipComponent, LegendComponent, GridComponent,
   ToolboxComponent, DataZoomComponent, MarkPointComponent
 } from 'echarts/components'
 import { LabelLayout } from 'echarts/features'
@@ -24,7 +24,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 
 use([
   PieChart, BarChart, LineChart,
-  TooltipComponent, LegendComponent, GridComponent,
+  TitleComponent, TooltipComponent, LegendComponent, GridComponent,
   ToolboxComponent, DataZoomComponent, MarkPointComponent,
   LabelLayout, CanvasRenderer
 ])
