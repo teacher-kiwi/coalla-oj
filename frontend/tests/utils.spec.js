@@ -97,3 +97,26 @@ describe('상수 표', () => {
     expect(DIFFICULTY.map(d => d.value)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6'])
   })
 })
+
+describe('대회 진행 시간 표시', () => {
+  const from = '2026-01-01T00:00:00Z'
+  const after = (minutes) => new Date(Date.parse(from) + minutes * 60000).toISOString()
+
+  it('한 시간 미만은 분으로 보여준다', () => {
+    expect(time.duration(from, after(45))).toBe('45분')
+  })
+
+  it('시간과 분을 함께 보여준다', () => {
+    expect(time.duration(from, after(90))).toBe('1시간 30분')
+    expect(time.duration(from, after(120))).toBe('2시간')
+  })
+
+  it('하루가 넘으면 분은 빼고 일과 시간만 보여준다', () => {
+    expect(time.duration(from, after(60 * 24))).toBe('1일')
+    expect(time.duration(from, after(60 * 24 * 2 + 90))).toBe('2일 1시간')
+  })
+
+  it('순서가 뒤집혀도 같은 값을 준다', () => {
+    expect(time.duration(after(90), from)).toBe('1시간 30분')
+  })
+})

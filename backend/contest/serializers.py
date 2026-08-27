@@ -1,6 +1,6 @@
 from utils.api import UsernameSerializer, serializers
 
-from .models import Contest, ContestAnnouncement, ContestRuleType
+from .models import ClassContestAssignment, Contest, ContestAnnouncement, ContestRuleType
 from .models import ACMContestRank, OIContestRank
 
 
@@ -106,3 +106,68 @@ class ACMContesHelperSerializer(serializers.Serializer):
     problem_id = serializers.CharField()
     rank_id = serializers.IntegerField()
     checked = serializers.BooleanField()
+
+
+# ---------------- 교사 학급 대회 ----------------
+
+class CreateClassContestSerializer(serializers.Serializer):
+    """교사용 대회 개설.
+
+    비밀번호·IP 제한·규칙 유형·공개 여부는 받지 않는다. 참가 범위는 학급 배포로
+    정해지고, 수업용 대회는 ACM 규칙에 실시간 순위로 고정한다.
+    """
+    title = serializers.CharField(max_length=128)
+    description = serializers.CharField(allow_blank=True)
+    start_time = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+
+    def validate(self, attrs):
+        if attrs["start_time"] >= attrs["end_time"]:
+            raise serializers.ValidationError("종료 시각이 시작 시각보다 뒤여야 합니다")
+        return attrs
+
+
+class EditClassContestSerializer(CreateClassContestSerializer):
+    id = serializers.IntegerField()
+
+
+class ClassContestSerializer(serializers.ModelSerializer):
+    status = serializers.CharField(read_only=True)
+    class_count = serializers.SerializerMethodField()
+    problem_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Contest
+        fields = ["id", "title", "description", "start_time", "end_time",
+                  "status", "class_count", "problem_count", "create_time"]
+
+    def get_class_count(self, obj):
+        return obj.assignments.count()
+
+    def get_problem_count(self, obj):
+        return obj.problem_set.count()
+
+
+class ClassContestAssignmentSerializer(serializers.ModelSerializer):
+    school_class = serializers.IntegerField(source="school_class_id", read_only=True)
+    school_name = serializers.CharField(source="school_class.school.name", read_only=True)
+    display_name = serializers.CharField(source="school_class.display_name", read_only=True)
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClassContestAssignment
+        fields = ["id", "school_class", "school_name", "display_name",
+                  "student_count", "assigned_at"]
+
+    def get_student_count(self, obj):
+        return obj.school_class.memberships.count()
+
+
+class AssignClassContestSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    class_id = serializers.IntegerField()
+
+
+class AddClassContestProblemSerializer(serializers.Serializer):
+    contest_id = serializers.IntegerField()
+    problem_id = serializers.IntegerField()

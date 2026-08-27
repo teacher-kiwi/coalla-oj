@@ -7,7 +7,10 @@
             {{ contests[index].title }}
           </el-button>
         </template>
-        <el-carousel v-model="index" :interval="6000" height="300px">
+        <!-- el-carousel 은 v-model 을 지원하지 않는다(modelValue prop 이 없다).
+             현재 위치는 change 이벤트로만 알 수 있어, 이걸 놓치면 제목과
+             "대회 열기" 링크가 첫 대회에 멈춘다. -->
+        <el-carousel :interval="6000" height="300px" @change="onCarouselChange">
           <el-carousel-item v-for="(contest, idx) of contests" :key="idx">
             <div class="contest-content">
               <div class="contest-content-tags">
@@ -45,6 +48,10 @@ import { CONTEST_STATUS } from '@/utils/constants'
 const router = useRouter()
 const contests = ref([])
 const index = ref(0)
+
+function onCarouselChange (newIndex) {
+  index.value = newIndex
+}
 
 function getDuration (startTime, endTime) {
   return time.duration(startTime, endTime)

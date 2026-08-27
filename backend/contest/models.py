@@ -4,7 +4,7 @@ from django.utils.timezone import now
 from utils.models import JSONField
 
 from utils.constants import ContestStatus, ContestType
-from account.models import User
+from account.models import SchoolClass, User
 from utils.models import RichTextField
 
 
@@ -24,6 +24,10 @@ class Contest(models.Model):
     # false 면 삭제한 것과 같다
     visible = models.BooleanField(default=True)
     allowed_ip_ranges = JSONField(default=list)
+    # 교사가 자기 학급을 대상으로 연 대회. 배포한 학급의 학생에게만 보인다.
+    # 만든 사람의 유형으로 판단하지 않는 이유: 교사가 나중에 일반 사용자로
+    # 바뀌어도 대회의 성격은 그대로여야 한다.
+    is_class_contest = models.BooleanField(default=False)
 
     @property
     def status(self):
@@ -40,6 +44,22 @@ class Contest(models.Model):
             return ContestType.PASSWORD_PROTECTED_CONTEST
         return ContestType.PUBLIC_CONTEST
 
+    def is_open_to(self, user):
+        """이 대회를 목록에서 보고 들어갈 수 있는 사용자인지.
+
+        관리자가 연 대회는 지금처럼 모두에게 열려 있다. 교사가 연 학급 대회는
+        만든 교사와 배포받은 학급의 학생만 볼 수 있다.
+        """
+        if not self.is_class_contest:
+            return True
+        if not user.is_authenticated:
+            return False
+        if user.is_contest_admin(self):
+            return True
+        return ClassContestAssignment.objects.filter(
+            contest=self,
+            school_class__memberships__student_id=user.id).exists()
+
     # 문제의 통계(제출 수·정답 수 등)를 볼 수 있는지
     def problem_details_permission(self, user):
         return self.rule_type == ContestRuleType.ACM or \
@@ -50,6 +70,24 @@ class Contest(models.Model):
     class Meta:
         db_table = "contest"
         ordering = ("-start_time",)
+
+
+class ClassContestAssignment(models.Model):
+    """교사가 연 대회를 학급에 배포한 기록.
+
+    문제집(ProblemSetAssignment)과 같은 방식이다. 배포한 학급의 학생만
+    대회 목록에서 보고 들어갈 수 있다. 관리자가 만든 대회는 배포가 없고
+    is_class_contest 가 False 라 지금처럼 모두에게 열린다.
+    """
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="assignments")
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE,
+                                     related_name="contest_assignments")
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "class_contest_assignment"
+        unique_together = (("contest", "school_class"),)
+        ordering = ("-assigned_at",)
 
 
 class AbstractContestRank(models.Model):

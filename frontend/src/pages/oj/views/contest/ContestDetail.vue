@@ -77,6 +77,13 @@
           <el-icon><MagicStick /></el-icon>
           관리자 도우미
         </VerticalMenuItem>
+        <!-- 학급 대회를 연 교사에게. 관리자 도우미는 /api/admin/* 을 쓰므로
+             교사 권한으로는 열리지 않는다(눌러도 로그인하라는 응답만 온다). -->
+        <VerticalMenuItem v-if="showClassContestEdit"
+                          :route="{ name: 'teacher-contest-detail', params: { contestId: contestID } }">
+          <el-icon><Edit /></el-icon>
+          대회 수정
+        </VerticalMenuItem>
       </VerticalMenu>
     </div>
   </div>
@@ -86,7 +93,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { House, ChatDotRound, PictureFilled, List, TrendCharts, MagicStick } from '@element-plus/icons-vue'
+import { House, ChatDotRound, PictureFilled, List, TrendCharts, MagicStick, Edit } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import api from '@oj/api'
 import time from '@/utils/time'
@@ -94,11 +101,13 @@ import { CONTEST_STATUS_REVERSE, RULE_TYPE_LABEL, CONTEST_TYPE_LABEL } from '@/u
 import VerticalMenu from '@oj/components/verticalMenu/verticalMenu.vue'
 import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import { useContestStore } from '@/store/contest'
+import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
 
 const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
+const userStore = useUserStore()
 const appStore = useAppStore()
 
 const route_name = ref('')
@@ -125,7 +134,14 @@ const countdownType = computed(() => {
   return 'warning'
 })
 
-const showAdminHelper = computed(() => isContestAdmin.value && contestRuleType.value === 'ACM')
+// 관리자 도우미는 /api/admin/* 이라 관리자만 쓸 수 있다. 학급 대회를 연 교사는
+// isContestAdmin 이지만 관리자 권한이 없어, 메뉴가 보이면 눌렀을 때 실패한다.
+const showAdminHelper = computed(() =>
+  isContestAdmin.value && contestRuleType.value === 'ACM' &&
+  !contest.value.is_class_contest && userStore.isAdminRole)
+// 학급 대회를 연 교사에게는 대신 교사용 관리 화면으로 보낸다
+const showClassContestEdit = computed(() =>
+  isContestAdmin.value && contest.value.is_class_contest && userStore.isTeacher)
 
 function localtime (val) {
   return time.utcToLocal(val)

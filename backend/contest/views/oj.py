@@ -2,6 +2,7 @@ import io
 
 import xlsxwriter
 from django.http import HttpResponse
+from django.db.models import Q
 from django.utils.timezone import now
 from django.core.cache import cache
 
@@ -17,6 +18,17 @@ from ..models import ContestAnnouncement, Contest, OIContestRank, ACMContestRank
 from ..serializers import ContestAnnouncementSerializer
 from ..serializers import ContestSerializer, ContestPasswordVerifySerializer
 from ..serializers import OIContestRankSerializer, ACMContestRankSerializer
+
+
+def _class_contest_visible_to(user):
+    """대회 목록에서 학급 대회를 걸러내는 조건."""
+    public_only = Q(is_class_contest=False)
+    if not user.is_authenticated:
+        return public_only
+    if user.is_super_admin():
+        return Q()
+    return public_only | Q(created_by=user) | Q(
+        assignments__school_class__memberships__student_id=user.id)
 
 
 class ContestAnnouncementListAPI(APIView):
@@ -41,6 +53,9 @@ class ContestAPI(APIView):
             contest = Contest.objects.get(id=id, visible=True)
         except Contest.DoesNotExist:
             return self.error("대회가 존재하지 않습니다")
+        # 배포받지 않은 학급 대회는 없는 것과 같이 취급한다(존재를 알리지 않는다)
+        if not contest.is_open_to(request.user):
+            return self.error("대회가 존재하지 않습니다")
         data = ContestSerializer(contest).data
         data["now"] = datetime2str(now())
         return self.success(data)
@@ -49,6 +64,17 @@ class ContestAPI(APIView):
 class ContestListAPI(APIView):
     def get(self, request):
         contests = Contest.objects.select_related("created_by").filter(visible=True)
+        # 학급 대회는 배포받은 학급의 학생과 만든 교사에게만 보인다.
+        # 배포 조인 때문에 같은 대회가 여러 번 나올 수 있어 distinct 가 필요하다.
+        contests = contests.filter(_class_contest_visible_to(request.user)).distinct()
+        # 학생 화면에서 "우리 반 대회"와 "공개 대회"를 나눠 보기 위한 구분.
+        # contest_type 이라는 이름은 이미 비밀번호 유무를 뜻해서 scope 를 쓴다.
+        # 값이 없으면 지금처럼 둘 다 보여준다.
+        scope = request.GET.get("scope")
+        if scope == "class":
+            contests = contests.filter(is_class_contest=True)
+        elif scope == "public":
+            contests = contests.filter(is_class_contest=False)
         keyword = request.GET.get("keyword")
         rule_type = request.GET.get("rule_type")
         status = request.GET.get("status")

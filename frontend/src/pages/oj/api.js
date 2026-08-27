@@ -84,6 +84,45 @@ export default {
   deleteStudent (id) {
     return ajax('teacher/student', 'delete', { params: { id } })
   },
+  // ---- 교사 대회 ----
+  getMyContests () {
+    return ajax('teacher/contest', 'get')
+  },
+  getMyContest (id) {
+    return ajax('teacher/contest', 'get', { params: { id } })
+  },
+  createMyContest (data) {
+    return ajax('teacher/contest', 'post', { data })
+  },
+  editMyContest (data) {
+    return ajax('teacher/contest', 'put', { data })
+  },
+  deleteMyContest (id) {
+    return ajax('teacher/contest', 'delete', { params: { id } })
+  },
+  getMyContestClasses (contestId) {
+    return ajax('teacher/contest/class', 'get', { params: { contest_id: contestId } })
+  },
+  assignMyContest (contestId, classId) {
+    return ajax('teacher/contest/class', 'post',
+      { data: { contest_id: contestId, class_id: classId } })
+  },
+  unassignMyContest (contestId, classId) {
+    return ajax('teacher/contest/class', 'delete',
+      { params: { contest_id: contestId, class_id: classId } })
+  },
+  getMyContestProblems (contestId) {
+    return ajax('teacher/contest/problem', 'get', { params: { contest_id: contestId } })
+  },
+  addMyContestProblem (contestId, problemId) {
+    return ajax('teacher/contest/problem', 'post',
+      { data: { contest_id: contestId, problem_id: problemId } })
+  },
+  removeMyContestProblem (contestId, problemId) {
+    return ajax('teacher/contest/problem', 'delete',
+      { params: { contest_id: contestId, problem_id: problemId } })
+  },
+
   // ---- 교사 출제 ----
   getMyProblems () {
     return ajax('teacher/problem', 'get')

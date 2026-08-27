@@ -123,6 +123,10 @@ def check_contest_permission(check_type="details"):
             if user.is_contest_admin(self.contest):
                 return func(*args, **kwargs)
 
+            # 학급 대회는 배포받은 학급의 학생만 들어갈 수 있다
+            if not self.contest.is_open_to(user):
+                return self.error("대회 %s 이(가) 존재하지 않습니다" % contest_id)
+
             if self.contest.contest_type == ContestType.PASSWORD_PROTECTED_CONTEST:
                 if not check_contest_password(request.session.get(CONTEST_PASSWORD_SESSION_KEY, {}).get(self.contest.id), self.contest.password):
                     return self.error("비밀번호가 올바르지 않거나 만료되었습니다")

@@ -31,6 +31,8 @@ const TeacherProblemSetList = () => import('@oj/views/teacher/ProblemSetList.vue
 const TeacherProgressBoard = () => import('@oj/views/teacher/ProgressBoard.vue')
 const TeacherStudentDetail = () => import('@oj/views/teacher/StudentDetail.vue')
 const TeacherProblemSetDetail = () => import('@oj/views/teacher/ProblemSetDetail.vue')
+const TeacherContestList = () => import('@oj/views/teacher/ContestList.vue')
+const TeacherContestDetail = () => import('@oj/views/teacher/ContestDetail.vue')
 const ProblemSetList = () => import('@oj/views/problem/ProblemSetList.vue')
 const ProblemSetDetail = () => import('@oj/views/problem/ProblemSetDetail.vue')
 const StudentPasswordSetting = () => import('@oj/views/setting/children/StudentPasswordSetting.vue')
@@ -194,6 +196,18 @@ export default [
     name: 'teacher-class-detail',
     meta: { requiresAuth: true, title: '학급 학생' },
     component: TeacherClassDetail
+  },
+  {
+    path: '/teacher/contest',
+    name: 'teacher-contest-list',
+    meta: { requiresAuth: true, title: '대회' },
+    component: TeacherContestList
+  },
+  {
+    path: '/teacher/contest/:contestId',
+    name: 'teacher-contest-detail',
+    meta: { requiresAuth: true, title: '대회 관리' },
+    component: TeacherContestDetail
   },
   {
     path: '/teacher/problem-set',

@@ -6,6 +6,22 @@
         <template #extra>
           <ul class="filter">
             <li>
+              <!-- 공개 대회와 학급 대회는 성격이 달라 섞이면 학생이 헷갈린다 -->
+              <el-dropdown @command="onScopeChange">
+                <span class="el-dropdown-link">
+                  {{ query.scope === '' ? '범위' : SCOPE_LABEL[query.scope] }}
+                  <el-icon><ArrowDown /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="">전체</el-dropdown-item>
+                    <el-dropdown-item command="class">학급</el-dropdown-item>
+                    <el-dropdown-item command="public">공개</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </li>
+            <li>
               <el-dropdown @command="onRuleChange">
                 <span class="el-dropdown-link">
                   {{ query.rule_type === '' ? '규칙' : RULE_TYPE_LABEL[query.rule_type] }}
@@ -47,10 +63,13 @@
         <ol id="contest-list">
           <li v-for="contest in contests" :key="contest.title">
             <el-row justify="space-between" align="middle">
-              <img class="trophy" src="../../../../assets/Cup.png" />
+              <img class="trophy" :src="contest.is_class_contest ? lectureIcon : cupIcon"
+                   :alt="contest.is_class_contest ? '학급 대회' : '공개 대회'" />
               <el-col :span="18" class="contest-main">
                 <p class="title">
                   <a class="entry" @click.stop="goContest(contest)">{{ contest.title }}</a>
+                  <el-tag v-if="contest.is_class_contest" type="success" size="small"
+                          effect="plain" class="kind">학급</el-tag>
                   <template v-if="contest.contest_type !== 'Public'">
                     <el-icon :size="20"><Lock /></el-icon>
                   </template>
@@ -96,7 +115,13 @@ import api from '@oj/api'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
 import Pagination from '@oj/components/Pagination.vue'
+// 학급 대회는 수업의 연장이라 트로피 대신 수업 아이콘을 쓴다
+import cupIcon from '@/assets/Cup.png'
+import lectureIcon from '@/assets/Lecture.png'
 import { CONTEST_STATUS_REVERSE, CONTEST_TYPE, RULE_TYPE_LABEL } from '@/utils/constants'
+
+// 학급 대회(교사가 자기 학급에 배포)와 공개 대회(관리자)를 나눠 본다
+const SCOPE_LABEL = { class: '학급', public: '공개' }
 import { useUserStore } from '@/store/user'
 import { useAppStore } from '@/store/app'
 
@@ -109,7 +134,7 @@ const page = ref(1)
 const limit = ref(10)
 const total = ref(0)
 const contests = ref([])
-const query = reactive({ status: '', keyword: '', rule_type: '' })
+const query = reactive({ status: '', keyword: '', rule_type: '', scope: '' })
 
 function localtime (val) {
   return time.utcToLocal(val, 'YYYY-M-D HH:mm')
@@ -131,6 +156,7 @@ function init () {
   query.status = q.status || ''
   query.rule_type = q.rule_type || ''
   query.keyword = q.keyword || ''
+  query.scope = q.scope || ''
   page.value = parseInt(q.page) || 1
   limit.value = parseInt(q.limit) || 10
   getContestList(page.value)
@@ -151,6 +177,12 @@ function changeRoute () {
 
 function onRuleChange (rule) {
   query.rule_type = rule
+  page.value = 1
+  changeRoute()
+}
+
+function onScopeChange (scope) {
+  query.scope = scope
   page.value = 1
   changeRoute()
 }
@@ -237,4 +269,9 @@ watch(() => route.fullPath, (newVal, oldVal) => {
   .contest-status-col {
     text-align: center;
   }
+
+.kind {
+  margin-left: 8px;
+  vertical-align: 3px;
+}
 </style>
