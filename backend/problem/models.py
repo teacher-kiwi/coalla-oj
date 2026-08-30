@@ -5,7 +5,6 @@ from utils.models import JSONField
 
 from account.models import SchoolClass, User
 from contest.models import Contest
-from utils.models import RichTextField
 from utils.constants import Choices
 
 
@@ -57,15 +56,15 @@ class Problem(models.Model):
     # 대회 문제를 공개 문제로도 열어둘지
     is_public = models.BooleanField(default=False)
     title = models.TextField()
-    description = RichTextField()
-    input_description = RichTextField()
-    output_description = RichTextField()
+    description = models.TextField()
+    input_description = models.TextField()
+    output_description = models.TextField()
     # [{input: "test", output: "123"}, ...]
     samples = JSONField()
     test_case_id = models.TextField()
     # [{"input_name": "1.in", "output_name": "1.out", "score": 0}]
     test_case_score = JSONField()
-    hint = RichTextField(null=True)
+    hint = models.TextField(null=True)
     languages = JSONField()
     template = JSONField()
     create_time = models.DateTimeField(auto_now_add=True)

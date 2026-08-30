@@ -20,15 +20,18 @@ class WebsiteConfigAPITest(APITestCase):
         self.assertSuccess(resp)
 
     def test_edit_website_config(self):
+        """푸터도 마크다운으로 저장한다. 서버는 손대지 않고 그대로 담는다.
+
+        원시 HTML 이 실행되지 않는 것은 화면 쪽에서 막는다(markdown-it 의 html 옵션).
+        """
         self.create_super_admin()
         url = self.reverse("website_config_api")
         data = {"website_base_url": "http://test.com", "website_name": "test name",
-                "website_name_shortcut": "test oj", "website_footer": "<img onerror=alert(1) src=#>",
+                "website_name_shortcut": "test oj", "website_footer": "**굵은** 푸터",
                 "allow_register": True, "submission_list_show_all": False}
         resp = self.client.post(url, data=data)
         self.assertSuccess(resp)
-        # onerror 는 걸러지고 src 만 남는다(HTML5 라 void 요소에 닫는 사선을 붙이지 않는다)
-        self.assertEqual(SysOptions.website_footer, '<img src="#">')
+        self.assertEqual(SysOptions.website_footer, "**굵은** 푸터")
 
     def test_set_google_client_id(self):
         self.create_super_admin()

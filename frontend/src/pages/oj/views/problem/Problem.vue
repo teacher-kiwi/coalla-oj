@@ -5,19 +5,19 @@
         <template #title>{{ problem.title }}</template>
         <div v-if="problemLoaded" id="problem-content" class="markdown-body" v-katex>
           <p class="title">문제 설명</p>
-          <p class="content" v-html="problem.description"></p>
+          <Markdown class="content" :source="problem.description" />
 
           <p class="title">
             입력
             <span v-if="problem.io_mode.io_mode == 'File IO'">(파일 입력: {{ problem.io_mode.input }})</span>
           </p>
-          <p class="content" v-html="problem.input_description"></p>
+          <Markdown class="content" :source="problem.input_description" />
 
           <p class="title">
             출력
             <span v-if="problem.io_mode.io_mode == 'File IO'">(파일 출력: {{ problem.io_mode.output }})</span>
           </p>
-          <p class="content" v-html="problem.output_description"></p>
+          <Markdown class="content" :source="problem.output_description" />
 
           <div v-for="(sample, index) of problem.samples" :key="index">
             <div class="flex-container sample">
@@ -40,7 +40,7 @@
           <div v-if="problem.hint">
             <p class="title">힌트</p>
             <el-card>
-              <div class="content" v-html="problem.hint"></div>
+              <Markdown class="content" :source="problem.hint" />
             </el-card>
           </div>
 
@@ -194,6 +194,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

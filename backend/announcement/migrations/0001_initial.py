@@ -3,7 +3,6 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-import utils.models
 
 
 class Migration(migrations.Migration):
@@ -20,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.TextField()),
-                ('content', utils.models.RichTextField()),
+                ('content', models.TextField()),
                 ('create_time', models.DateTimeField(auto_now_add=True)),
                 ('last_update_time', models.DateTimeField(auto_now=True)),
                 ('visible', models.BooleanField(default=True)),

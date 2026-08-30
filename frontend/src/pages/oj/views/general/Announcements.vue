@@ -25,7 +25,7 @@
         <Pagination v-if="!isContest" :total="total" :page-size="limit" :current="page" @on-change="getAnnouncementList" />
       </template>
       <template v-else>
-        <div v-katex v-html="announcement.content" key="content" class="content-container markdown-body"></div>
+        <Markdown :source="announcement.content" key="content" class="content-container" />
       </template>
     </transition-group>
   </Panel>
@@ -33,6 +33,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute } from 'vue-router'
 import { Back } from '@element-plus/icons-vue'
 import api from '@oj/api'

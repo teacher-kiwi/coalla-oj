@@ -16,16 +16,16 @@
           <template #default="{ row }">
             <div class="detail">
               <p class="detail-title">문제 설명</p>
-              <div class="detail-body" v-html="row.description"></div>
+              <Markdown class="detail-body" :source="row.description" />
 
               <el-row :gutter="16">
                 <el-col :span="12">
                   <p class="detail-title">입력 설명</p>
-                  <div class="detail-body" v-html="row.input_description"></div>
+                  <Markdown class="detail-body" :source="row.input_description" />
                 </el-col>
                 <el-col :span="12">
                   <p class="detail-title">출력 설명</p>
-                  <div class="detail-body" v-html="row.output_description"></div>
+                  <Markdown class="detail-body" :source="row.output_description" />
                 </el-col>
               </el-row>
 
@@ -42,7 +42,7 @@
               </p>
 
               <p v-if="row.hint" class="detail-title">힌트</p>
-              <div v-if="row.hint" class="detail-body" v-html="row.hint"></div>
+              <Markdown v-if="row.hint" class="detail-body" :source="row.hint" />
             </div>
           </template>
         </el-table-column>
@@ -81,6 +81,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import api from '../../api.js'

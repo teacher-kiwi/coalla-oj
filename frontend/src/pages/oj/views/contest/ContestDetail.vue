@@ -15,7 +15,7 @@
                 <span id="countdown">{{ countdown }}</span>
               </el-tag>
             </template>
-            <div v-html="contest.description" class="markdown-body"></div>
+            <Markdown :source="contest.description" />
             <div v-if="passwordFormVisible" class="contest-password">
               <el-input v-model="contestPassword" type="password"
                         placeholder="대회 비밀번호" class="contest-password-input"
@@ -91,6 +91,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { House, ChatDotRound, PictureFilled, List, TrendCharts, MagicStick, Edit } from '@element-plus/icons-vue'

@@ -45,10 +45,6 @@ charset-normalizer==3.4.9
 idna==3.18
 urllib3==2.7.0
 
-# --- 리치 텍스트 XSS 필터 ---
-# 러스트 확장이지만 musllinux abi3 휠이 있어 알파인에서도 툴체인 없이 깔린다.
-nh3==0.3.6
-
 # --- 기타 유틸 ---
 pillow==10.2.0
 python-dateutil==2.8.2

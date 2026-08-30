@@ -13,6 +13,7 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'
 import katex from '@/plugins/katex'
+import { configureMarkdown } from '@/plugins/markdown'
 
 import Panel from './components/Panel.vue'
 import IconBtn from './components/btn/IconBtn.vue'
@@ -20,6 +21,9 @@ import Save from './components/btn/Save.vue'
 import Cancel from './components/btn/Cancel.vue'
 import '@/styles/index.less'
 import './style.less'
+
+// 마크다운 렌더 설정은 편집기·표시 화면이 만들어지기 전에 걸어야 한다
+configureMarkdown()
 
 const app = createApp(App)
 

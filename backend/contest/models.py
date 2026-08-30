@@ -5,12 +5,11 @@ from utils.models import JSONField
 
 from utils.constants import ContestStatus, ContestType
 from account.models import SchoolClass, User
-from utils.models import RichTextField
 
 
 class Contest(models.Model):
     title = models.TextField()
-    description = RichTextField()
+    description = models.TextField()
     # 순위를 실시간으로 보여줄지, 캐시된 순위를 보여줄지(봉인)
     real_time_rank = models.BooleanField()
     password = models.TextField(null=True)
@@ -125,7 +124,7 @@ class OIContestRank(AbstractContestRank):
 class ContestAnnouncement(models.Model):
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE)
     title = models.TextField()
-    content = RichTextField()
+    content = models.TextField()
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     visible = models.BooleanField(default=True)
     create_time = models.DateTimeField(auto_now_add=True)

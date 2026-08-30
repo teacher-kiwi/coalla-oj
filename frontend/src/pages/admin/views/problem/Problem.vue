@@ -18,19 +18,19 @@
         <el-row :gutter="20">
           <el-col :span="24">
             <el-form-item prop="description" label="설명" required>
-              <Simditor v-model="problem.description" />
+              <MarkdownEditor v-model="problem.description" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="24">
             <el-form-item prop="input_description" label="입력 설명" required>
-              <Simditor v-model="problem.input_description" />
+              <MarkdownEditor v-model="problem.input_description" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item prop="output_description" label="출력 설명" required>
-              <Simditor v-model="problem.output_description" />
+              <MarkdownEditor v-model="problem.output_description" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -120,7 +120,7 @@
         </div>
 
         <el-form-item class="hint-item" label="힌트">
-          <Simditor v-model="problem.hint" placeholder="" />
+          <MarkdownEditor v-model="problem.hint" placeholder="" />
         </el-form-item>
 
         <el-form-item label="코드 템플릿">
@@ -222,7 +222,7 @@ import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
-import Simditor from '../../components/Simditor.vue'
+import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import Accordion from '../../components/Accordion.vue'
 import CodeMirror from '../../components/CodeMirror.vue'
 import api from '../../api.js'

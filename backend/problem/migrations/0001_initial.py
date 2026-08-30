@@ -4,7 +4,6 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 import problem.models
-import utils.models
 
 
 class Migration(migrations.Migration):
@@ -35,13 +34,13 @@ class Migration(migrations.Migration):
                 ('_id', models.TextField(db_index=True)),
                 ('is_public', models.BooleanField(default=False)),
                 ('title', models.TextField()),
-                ('description', utils.models.RichTextField()),
-                ('input_description', utils.models.RichTextField()),
-                ('output_description', utils.models.RichTextField()),
+                ('description', models.TextField()),
+                ('input_description', models.TextField()),
+                ('output_description', models.TextField()),
                 ('samples', models.JSONField()),
                 ('test_case_id', models.TextField()),
                 ('test_case_score', models.JSONField()),
-                ('hint', utils.models.RichTextField(null=True)),
+                ('hint', models.TextField(null=True)),
                 ('languages', models.JSONField()),
                 ('template', models.JSONField()),
                 ('create_time', models.DateTimeField(auto_now_add=True)),

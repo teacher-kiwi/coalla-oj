@@ -25,7 +25,7 @@
                 </el-button>
               </div>
               <div class="contest-content-description">
-                <blockquote v-html="contest.description"></blockquote>
+                <Markdown :source="contest.description" />
               </div>
             </div>
           </el-carousel-item>
@@ -38,6 +38,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRouter } from 'vue-router'
 import { Calendar, Timer, Trophy } from '@element-plus/icons-vue'
 import Announcements from './Announcements.vue'

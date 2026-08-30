@@ -8,7 +8,7 @@
         </transition>
       </router-view>
       <div class="footer">
-        <p v-html="appStore.website.website_footer"></p>
+        <Markdown :source="appStore.website.website_footer" />
         <p>Powered by <a href="https://github.com/QingdaoU/OnlineJudge">OnlineJudge</a>
           <span v-if="version">&nbsp; Version: {{ version }}</span>
         </p>
@@ -20,6 +20,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/store/app'

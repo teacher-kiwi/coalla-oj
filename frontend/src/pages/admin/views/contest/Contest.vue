@@ -10,7 +10,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="설명" required>
-              <Simditor v-model="contest.description" />
+              <MarkdownEditor v-model="contest.description" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -72,7 +72,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'
-import Simditor from '../../components/Simditor.vue'
+import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import api from '../../api.js'
 const route = useRoute()
 const router = useRouter()

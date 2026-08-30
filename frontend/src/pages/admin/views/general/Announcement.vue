@@ -38,7 +38,7 @@
           <el-input v-model="announcement.title" placeholder="제목" class="title-input" />
         </el-form-item>
         <el-form-item label="내용" required>
-          <Simditor v-model="announcement.content" />
+          <MarkdownEditor v-model="announcement.content" />
         </el-form-item>
         <div class="visible-box">
           <span>공개</span>
@@ -58,7 +58,7 @@ import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import Simditor from '../../components/Simditor.vue'
+import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import api from '../../api.js'
 import time from '@/utils/time'
 const route = useRoute()

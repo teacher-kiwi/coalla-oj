@@ -3,7 +3,6 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
-import utils.models
 
 
 class Migration(migrations.Migration):
@@ -20,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.TextField()),
-                ('description', utils.models.RichTextField()),
+                ('description', models.TextField()),
                 ('real_time_rank', models.BooleanField()),
                 ('password', models.TextField(null=True)),
                 ('rule_type', models.TextField()),
@@ -42,7 +41,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.TextField()),
-                ('content', utils.models.RichTextField()),
+                ('content', models.TextField()),
                 ('visible', models.BooleanField(default=True)),
                 ('create_time', models.DateTimeField(auto_now_add=True)),
                 ('contest', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contest.contest')),

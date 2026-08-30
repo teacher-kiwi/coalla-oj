@@ -1,9 +1,3 @@
+# JSONField 를 여기서 다시 내보내는 이유: 옛 마이그레이션들이 utils.models.JSONField
+# 를 가리키고 있어 경로를 유지해야 한다.
 from django.db.models import JSONField  # NOQA
-from django.db import models
-
-from utils.xss_filter import clean_html
-
-
-class RichTextField(models.TextField):
-    def get_prep_value(self, value):
-        return clean_html(value)

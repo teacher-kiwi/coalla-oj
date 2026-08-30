@@ -113,9 +113,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { DIFFICULTY, DIFFICULTY_GUIDE } from '@/utils/constants'
-// 마크다운 편집기는 관리자 출제 화면에서 쓰던 것을 그대로 쓴다.
-// (편집기 동작에 얽힌 주의사항이 그 컴포넌트 주석에 정리되어 있다)
-import MarkdownEditor from '@admin/components/Simditor.vue'
+// 관리자 출제 화면과 같은 편집기를 쓴다
+import MarkdownEditor from '@admin/components/MarkdownEditor.vue'
 
 // 서버(problem/serializers.py)와 같은 값이어야 한다
 const MAX_CASES = 20
