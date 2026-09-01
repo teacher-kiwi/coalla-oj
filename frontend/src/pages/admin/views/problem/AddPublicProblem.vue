@@ -3,7 +3,7 @@
     <el-input v-model="keyword" placeholder="검색어" :prefix-icon="SearchIcon" />
     <el-table :data="problems" v-loading="loading">
       <el-table-column label="ID" width="100" prop="id" />
-      <el-table-column label="표시 ID" width="200" prop="_id" />
+      <el-table-column label="표시 ID" width="200" prop="display_id" />
       <el-table-column label="제목" prop="title" />
       <el-table-column label="옵션" align="center" width="100" fixed="right">
         <template #default="{ row }">
@@ -19,7 +19,6 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { Search as SearchIcon } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
 import api from '@admin/api'
 
 const props = defineProps({ contestID: { type: [String, Number], required: true } })
@@ -53,11 +52,10 @@ function getPublicProblem (page = 1) {
   }).catch(() => { loading.value = false })
 }
 
+// 대회 안 표시(A, B, C)는 순서가 정하므로 물어볼 값이 없다
 function handleAddProblem (problemID) {
-  ElMessageBox.prompt('대회 문제의 표시 ID를 입력하세요', '확인').then(({ value }) => {
-    api.addProblemFromPublic({ problem_id: problemID, contest_id: props.contestID, display_id: value }).then(() => {
-      emit('on-change')
-    }, () => {})
+  api.addProblemFromPublic({ problem_id: problemID, contest_id: props.contestID }).then(() => {
+    emit('on-change')
   }, () => {})
 }
 

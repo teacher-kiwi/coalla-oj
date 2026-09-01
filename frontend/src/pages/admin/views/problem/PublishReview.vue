@@ -46,7 +46,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="번호" prop="_id" width="90" />
+        <el-table-column label="번호" prop="display_id" width="90" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="출제자" width="140">
           <template #default="{ row }">{{ row.created_by?.username || '-' }}</template>

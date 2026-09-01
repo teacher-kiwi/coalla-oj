@@ -187,7 +187,7 @@ class ClassContestProblemTest(ClassContestTestBase):
         resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
                                                         "problem_id": mine.id})
         self.assertSuccess(resp)
-        self.assertEqual(resp.data["data"]["_id"], "A")
+        self.assertEqual(resp.data["data"]["display_id"], "A")
         # 원본은 그대로 남는다
         mine.refresh_from_db()
         self.assertIsNone(mine.contest_id)
@@ -198,9 +198,26 @@ class ClassContestProblemTest(ClassContestTestBase):
             problem = make_problem(f"200{i}", self.teacher)
             self.client.post(self.problem_url, data={"contest_id": self.contest_id,
                                                      "problem_id": problem.id})
-        labels = list(Problem.objects.filter(contest_id=self.contest_id)
-                      .order_by("_id").values_list("_id", flat=True))
-        self.assertEqual(labels, ["A", "B", "C"])
+        problems = Problem.objects.filter(contest_id=self.contest_id).order_by("order")
+        self.assertEqual([p.order for p in problems], [1, 2, 3])
+        self.assertEqual([p.display_id for p in problems], ["A", "B", "C"])
+        # 라벨은 만들어 쓰는 값이라 저장하지 않는다
+        self.assertEqual([p._id for p in problems], [None, None, None])
+
+    def test_removed_letter_is_reused(self):
+        """가운데 문제를 빼면 그 자리를 다시 쓴다. 라벨이 A, C, D 로 건너뛰면 안 된다."""
+        copies = []
+        for i in range(3):
+            problem = make_problem(f"210{i}", self.teacher)
+            copies.append(self.client.post(self.problem_url, data={
+                "contest_id": self.contest_id, "problem_id": problem.id}).data["data"]["id"])
+        self.assertSuccess(self.client.delete(
+            self.problem_url + f"?contest_id={self.contest_id}&problem_id={copies[1]}"))
+
+        fresh = make_problem("2200", self.teacher)
+        resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
+                                                        "problem_id": fresh.id})
+        self.assertEqual(resp.data["data"]["display_id"], "B")
 
     def test_cannot_add_another_teachers_private_problem(self):
         self.client.logout()

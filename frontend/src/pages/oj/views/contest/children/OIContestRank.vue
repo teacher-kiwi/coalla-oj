@@ -48,8 +48,8 @@
       <el-table-column v-for="prob in contestProblems" :key="prob.id" align="center">
         <template #header>
           <a class="emphasis link-text"
-             @click="router.push({ name: 'contest-problem-details', params: { contestID, problemID: prob._id } })">
-            {{ prob._id }}
+             @click="router.push({ name: 'contest-problem-details', params: { contestID, problemID: prob.display_id } })">
+            {{ prob.display_id }}
           </a>
         </template>
         <template #default="{ row }">

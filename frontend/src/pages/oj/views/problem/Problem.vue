@@ -147,7 +147,7 @@
           </div>
         </template>
         <ul>
-          <li><p>ID</p><p>{{ problem._id }}</p></li>
+          <li><p>ID</p><p>{{ problem.display_id }}</p></li>
           <li><p>시간 제한</p><p>{{ problem.time_limit }}MS</p></li>
           <li><p>메모리 제한</p><p>{{ problem.memory_limit }}MB</p></li>
           <li><p>IO 모드</p><p>{{ problem.io_mode.io_mode }}</p></li>
@@ -481,7 +481,7 @@ onMounted(() => {
 onBeforeRouteLeave((to, from) => {
   clearTimeout(refreshStatus)
   contestStore.changeContestItemVisible({ menu: true })
-  storage.set(buildProblemCodeKey(problem.value._id, from.params.contestID), {
+  storage.set(buildProblemCodeKey(problem.value.display_id, from.params.contestID), {
     code: code.value,
     language: language.value,
     theme: theme.value,

@@ -51,14 +51,14 @@
           </el-table-column>
           <el-table-column label="#" width="80">
             <template #default="{ row }">
-              <el-button link type="primary" @click="router.push({ name: 'problem-details', params: { problemID: row._id } })">
-                {{ row._id }}
+              <el-button link type="primary" @click="router.push({ name: 'problem-details', params: { problemID: row.display_id } })">
+                {{ row.display_id }}
               </el-button>
             </template>
           </el-table-column>
           <el-table-column label="제목" width="400">
             <template #default="{ row }">
-              <el-button link type="primary" class="title-btn" @click="router.push({ name: 'problem-details', params: { problemID: row._id } })">
+              <el-button link type="primary" class="title-btn" @click="router.push({ name: 'problem-details', params: { problemID: row.display_id } })">
                 {{ row.title }}
               </el-button>
             </template>

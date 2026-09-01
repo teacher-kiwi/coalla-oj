@@ -35,7 +35,7 @@ class SubmissionModelSerializer(_AuthorMixin, serializers.ModelSerializer):
 
 # 채점 상세(info)를 감추는 직렬화기. ACM 규칙에서 쓴다.
 class SubmissionSafeModelSerializer(_AuthorMixin, serializers.ModelSerializer):
-    problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
+    problem = serializers.SlugRelatedField(read_only=True, slug_field="display_id")
     username = serializers.SerializerMethodField()
     nickname = serializers.SerializerMethodField()
     _nicknames = {}
@@ -46,7 +46,7 @@ class SubmissionSafeModelSerializer(_AuthorMixin, serializers.ModelSerializer):
 
 
 class SubmissionListSerializer(_AuthorMixin, serializers.ModelSerializer):
-    problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
+    problem = serializers.SlugRelatedField(read_only=True, slug_field="display_id")
     show_link = serializers.SerializerMethodField()
     username = serializers.SerializerMethodField()
     nickname = serializers.SerializerMethodField()
@@ -79,7 +79,7 @@ class TeacherStudentSubmissionSerializer(serializers.ModelSerializer):
     표시 이름이 필요 없다(누구인지 이미 알고 연 화면이다). 코드는 목록에 싣지 않고
     기존 제출 상세 API 로 연다.
     """
-    problem = serializers.SlugRelatedField(read_only=True, slug_field="_id")
+    problem = serializers.SlugRelatedField(read_only=True, slug_field="display_id")
     problem_title = serializers.SerializerMethodField()
 
     class Meta:

@@ -43,7 +43,6 @@ class ProblemIOModeSerializer(serializers.Serializer):
 
 
 class CreateOrEditProblemSerializer(serializers.Serializer):
-    _id = serializers.CharField(max_length=32, allow_blank=True, allow_null=True)
     title = serializers.CharField(max_length=1024)
     description = serializers.CharField()
     # 입력이 없는 문제("Hello World 출력하기")도 있어 비워둘 수 있다.
@@ -71,11 +70,13 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=256, allow_blank=True, allow_null=True)
 
 
+# 공개 문제만 표시 번호를 받는다. 비워 보내면 서버가 매긴다(옛 데이터 이관용 입력칸).
+# 대회 문제의 표시(A, B, C)는 order 가 정하므로 받을 값이 없다.
 class CreateProblemSerializer(CreateOrEditProblemSerializer):
-    pass
+    _id = serializers.CharField(max_length=32, allow_blank=True, allow_null=True)
 
 
-class EditProblemSerializer(CreateOrEditProblemSerializer):
+class EditProblemSerializer(CreateProblemSerializer):
     id = serializers.IntegerField()
 
 
@@ -111,6 +112,9 @@ class CompileSPJSerializer(serializers.Serializer):
 class BaseProblemSerializer(serializers.ModelSerializer):
     tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
     created_by = UsernameSerializer()
+    # 화면에 보이는 번호. 공개 문제는 _id, 대회 문제는 order 로 만든 A, B, C 다.
+    # 화면은 이것만 본다(_id 는 관리자 출제 화면에서만 쓴다).
+    display_id = serializers.ReadOnlyField()
 
     def get_public_template(self, obj):
         ret = {}
@@ -130,7 +134,7 @@ class ProblemSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("_id", "order", "test_case_score", "test_case_id", "visible", "is_public",
                    "spj_code", "spj_version", "spj_compile_ok")
 
 
@@ -141,10 +145,11 @@ class ProblemListSerializer(serializers.ModelSerializer):
     rule_type 은 화면에 쓰이진 않지만 "내가 푼 문제" 표시(_add_problem_status)에 필요하다.
     """
     tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+    display_id = serializers.ReadOnlyField()
 
     class Meta:
         model = Problem
-        fields = ("id", "_id", "title", "difficulty", "tags", "rule_type", "visibility",
+        fields = ("id", "display_id", "title", "difficulty", "tags", "rule_type", "visibility",
                   "submission_number", "accepted_number")
 
 
@@ -153,7 +158,7 @@ class ProblemSafeSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("_id", "order", "test_case_score", "test_case_id", "visible", "is_public",
                    "spj_code", "spj_version", "spj_compile_ok",
                    "difficulty", "submission_number", "accepted_number", "statistic_info")
 
@@ -164,7 +169,7 @@ class ContestProblemMakePublicSerializer(serializers.Serializer):
 
 
 class ExportProblemSerializer(serializers.ModelSerializer):
-    display_id = serializers.SerializerMethodField()
+    display_id = serializers.ReadOnlyField()
     description = serializers.SerializerMethodField()
     input_description = serializers.SerializerMethodField()
     output_description = serializers.SerializerMethodField()
@@ -174,9 +179,6 @@ class ExportProblemSerializer(serializers.ModelSerializer):
     template = serializers.SerializerMethodField()
     source = serializers.SerializerMethodField()
     tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
-
-    def get_display_id(self, obj):
-        return obj._id
 
     def _html_format_value(self, value):
         return {"format": "html", "value": value}
@@ -222,7 +224,6 @@ class ExportProblemSerializer(serializers.ModelSerializer):
 class AddContestProblemSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     problem_id = serializers.IntegerField()
-    display_id = serializers.CharField()
 
 
 class ExportProblemRequestSerialzier(serializers.Serializer):
@@ -344,10 +345,11 @@ class ReviewProblemPublishSerializer(serializers.Serializer):
 class TeacherProblemListSerializer(serializers.ModelSerializer):
     """교사가 자기 문제를 관리하는 목록용."""
     tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
+    display_id = serializers.ReadOnlyField()
 
     class Meta:
         model = Problem
-        fields = ("id", "_id", "title", "difficulty", "tags", "visibility", "visible",
+        fields = ("id", "display_id", "title", "difficulty", "tags", "visibility", "visible",
                   "create_time", "submission_number", "accepted_number")
 
 
@@ -355,9 +357,11 @@ class TeacherProblemListSerializer(serializers.ModelSerializer):
 
 class ProblemBriefSerializer(serializers.ModelSerializer):
     """문제집 화면용 요약. 본문·테스트케이스는 기존 문제 상세 API 에서 받는다."""
+    display_id = serializers.ReadOnlyField()
+
     class Meta:
         model = Problem
-        fields = ("id", "_id", "title", "difficulty", "submission_number", "accepted_number")
+        fields = ("id", "display_id", "title", "difficulty", "submission_number", "accepted_number")
 
 
 class ProblemSetItemSerializer(serializers.ModelSerializer):

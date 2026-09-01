@@ -490,24 +490,23 @@ class ContestProblemAPI(ProblemBase):
         if data["rule_type"] != contest.rule_type:
             return self.error("규칙 유형이 올바르지 않습니다")
 
-        _id = data["_id"]
-        if not _id:
-            return self.error("표시 ID를 입력하세요")
-
-        if Problem.objects.filter(_id=_id, contest=contest).exists():
-            return self.error("이미 사용 중인 표시 ID입니다")
-
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
 
         data["contest"] = contest
+        # 대회 안 표시(A, B, C)는 순서가 정한다. 새 문제는 맨 뒤에 붙는다.
+        data["order"] = Problem.next_order(contest)
         tags = data.pop("tags")
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
             return self.error(error)
         data["created_by"] = request.user
-        problem = Problem.objects.create(**data)
+        try:
+            problem = Problem.objects.create(**data)
+        except IntegrityError:
+            # 순서를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
+            return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
         problem.tags.set(tag_objs)
         return self.success(ProblemAdminSerializer(problem).data)
 
@@ -558,12 +557,6 @@ class ContestProblemAPI(ProblemBase):
             problem = Problem.objects.get(id=problem_id, contest=contest)
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
-
-        _id = data["_id"]
-        if not _id:
-            return self.error("표시 ID를 입력하세요")
-        if Problem.objects.exclude(id=problem_id).filter(_id=_id, contest=contest).exists():
-            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -618,6 +611,8 @@ class MakeContestProblemPublicAPIView(APIView):
         problem.pk = None
         problem.contest = None
         problem._id = display_id
+        # 대회 안 순서는 공개 문제에서 뜻이 없다. 남겨두면 목록에서 앞으로 튀어나온다.
+        problem.order = 0
         problem.visible = False
         problem.submission_number = problem.accepted_number = 0
         problem.statistic_info = {}
@@ -638,18 +633,21 @@ class AddContestProblemAPI(APIView):
 
         if contest.status == ContestStatus.CONTEST_ENDED:
             return self.error("종료된 대회입니다")
-        if Problem.objects.filter(contest=contest, _id=data["display_id"]).exists():
-            return self.error("이 대회에 이미 같은 표시 ID가 있습니다")
 
         tags = problem.tags.all()
         problem.pk = None
         problem.contest = contest
         problem.is_public = True
         problem.visible = True
-        problem._id = request.data["display_id"]
+        problem._id = None
+        problem.order = Problem.next_order(contest)
         problem.submission_number = problem.accepted_number = 0
         problem.statistic_info = {}
-        problem.save()
+        try:
+            problem.save()
+        except IntegrityError:
+            # 순서를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
+            return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
         problem.tags.set(tags)
         return self.success()
 

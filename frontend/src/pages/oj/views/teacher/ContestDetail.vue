@@ -31,7 +31,7 @@
       </template>
 
       <el-table v-loading="loading.problems" :data="problems" class="full-width">
-        <el-table-column label="번호" prop="_id" width="80" />
+        <el-table-column label="번호" prop="display_id" width="80" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="난이도" width="120">
           <template #default="{ row }">{{ DIFFICULTY_LABEL[row.difficulty] || row.difficulty }}</template>
@@ -96,7 +96,7 @@
 
     <el-dialog v-model="problemDialog" title="문제 넣기" width="620px">
       <el-table :data="candidates" height="360" @row-click="addProblem" class="pick-table">
-        <el-table-column label="번호" prop="_id" width="90" />
+        <el-table-column label="번호" prop="display_id" width="90" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="구분" width="100">
           <template #default="{ row }">{{ row.visibility === 'public' ? '공개' : '내 문제' }}</template>

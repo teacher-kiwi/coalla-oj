@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from utils.api.tests import APITestCase
 
 from .models import ProblemTag, ProblemIOMode
-from .models import Problem, ProblemRuleType
+from .models import contest_problem_label, contest_problem_order, Problem, ProblemRuleType
 from contest.models import Contest
 from contest.tests import DEFAULT_CONTEST_DATA
 
@@ -400,6 +400,8 @@ class ContestProblemTest(ProblemCreateTestBase):
         self.contest = self.client.post(url, data=contest_data).data["data"]
         self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
         self.problem.contest_id = self.contest["id"]
+        self.problem._id = None
+        self.problem.order = 1
         self.problem.save()
         self.url = self.reverse("contest_problem_api")
 
@@ -411,9 +413,10 @@ class ContestProblemTest(ProblemCreateTestBase):
 
     def test_admin_get_one_contest_problem(self):
         contest_id = self.contest["id"]
-        problem_id = self.problem._id
-        resp = self.client.get("{}?contest_id={}&problem_id={}".format(self.url, contest_id, problem_id))
+        # 대회 문제는 대회 안 표시(A, B, C)로 연다
+        resp = self.client.get("{}?contest_id={}&problem_id={}".format(self.url, contest_id, "A"))
         self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["display_id"], "A")
 
     def test_regular_user_get_not_started_contest_problem(self):
         self.create_user("test", "test123")
@@ -441,7 +444,6 @@ class AddProblemFromPublicProblemAPITest(ProblemCreateTestBase):
         self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
         self.url = self.reverse("add_contest_problem_from_public_api")
         self.data = {
-            "display_id": "1000",
             "contest_id": self.contest["id"],
             "problem_id": self.problem.id
         }
@@ -450,7 +452,10 @@ class AddProblemFromPublicProblemAPITest(ProblemCreateTestBase):
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         self.assertTrue(Problem.objects.all().exists())
-        self.assertTrue(Problem.objects.filter(contest_id=self.contest["id"]).exists())
+        copied = Problem.objects.get(contest_id=self.contest["id"])
+        # 담은 순서가 대회 안 표시를 정한다
+        self.assertEqual(copied.display_id, "A")
+        self.assertIsNone(copied._id)
 
 
 class ParseProblemTemplateTest(APITestCase):
@@ -494,21 +499,72 @@ ddd
         self.assertEqual(ret["append"], "ccc\n")
 
 
-class PublicDisplayIdUniqueTest(APITestCase):
-    """공개 문제의 표시 번호는 DB 가 유일하게 지킨다.
+class ContestProblemLabelTest(APITestCase):
+    """대회 안 표시(A, B, C)는 저장하지 않고 순서로 만든다."""
+    def test_label_and_order_round_trip(self):
+        for order, label in ((1, "A"), (2, "B"), (26, "Z")):
+            self.assertEqual(contest_problem_label(order), label)
+            self.assertEqual(contest_problem_order(label), order)
 
-    unique_together(("_id", "contest")) 는 contest 가 NULL 인 공개 문제를 막지 못한다
-    (유니크 인덱스에서 NULL 은 서로 다른 값으로 취급된다). 같은 번호가 둘 생기면
-    _id 로 조회하는 제출 경로에서 MultipleObjectsReturned 가 난다.
+    def test_beyond_the_alphabet_falls_back_to_the_number(self):
+        self.assertEqual(contest_problem_label(27), "27")
+        self.assertEqual(contest_problem_order("27"), 27)
+
+    def test_unreadable_label_is_rejected(self):
+        # 주소로 아무 값이나 들어온다. 조회 전에 걸러야 한다.
+        for value in ("", None, "AB", "가", "0", "-1"):
+            self.assertIsNone(contest_problem_order(value))
+
+    def test_public_problem_shows_its_number(self):
+        problem = Problem(_id="1000", order=0)
+        self.assertEqual(problem.display_id, "1000")
+
+
+class MakeContestProblemPublicTest(ProblemCreateTestBase):
+    def setUp(self):
+        self.admin = self.create_super_admin()
+        ProblemTag.objects.create(name="test")
+        create_test_case_dir()
+        contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
+        contest_data["password"] = ""
+        self.contest = self.client.post(self.reverse("contest_admin_api"), data=contest_data).data["data"]
+        # 대회에서 직접 출제한 문제여야 한다. 공개 문제에서 담아온 것은 이미 공개다.
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["contest_id"] = self.contest["id"]
+        self.assertSuccess(self.client.post(self.reverse("contest_problem_admin_api"), data=data))
+        self.contest_problem = Problem.objects.get(contest_id=self.contest["id"])
+
+    def test_copy_leaves_the_contest_order_behind(self):
+        """공개 문제에는 대회 안 순서가 없다. 남겨두면 목록에서 앞으로 튀어나온다."""
+        self.assertEqual(self.contest_problem.order, 1)
+        resp = self.client.post(self.reverse("make_public_api"),
+                                data={"id": self.contest_problem.id, "display_id": "2000"})
+        self.assertSuccess(resp)
+        copied = Problem.objects.get(_id="2000", contest__isnull=True)
+        self.assertEqual(copied.order, 0)
+        self.assertEqual(copied.display_id, "2000")
+
+
+class DisplayIdUniqueTest(APITestCase):
+    """표시가 겹치지 않는 것은 DB 가 지킨다.
+
+    공개 문제는 표시 번호(_id)로, 대회 문제는 대회 안 순서(order)로 지킨다. 둘 다
+    contest 가 NULL 이냐 아니냐로 나뉘는 부분 인덱스다. 그냥 유니크로 걸면 유니크
+    인덱스에서 NULL 이 서로 다른 값으로 취급되어 아무것도 막지 못한다.
     """
     def setUp(self):
         self.admin = self.create_super_admin()
 
-    def _create(self, display_id, contest=None):
+    def _make_contest(self, title):
+        return Contest.objects.create(
+            title=title, description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1), created_by=self.admin)
+
+    def _create(self, display_id=None, contest=None, order=0):
         data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
         data.pop("tags")
         data["_id"] = display_id
-        return Problem.objects.create(created_by=self.admin, contest=contest, **data)
+        return Problem.objects.create(created_by=self.admin, contest=contest, order=order, **data)
 
     def test_duplicate_public_display_id_is_rejected(self):
         self._create("1000")
@@ -516,12 +572,22 @@ class PublicDisplayIdUniqueTest(APITestCase):
             with transaction.atomic():
                 self._create("1000")
 
-    def test_same_display_id_allowed_in_different_contests(self):
-        """대회 안의 A·B·C 는 대회마다 따로 쓴다. 제약이 그것까지 막으면 안 된다."""
+    def test_duplicate_order_in_one_contest_is_rejected(self):
+        """같은 대회에 순서가 겹치면 라벨도 겹친다(A 가 둘)."""
+        contest = self._make_contest("c")
+        self._create(contest=contest, order=1)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._create(contest=contest, order=1)
+
+    def test_same_order_allowed_in_different_contests(self):
+        """대회 안의 A, B, C 는 대회마다 따로 쓴다. 제약이 그것까지 막으면 안 된다."""
         for i in range(2):
-            contest = Contest.objects.create(
-                title=f"c{i}", description="d", rule_type="ACM", real_time_rank=True,
-                start_time=now(), end_time=now() + timedelta(days=1),
-                created_by=self.admin)
-            self._create("A", contest=contest)
-        self.assertEqual(Problem.objects.filter(_id="A").count(), 2)
+            self._create(contest=self._make_contest(f"c{i}"), order=1)
+        self.assertEqual(Problem.objects.filter(order=1).count(), 2)
+
+    def test_public_problems_do_not_collide_on_order(self):
+        """공개 문제는 order 가 모두 0 이다. 제약이 여기까지 걸리면 안 된다."""
+        self._create("1000")
+        self._create("1001")
+        self.assertEqual(Problem.objects.filter(order=0).count(), 2)

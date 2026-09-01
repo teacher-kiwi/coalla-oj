@@ -83,7 +83,7 @@ const limit = computed({
 function mapProblemDisplayID () {
   const map = {}
   contestProblems.value.forEach(ele => {
-    map[ele.id] = ele._id
+    map[ele.id] = ele.display_id
   })
   problemsMap.value = map
 }

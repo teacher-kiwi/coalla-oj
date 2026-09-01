@@ -5,7 +5,7 @@
       <el-table v-if="contestRuleType === 'ACM' || OIContestRealTimePermission"
                 :key="statusColumnVisible"
                 :data="problems" @row-click="goContestProblem" empty-text="문제 없음">
-        <el-table-column label="#" prop="_id" sortable width="150" />
+        <el-table-column label="#" prop="display_id" sortable width="150" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="총 제출" prop="submission_number" />
         <el-table-column label="정답률">
@@ -23,7 +23,7 @@
         </el-table-column>
       </el-table>
       <el-table v-else :data="problems" @row-click="goContestProblem" empty-text="문제 없음">
-        <el-table-column label="#" prop="_id" width="150" />
+        <el-table-column label="#" prop="display_id" width="150" />
         <el-table-column label="제목" prop="title" />
       </el-table>
     </Panel>
@@ -57,7 +57,7 @@ function goContestProblem (row) {
     name: 'contest-problem-details',
     params: {
       contestID: route.params.contestID,
-      problemID: row._id
+      problemID: row.display_id
     }
   })
 }

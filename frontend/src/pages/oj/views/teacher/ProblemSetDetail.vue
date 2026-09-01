@@ -14,11 +14,11 @@
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
         <el-table-column label="#" width="100">
-          <template #default="{ row }">{{ row.problem._id }}</template>
+          <template #default="{ row }">{{ row.problem.display_id }}</template>
         </el-table-column>
         <el-table-column label="제목">
           <template #default="{ row }">
-            <el-button link type="primary" @click="goProblem(row.problem._id)">
+            <el-button link type="primary" @click="goProblem(row.problem.display_id)">
               {{ row.problem.title }}
             </el-button>
           </template>
@@ -102,7 +102,7 @@
       <el-table v-loading="searching" :data="candidates"
                 class="full-width candidate-table" @selection-change="onSelectionChange">
         <el-table-column type="selection" width="45" />
-        <el-table-column label="#" prop="_id" width="100" />
+        <el-table-column label="#" prop="display_id" width="100" />
         <el-table-column label="제목" prop="title" />
         <el-table-column label="난이도" width="90">
           <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>

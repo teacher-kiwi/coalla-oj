@@ -3,13 +3,14 @@
     <Panel :title="title">
       <el-form ref="formRef" :model="problem" :rules="rules" label-position="top" label-width="70px">
         <el-row :gutter="20">
-          <el-col :span="6">
-            <el-form-item prop="_id" label="표시 ID"
-                          :required="routeName === 'create-contest-problem' || routeName === 'edit-contest-problem'">
-              <el-input placeholder="표시 ID" v-model="problem._id" />
+          <!-- 대회 문제의 표시(A, B, C)는 담은 순서가 정하므로 입력칸이 없다.
+               공개 문제의 번호는 비워두면 서버가 매긴다(옛 데이터 이관용 칸이다). -->
+          <el-col :span="6" v-if="!isContestProblem">
+            <el-form-item prop="_id" label="표시 ID">
+              <el-input placeholder="비우면 자동" v-model="problem._id" />
             </el-form-item>
           </el-col>
-          <el-col :span="18">
+          <el-col :span="isContestProblem ? 24 : 18">
             <el-form-item prop="title" label="제목" required>
               <el-input placeholder="제목" v-model="problem.title" />
             </el-form-item>
@@ -218,7 +219,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
@@ -232,7 +233,6 @@ const router = useRouter()
 
 const formRef = ref(null)
 const rules = {
-  _id: { required: true, message: '표시 ID를 입력하세요', trigger: 'blur' },
   title: { required: true, message: '제목을 입력하세요', trigger: 'blur' },
   description: { required: true, message: '설명을 입력하세요', trigger: 'blur' },
   input_description: { required: true, message: '입력 설명을 입력하세요', trigger: 'blur' },
@@ -251,6 +251,8 @@ const title = ref('')
 const spjMode = ref('')
 const disableRuleType = ref(false)
 const routeName = ref('')
+const isContestProblem = computed(
+  () => routeName.value === 'create-contest-problem' || routeName.value === 'edit-contest-problem')
 const error = reactive({ tags: '', spj: '', languages: '', testCase: '' })
 
 function defaultProblem () {

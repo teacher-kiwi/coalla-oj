@@ -8,6 +8,7 @@ from django.http import FileResponse
 
 from account.decorators import check_contest_permission, ensure_created_by
 from account.models import User
+from problem.models import contest_problem_label
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
@@ -184,9 +185,9 @@ class ACMContestHelper(APIView):
 
 class DownloadContestSubmissions(APIView):
     def _dump_submissions(self, contest, exclude_admin=True):
-        problem_ids = contest.problem_set.all().values_list("id", "_id")
-        id2display_id = {k[0]: k[1] for k in problem_ids}
-        ac_map = {k[0]: False for k in problem_ids}
+        problem_ids = contest.problem_set.all().values_list("id", "order")
+        id2display_id = {pk: contest_problem_label(order) for pk, order in problem_ids}
+        ac_map = {pk: False for pk, _ in problem_ids}
         submissions = Submission.objects.filter(contest=contest, result=JudgeStatus.ACCEPTED).order_by("-create_time")
         user_ids = submissions.values_list("user_id", flat=True)
         users = User.objects.filter(id__in=user_ids)

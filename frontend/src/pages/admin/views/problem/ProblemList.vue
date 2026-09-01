@@ -8,8 +8,12 @@
         <el-table-column width="100" prop="id" label="ID" />
         <el-table-column width="150" label="표시 ID">
           <template #default="{ row }">
-            <span v-show="!row.isEditing">{{ row._id }}</span>
-            <el-input v-show="row.isEditing" v-model="row._id" @keyup.enter="handleInlineEdit(row)" />
+            <!-- 대회 문제의 표시(A, B, C)는 순서가 정하므로 고칠 수 없다 -->
+            <span v-if="contestId">{{ row.display_id }}</span>
+            <template v-else>
+              <span v-show="!row.isEditing">{{ row._id }}</span>
+              <el-input v-show="row.isEditing" v-model="row._id" @keyup.enter="handleInlineEdit(row)" />
+            </template>
           </template>
         </el-table-column>
         <el-table-column prop="title" label="제목">
@@ -60,8 +64,8 @@
     <el-dialog title="문제를 수정하시겠습니까?" width="20%" v-model="inlineEditDialogVisible"
                :close-on-click-modal="false">
       <div>
-        <p>DisplayID: {{ currentRow._id }}</p>
-        <p>Title: {{ currentRow.title }}</p>
+        <p>표시 ID: {{ contestId ? currentRow.display_id : currentRow._id }}</p>
+        <p>제목: {{ currentRow.title }}</p>
       </div>
       <template #footer>
         <cancel @click="inlineEditDialogVisible = false; getProblemList(currentPage)" />

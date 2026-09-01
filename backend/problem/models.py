@@ -48,11 +48,36 @@ def _default_io_mode():
 # 사람이 직접 정하면 중복도 나고 정렬도 깨지고, 출제 화면에 칸이 하나 더 필요하다.
 FIRST_DISPLAY_ID = 1000
 
+# 대회 문제는 대회 안에서 A, B, C 로 보인다. 라벨을 저장하지 않고 order 로 만든다.
+# 저장하면 문제를 빼거나 순서를 바꿀 때마다 라벨을 다시 매겨야 한다.
+CONTEST_PROBLEM_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def contest_problem_label(order):
+    """대회 문제 순서(1부터)를 표시 라벨로. 1 -> A, 2 -> B."""
+    if 1 <= order <= len(CONTEST_PROBLEM_LABELS):
+        return CONTEST_PROBLEM_LABELS[order - 1]
+    return str(order)
+
+
+def contest_problem_order(label):
+    """표시 라벨을 순서로. A -> 1. 대회 문제 주소(/contest/1/problem/A)를 읽을 때 쓴다."""
+    label = (label or "").strip().upper()
+    if len(label) == 1 and label in CONTEST_PROBLEM_LABELS:
+        return CONTEST_PROBLEM_LABELS.index(label) + 1
+    # 27번째부터는 라벨이 숫자다(contest_problem_label 참고)
+    if label.isdigit() and int(label) > 0:
+        return int(label)
+    return None
+
 
 class Problem(models.Model):
-    # 화면에 보이는 문제 번호(1000 등). DB pk 와 별개다.
-    _id = models.TextField(db_index=True)
+    # 공개 문제의 표시 번호(1000 등). DB pk 와 별개다.
+    # 대회 문제는 쓰지 않는다(대회 안 표시는 order 가 정한다).
+    _id = models.TextField(db_index=True, null=True)
     contest = models.ForeignKey(Contest, null=True, on_delete=models.CASCADE)
+    # 대회 안에서의 순서(1부터). 화면에는 A, B, C 로 보인다. 공개 문제는 0 이다.
+    order = models.PositiveIntegerField(default=0)
     # 대회 문제를 공개 문제로도 열어둘지
     is_public = models.BooleanField(default=False)
     title = models.TextField()
@@ -97,10 +122,30 @@ class Problem(models.Model):
 
     @classmethod
     def next_display_id(cls):
-        """다음 공개 문제 번호. 대회 문제는 대회 안에서 A·B·C 로 보이므로 제외한다."""
+        """다음 공개 문제 번호. 대회 문제는 대회 안에서 A, B, C 로 보이므로 제외한다."""
         used = cls.objects.filter(contest_id__isnull=True).values_list("_id", flat=True)
         numbers = [int(v) for v in used if str(v).isdigit()]
         return str(max(numbers) + 1) if numbers else str(FIRST_DISPLAY_ID)
+
+    @classmethod
+    def next_order(cls, contest):
+        """대회에 다음으로 넣을 문제의 순서.
+
+        비어 있는 가장 앞자리를 쓴다. 뒤에만 붙이면 중간 문제를 뺐을 때 라벨이
+        A, C, D 처럼 건너뛰고, 26개를 넣지 않았는데도 자리가 없다고 나온다.
+        """
+        used = set(cls.objects.filter(contest=contest).values_list("order", flat=True))
+        order = 1
+        while order in used:
+            order += 1
+        return order
+
+    @property
+    def display_id(self):
+        """화면에 보이는 문제 번호. 공개 문제는 1000 같은 번호, 대회 문제는 A, B, C."""
+        if self.contest_id is None:
+            return self._id
+        return contest_problem_label(self.order)
 
     @property
     def is_open_to_everyone(self):
@@ -108,18 +153,20 @@ class Problem(models.Model):
 
     class Meta:
         db_table = "problem"
-        unique_together = (("_id", "contest"),)
         constraints = [
-            # unique_together 는 공개 문제를 못 막는다. contest 가 NULL 인데
-            # 유니크 인덱스에서 NULL 은 서로 다른 값으로 취급되어, ("1000", NULL) 이
+            # 공개 문제는 contest 가 NULL 이라 ("_id", "contest") 유니크로는 막지 못한다.
+            # 유니크 인덱스에서 NULL 은 서로 다른 값으로 취급되어 ("1000", NULL) 이
             # 몇 개든 들어간다. 그러면 조회(_id 로 get)에서 MultipleObjectsReturned 가
             # 나는데, 만든 사람이 아니라 나중에 제출하는 학생에게서 터진다.
             models.UniqueConstraint(fields=["_id"], condition=Q(contest__isnull=True),
                                     name="uniq_public_display_id"),
+            # 대회 문제는 순서가 겹치면 라벨도 겹친다(A 가 둘).
+            models.UniqueConstraint(fields=["contest", "order"], condition=Q(contest__isnull=False),
+                                    name="uniq_contest_problem_order"),
         ]
-        # 표시 번호는 문자열이라 그냥 정렬하면 12 가 2 보다 앞에 온다.
-        # 길이를 먼저 보면 숫자 순서가 되고, 대회의 A·B·C 도 자연스럽게 정렬된다.
-        ordering = (Length("_id"), "_id")
+        # 공개 문제는 order 가 0 이라 표시 번호 순으로, 대회 문제는 order 순으로 줄선다.
+        # 표시 번호는 문자열이라 그냥 정렬하면 12 가 2 보다 앞에 온다. 길이를 먼저 본다.
+        ordering = ("order", Length("_id"), "_id")
 
     def add_submission_number(self):
         self.submission_number = models.F("submission_number") + 1

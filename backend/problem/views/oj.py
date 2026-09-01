@@ -1,8 +1,8 @@
 from django.db.models import Q, Count
 from utils.api import APIView
 from account.decorators import check_contest_permission, login_required
-from ..models import (can_access_problem, ProblemTag, Problem, ProblemRuleType,
-                      ProblemSet, ProblemSetAssignment, ProblemVisibility)
+from ..models import (can_access_problem, contest_problem_order, ProblemTag, Problem,
+                      ProblemRuleType, ProblemSet, ProblemSetAssignment, ProblemVisibility)
 from ..serializers import (ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
                            TagSerializer, ProblemSafeSerializer)
 from ..utils import filter_problem_tags_by_keyword
@@ -33,7 +33,7 @@ class PickOneAPI(APIView):
                    .order_by("?").first())
         if problem is None:
             return self.error("선택할 문제가 없습니다")
-        return self.success(problem._id)
+        return self.success(problem.display_id)
 
 
 class ProblemAPI(APIView):
@@ -111,11 +111,13 @@ class ContestProblemAPI(APIView):
     def get(self, request):
         problem_id = request.GET.get("problem_id")
         if problem_id:
-            try:
-                problem = Problem.objects.select_related("created_by").get(_id=problem_id,
-                                                                           contest=self.contest,
-                                                                           visible=True)
-            except Problem.DoesNotExist:
+            # 주소에는 대회 안 표시(A, B, C)가 들어온다
+            order = contest_problem_order(problem_id)
+            problem = None
+            if order is not None:
+                problem = (Problem.objects.select_related("created_by")
+                           .filter(order=order, contest=self.contest, visible=True).first())
+            if problem is None:
                 return self.error("문제가 존재하지 않습니다.")
             if self.contest.problem_details_permission(request.user):
                 problem_data = ProblemSerializer(problem).data

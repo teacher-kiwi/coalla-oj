@@ -6,12 +6,12 @@
 
 순위 화면은 관리자 대회와 같은 것을 그대로 쓴다.
 """
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 
 from account.decorators import teacher_required
 from account.views.teacher import owned_class
-from problem.models import Problem, ProblemVisibility
+from problem.models import CONTEST_PROBLEM_LABELS, Problem, ProblemVisibility
 from utils.api import APIView, validate_serializer
 from utils.constants import ContestRuleType, ContestStatus
 from utils.shortcuts import int_or_none
@@ -20,8 +20,8 @@ from ..serializers import (AddClassContestProblemSerializer, AssignClassContestS
                            ClassContestAssignmentSerializer, ClassContestSerializer,
                            CreateClassContestSerializer, EditClassContestSerializer)
 
-# 대회 문제는 대회 안에서 A, B, C 로 보인다(_id 가 그 라벨이다).
-_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+# 대회 안 표시(A, B, C)는 라벨 개수까지만 만들 수 있다
+MAX_CONTEST_PROBLEMS = len(CONTEST_PROBLEM_LABELS)
 
 
 def owned_contest(user, contest_id):
@@ -139,8 +139,8 @@ class TeacherContestProblemAPI(APIView):
         contest = owned_contest(request.user, request.GET.get("contest_id"))
         if not contest:
             return self.error("대회가 존재하지 않습니다")
-        problems = Problem.objects.filter(contest=contest).order_by("_id")
-        return self.success([{"id": p.id, "_id": p._id, "title": p.title,
+        problems = Problem.objects.filter(contest=contest).order_by("order")
+        return self.success([{"id": p.id, "display_id": p.display_id, "title": p.title,
                               "difficulty": p.difficulty} for p in problems])
 
     @validate_serializer(AddClassContestProblemSerializer)
@@ -159,26 +159,32 @@ class TeacherContestProblemAPI(APIView):
                                or problem.visibility == ProblemVisibility.public):
             return self.error("문제가 존재하지 않습니다")
 
-        used = set(Problem.objects.filter(contest=contest).values_list("_id", flat=True))
-        label = next((c for c in _LABELS if c not in used), None)
-        if label is None:
-            return self.error(f"대회에는 문제를 {len(_LABELS)}개까지 넣을 수 있습니다")
+        order = Problem.next_order(contest)
+        if order > MAX_CONTEST_PROBLEMS:
+            return self.error(f"대회에는 문제를 {MAX_CONTEST_PROBLEMS}개까지 넣을 수 있습니다")
 
-        with transaction.atomic():
-            tags = list(problem.tags.all())
-            problem.pk = None
-            problem.contest = contest
-            problem._id = label
-            problem.is_public = False
-            problem.visible = True
-            # 원본 문제의 통계를 물려받지 않게 비운다
-            problem.submission_number = problem.accepted_number = 0
-            problem.statistic_info = {}
-            problem.visibility = ProblemVisibility.private
-            problem.last_update_time = now()
-            problem.save()
-            problem.tags.set(tags)
-        return self.success({"id": problem.id, "_id": problem._id, "title": problem.title})
+        try:
+            with transaction.atomic():
+                tags = list(problem.tags.all())
+                problem.pk = None
+                problem.contest = contest
+                problem._id = None
+                problem.order = order
+                problem.is_public = False
+                problem.visible = True
+                # 원본 문제의 통계를 물려받지 않게 비운다
+                problem.submission_number = problem.accepted_number = 0
+                problem.statistic_info = {}
+                problem.visibility = ProblemVisibility.private
+                problem.last_update_time = now()
+                problem.save()
+                problem.tags.set(tags)
+        except IntegrityError:
+            # 순서를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
+            # (버튼 두 번 누르기). 같은 문제를 두 번 넣지 않도록 다시 시도하지 않는다.
+            return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
+        return self.success({"id": problem.id, "display_id": problem.display_id,
+                             "title": problem.title})
 
     @teacher_required
     def delete(self, request):

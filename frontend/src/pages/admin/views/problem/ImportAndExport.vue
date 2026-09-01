@@ -7,7 +7,7 @@
       <el-table :data="problems" v-loading="loadingProblems" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="60" />
         <el-table-column label="ID" width="100" prop="id" />
-        <el-table-column label="표시 ID" width="200" prop="_id" />
+        <el-table-column label="표시 ID" width="200" prop="display_id" />
         <el-table-column label="제목" prop="title" />
         <el-table-column prop="created_by.username" label="작성자" />
         <el-table-column prop="create_time" label="생성 일시">

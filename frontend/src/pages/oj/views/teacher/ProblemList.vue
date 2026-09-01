@@ -6,10 +6,10 @@
     </template>
 
     <el-table v-loading="loading" :data="problems" class="full-width">
-      <el-table-column label="번호" prop="_id" width="90" />
+      <el-table-column label="번호" prop="display_id" width="90" />
       <el-table-column label="제목">
         <template #default="{ row }">
-          <el-button link type="primary" @click="goProblem(row._id)">{{ row.title }}</el-button>
+          <el-button link type="primary" @click="goProblem(row.display_id)">{{ row.title }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="난이도" width="100" align="center">

@@ -89,7 +89,7 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         self.assertEqual(resp.data["data"]["added"], 2)
 
         detail = self.client.get(self.set_url + f"?id={set_id}").data["data"]
-        self.assertEqual([i["problem"]["_id"] for i in detail["items"]], ["P1", "P2"])
+        self.assertEqual([i["problem"]["display_id"] for i in detail["items"]], ["P1", "P2"])
 
     def test_duplicate_problem_ignored(self):
         set_id = self._create_set()
@@ -116,7 +116,7 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         self.assertSuccess(self.client.put(self.item_url, data={"problem_set": set_id,
                                                                 "items": reversed_ids}))
         detail = self.client.get(self.set_url + f"?id={set_id}").data["data"]
-        self.assertEqual([i["problem"]["_id"] for i in detail["items"]], ["P2", "P1"])
+        self.assertEqual([i["problem"]["display_id"] for i in detail["items"]], ["P2", "P1"])
 
     def test_reorder_rejects_stale_list(self):
         set_id = self._create_set()
@@ -250,7 +250,7 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         self._login_student()
         resp = self.client.get(self.detail_url + f"?id={self.set_id}")
         self.assertSuccess(resp)
-        self.assertEqual([p["_id"] for p in resp.data["data"]["problems"]], ["P1", "P2"])
+        self.assertEqual([p["display_id"] for p in resp.data["data"]["problems"]], ["P1", "P2"])
 
     def test_closed_assignment_is_hidden(self):
         ProblemSetAssignment.objects.filter(id=self.assignment_id).update(is_open=False)
@@ -309,7 +309,7 @@ class ProblemSetProgressTest(ProblemSetTestBase):
         resp = self.client.get(self._url())
         self.assertSuccess(resp)
         data = resp.data["data"]
-        self.assertEqual([p["_id"] for p in data["problems"]], ["P1", "P2"])
+        self.assertEqual([p["display_id"] for p in data["problems"]], ["P1", "P2"])
 
         first, second = data["students"]
         self.assertEqual(first["number"], 1)
@@ -409,7 +409,7 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
     def test_private_problem_is_not_in_the_public_list(self):
         resp = self.client.get(self.problem_url + "?limit=100")
         self.assertSuccess(resp)
-        ids = [p["_id"] for p in resp.data["data"]["results"]]
+        ids = [p["display_id"] for p in resp.data["data"]["results"]]
         self.assertIn(self.problem._id, ids)
         self.assertNotIn(self.private._id, ids)
 
@@ -418,14 +418,14 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
         # 공개 문제와 내가 만든 비공개 문제가 함께 보여야 한다.
         resp = self.client.get(self.problem_url + "?limit=100&mine=1")
         self.assertSuccess(resp)
-        ids = [p["_id"] for p in resp.data["data"]["results"]]
+        ids = [p["display_id"] for p in resp.data["data"]["results"]]
         self.assertIn(self.private._id, ids)
         self.assertIn(self.problem._id, ids)
 
     def test_mine_flag_does_not_show_another_teachers_private_problem(self):
         other = self.create_teacher(username="박선생", login=False)
         hidden = create_problem("3000", other, visibility="private")
-        ids = [p["_id"] for p in
+        ids = [p["display_id"] for p in
                self.client.get(self.problem_url + "?limit=100&mine=1").data["data"]["results"]]
         self.assertNotIn(hidden._id, ids)
 

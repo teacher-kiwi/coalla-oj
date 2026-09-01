@@ -31,10 +31,10 @@
         </template>
       </el-table-column>
       <el-table-column v-for="(problem, index) in board.problems" :key="problem.id"
-                       :label="problem._id" align="center" width="80">
+                       :label="problem.display_id" align="center" width="80">
         <template #header>
           <el-tooltip :content="problem.title" placement="top">
-            <span>{{ problem._id }}</span>
+            <span>{{ problem.display_id }}</span>
           </el-tooltip>
         </template>
         <template #default="{ row }">
@@ -50,7 +50,7 @@
 
     <div v-if="board && board.students.length" class="totals">
       <span v-for="(total, index) in board.totals" :key="index" class="total-item">
-        <b>{{ board.problems[index]._id }}</b>
+        <b>{{ board.problems[index].display_id }}</b>
         해결 {{ total.solved }}명 · 시도 {{ total.tried }}명
       </span>
     </div>

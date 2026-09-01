@@ -95,8 +95,8 @@ export const useContestStore = defineStore('contest', {
       try {
         const res = await api.getContestProblemList(contestID)
         this.contestProblems = res.data.data.sort((a, b) => {
-          if (a._id === b._id) return 0
-          return a._id > b._id ? 1 : -1
+          if (a.display_id === b.display_id) return 0
+          return a.display_id > b.display_id ? 1 : -1
         })
         return res
       } catch {

@@ -22,11 +22,11 @@
                    color="#ed3f14" :size="16"><CircleClose /></el-icon>
         </template>
       </el-table-column>
-      <el-table-column label="#" prop="_id" width="100" />
+      <el-table-column label="#" prop="display_id" width="100" />
       <el-table-column label="제목">
         <template #default="{ row }">
           <el-button v-if="row.available !== false" link type="primary"
-                     @click="goProblem(row._id)">{{ row.title }}</el-button>
+                     @click="goProblem(row.display_id)">{{ row.title }}</el-button>
           <template v-else>
             <span class="unavailable">{{ row.title }}</span>
             <!-- 관리자가 문제를 감춘 경우다. 목록에서 조용히 빼면 학생은 이유를 알 수 없다 -->

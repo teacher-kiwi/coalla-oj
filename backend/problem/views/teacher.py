@@ -248,7 +248,7 @@ class ProblemSetProgressAPI(APIView):
         data = {
             "problem_set": {"id": problem_set.id, "title": problem_set.title},
             "school_class": {"id": school_class.id, "name": str(school_class)},
-            "problems": [{"id": p.id, "_id": p._id, "title": p.title} for p in problems],
+            "problems": [{"id": p.id, "display_id": p.display_id, "title": p.title} for p in problems],
             "students": students,
             "totals": totals,
         }
@@ -289,7 +289,7 @@ def _progress_xlsx(data):
     worksheet.write(0, 0, "번호")
     worksheet.write(0, 1, "이름")
     for index, problem in enumerate(data["problems"]):
-        worksheet.write(0, 2 + index, "{} {}".format(problem["_id"], problem["title"]))
+        worksheet.write(0, 2 + index, "{} {}".format(problem["display_id"], problem["title"]))
     worksheet.write(0, 2 + len(data["problems"]), "해결")
 
     for row, student in enumerate(data["students"], start=1):
