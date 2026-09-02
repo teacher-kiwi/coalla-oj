@@ -6,7 +6,6 @@ from django.contrib import auth
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
-from problem.models import Problem
 from utils.constants import ContestRuleType
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.shortcuts import rand_str, datetime2str
@@ -199,28 +198,6 @@ class UserRankAPI(APIView):
             data["results"], many=True,
             nicknames=my_student_nicknames(request.user)).data
         return self.success(data)
-
-
-class ProfileProblemDisplayIDRefreshAPI(APIView):
-    @login_required
-    def get(self, request):
-        profile = request.user.userprofile
-        acm_problems = profile.acm_problems_status.get("problems", {})
-        oi_problems = profile.oi_problems_status.get("problems", {})
-        ids = list(acm_problems.keys()) + list(oi_problems.keys())
-        if not ids:
-            return self.success()
-        # id 로 짝지어야 한다. 예전에는 zip(ids, display_ids) 로 조회 순서에 기댔는데,
-        # 순서가 보장되지 않아 엉뚱한 표시 ID 가 들어갔고 숨김·삭제된 문제가 있으면
-        # 개수가 어긋나 KeyError 로 터졌다.
-        id_map = {str(pk): _id for pk, _id in
-                  Problem.objects.filter(id__in=ids, visible=True).values_list("id", "_id")}
-        for problems in (acm_problems, oi_problems):
-            for k, v in problems.items():
-                if k in id_map:
-                    v["_id"] = id_map[k]
-        profile.save(update_fields=["acm_problems_status", "oi_problems_status"])
-        return self.success()
 
 
 class SSOAPI(CSRFExemptAPIView):

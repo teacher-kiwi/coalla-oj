@@ -201,9 +201,6 @@ export default {
   updateProfile (profile) {
     return ajax('profile', 'put', { data: profile })
   },
-  freshDisplayID (userID) {
-    return ajax('profile/fresh_display_id', 'get', { params: { user_id: userID } })
-  },
   getSessions () {
     return ajax('sessions', 'get')
   },

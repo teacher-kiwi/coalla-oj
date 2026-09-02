@@ -70,13 +70,11 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=256, allow_blank=True, allow_null=True)
 
 
-# 공개 문제만 표시 번호를 받는다. 비워 보내면 서버가 매긴다(옛 데이터 이관용 입력칸).
-# 대회 문제의 표시(A, B, C)는 order 가 정하므로 받을 값이 없다.
 class CreateProblemSerializer(CreateOrEditProblemSerializer):
-    _id = serializers.CharField(max_length=32, allow_blank=True, allow_null=True)
+    pass
 
 
-class EditProblemSerializer(CreateProblemSerializer):
+class EditProblemSerializer(CreateOrEditProblemSerializer):
     id = serializers.IntegerField()
 
 
@@ -112,8 +110,7 @@ class CompileSPJSerializer(serializers.Serializer):
 class BaseProblemSerializer(serializers.ModelSerializer):
     tags = serializers.SlugRelatedField(many=True, slug_field="name", read_only=True)
     created_by = UsernameSerializer()
-    # 화면에 보이는 번호. 공개 문제는 _id, 대회 문제는 order 로 만든 A, B, C 다.
-    # 화면은 이것만 본다(_id 는 관리자 출제 화면에서만 쓴다).
+    # 화면에 보이는 번호. 공개 문제는 pk, 대회 문제는 order 로 만든 A, B, C 다.
     display_id = serializers.ReadOnlyField()
 
     def get_public_template(self, obj):
@@ -134,7 +131,7 @@ class ProblemSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("_id", "order", "test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("order", "test_case_score", "test_case_id", "visible", "is_public",
                    "spj_code", "spj_version", "spj_compile_ok")
 
 
@@ -158,14 +155,13 @@ class ProblemSafeSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("_id", "order", "test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("order", "test_case_score", "test_case_id", "visible", "is_public",
                    "spj_code", "spj_version", "spj_compile_ok",
                    "difficulty", "submission_number", "accepted_number", "statistic_info")
 
 
 class ContestProblemMakePublicSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    display_id = serializers.CharField(max_length=32)
 
 
 class ExportProblemSerializer(serializers.ModelSerializer):
@@ -262,7 +258,8 @@ class AnswerSerializer(serializers.Serializer):
 
 
 class ImportProblemSerializer(serializers.Serializer):
-    display_id = serializers.CharField(max_length=128)
+    # 파일에 실려 오지만 쓰지 않는다. 번호는 받는 쪽에서 pk 로 새로 붙는다.
+    display_id = serializers.CharField(max_length=128, required=False, allow_blank=True)
     title = serializers.CharField(max_length=128)
     description = FormatValueSerializer()
     input_description = FormatValueSerializer()

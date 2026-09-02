@@ -16,7 +16,7 @@ from utils.api.tests import APITestCase
 from .dispatcher import JudgeDispatcher
 
 DEFAULT_PROBLEM_DATA = {
-    "_id": "D-1", "title": "test", "description": "<p>test</p>",
+    "title": "test", "description": "<p>test</p>",
     "input_description": "test", "output_description": "test",
     "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
     "visible": True, "languages": ["C", "Python3"], "template": {},
@@ -98,7 +98,7 @@ class StatisticInfoTest(DispatcherTestBase):
         self.assertNotIn("score", dispatcher.submission.statistic_info)
 
     def test_oi_sums_the_score_of_passed_cases(self):
-        self.problem = self._create_problem(_id="D-2", rule_type=ProblemRuleType.OI)
+        self.problem = self._create_problem(rule_type=ProblemRuleType.OI)
         submission = self._submit()
         dispatcher = self._dispatcher(submission, JudgeStatus.PARTIALLY_ACCEPTED)
         resp = [case(JudgeStatus.ACCEPTED), case(JudgeStatus.WRONG_ANSWER)]
@@ -111,7 +111,7 @@ class StatisticInfoTest(DispatcherTestBase):
     def test_oi_score_is_zero_when_test_case_score_is_short(self):
         # 테스트케이스 개수와 점수 정보가 어긋난 문제. 저장할 때 막고 있지만
         # 이미 어긋난 데이터가 있어도 채점이 예외로 죽지는 않아야 한다
-        self.problem = self._create_problem(_id="D-3", rule_type=ProblemRuleType.OI,
+        self.problem = self._create_problem(rule_type=ProblemRuleType.OI,
                                             test_case_score=[{"output_name": "1.out",
                                                               "input_name": "1.in",
                                                               "score": 40}])
@@ -134,9 +134,9 @@ class AcmProblemStatusTest(DispatcherTestBase):
         profile = self._profile()
         self.assertEqual(profile.submission_number, 1)
         self.assertEqual(profile.accepted_number, 1)
+        # 키가 곧 문제 번호다. 표시 번호를 따로 담아두지 않는다.
         solved = profile.acm_problems_status["problems"][str(self.problem.id)]
-        self.assertEqual(solved["status"], JudgeStatus.ACCEPTED)
-        self.assertEqual(solved["_id"], self.problem._id)
+        self.assertEqual(solved, {"status": JudgeStatus.ACCEPTED})
 
     def test_wrong_answer_counts_submission_only(self):
         submission = self._submit()
@@ -179,7 +179,7 @@ class AcmProblemStatusTest(DispatcherTestBase):
 class OiProblemStatusTest(DispatcherTestBase):
     def setUp(self):
         super().setUp()
-        self.problem = self._create_problem(_id="D-OI", rule_type=ProblemRuleType.OI)
+        self.problem = self._create_problem(rule_type=ProblemRuleType.OI)
 
     def test_score_is_added_to_total(self):
         submission = self._submit(statistic_info={"score": 40})

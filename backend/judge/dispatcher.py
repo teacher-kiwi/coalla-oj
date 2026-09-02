@@ -271,8 +271,7 @@ class JudgeDispatcher(DispatcherBase):
             if problem.rule_type == ProblemRuleType.ACM:
                 acm_problems_status = user_profile.acm_problems_status.get("problems", {})
                 if problem_id not in acm_problems_status:
-                    acm_problems_status[problem_id] = {"status": self.submission.result,
-                                                       "_id": self.problem.display_id}
+                    acm_problems_status[problem_id] = {"status": self.submission.result}
                     if self.submission.result == JudgeStatus.ACCEPTED:
                         user_profile.accepted_number += 1
                 elif acm_problems_status[problem_id]["status"] != JudgeStatus.ACCEPTED:
@@ -288,7 +287,6 @@ class JudgeDispatcher(DispatcherBase):
                 if problem_id not in oi_problems_status:
                     user_profile.add_score(score)
                     oi_problems_status[problem_id] = {"status": self.submission.result,
-                                                      "_id": self.problem.display_id,
                                                       "score": score}
                     if self.submission.result == JudgeStatus.ACCEPTED:
                         user_profile.accepted_number += 1

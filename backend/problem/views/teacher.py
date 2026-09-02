@@ -346,32 +346,13 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
 
         cases = request.serializer.validated_data["cases"]
         info, test_case_id = self.process_cases(cases)
-        problem = self._create_with_display_id(data, cases, info, test_case_id,
-                                               tag_objs, request.user)
-        if problem is None:
-            return self.error("문제 번호를 배정하지 못했습니다. 다시 시도해주세요")
+        with transaction.atomic():
+            problem = self._build_problem(data, cases, info, test_case_id, request.user)
+            problem.tags.set(tag_objs)
         return self.success(TeacherProblemListSerializer(problem).data)
 
-    # 번호는 "지금까지 쓴 것 중 가장 큰 값 + 1" 이라 두 교사가 같은 순간에 만들면
-    # 같은 값을 읽는다. DB 제약(uniq_public_display_id)이 두 번째를 막아주므로,
-    # 걸리면 번호를 다시 읽어 몇 번 더 시도한다.
-    _DISPLAY_ID_RETRIES = 5
-
-    def _create_with_display_id(self, data, cases, info, test_case_id, tag_objs, user):
-        for _ in range(self._DISPLAY_ID_RETRIES):
-            try:
-                with transaction.atomic():
-                    problem = self._build_problem(data, cases, info, test_case_id,
-                                                  user, Problem.next_display_id())
-                    problem.tags.set(tag_objs)
-                    return problem
-            except IntegrityError:
-                continue
-        return None
-
-    def _build_problem(self, data, cases, info, test_case_id, user, display_id):
+    def _build_problem(self, data, cases, info, test_case_id, user):
         return Problem.objects.create(
-            _id=display_id,
             title=data["title"],
             description=data["description"],
             input_description=data["input_description"],

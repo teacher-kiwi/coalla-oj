@@ -3,14 +3,8 @@
     <Panel :title="title">
       <el-form ref="formRef" :model="problem" :rules="rules" label-position="top" label-width="70px">
         <el-row :gutter="20">
-          <!-- 대회 문제의 표시(A, B, C)는 담은 순서가 정하므로 입력칸이 없다.
-               공개 문제의 번호는 비워두면 서버가 매긴다(옛 데이터 이관용 칸이다). -->
-          <el-col :span="6" v-if="!isContestProblem">
-            <el-form-item prop="_id" label="표시 ID">
-              <el-input placeholder="비우면 자동" v-model="problem._id" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="isContestProblem ? 24 : 18">
+          <!-- 문제 번호는 서버가 정한다. 공개 문제는 pk, 대회 문제는 담은 순서다. -->
+          <el-col :span="24">
             <el-form-item prop="title" label="제목" required>
               <el-input placeholder="제목" v-model="problem.title" />
             </el-form-item>
@@ -219,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
@@ -251,13 +245,11 @@ const title = ref('')
 const spjMode = ref('')
 const disableRuleType = ref(false)
 const routeName = ref('')
-const isContestProblem = computed(
-  () => routeName.value === 'create-contest-problem' || routeName.value === 'edit-contest-problem')
 const error = reactive({ tags: '', spj: '', languages: '', testCase: '' })
 
 function defaultProblem () {
   return {
-    _id: '', title: '', description: '', input_description: '', output_description: '',
+    title: '', description: '', input_description: '', output_description: '',
     time_limit: 1000, memory_limit: 256, difficulty: 'L1', visible: true,
     tags: [], languages: [], template: {}, samples: [{ input: '', output: '' }],
     spj: false, spj_language: '', spj_code: '', spj_compile_ok: false,

@@ -26,16 +26,7 @@
         </div>
 
         <div id="problems">
-          <div v-if="problems.length">
-            해결한 문제 목록
-            <el-popover v-if="refreshVisible" trigger="hover" placement="right-start">
-              <template #reference>
-                <el-icon><QuestionFilled /></el-icon>
-              </template>
-              <p>아래 문제 번호가 실제와 다르면<br />이 버튼으로 다시 맞출 수 있습니다.</p>
-              <el-button type="info" @click="freshProblemDisplayID">번호 새로고침</el-button>
-            </el-popover>
-          </div>
+          <div v-if="problems.length">해결한 문제 목록</div>
           <p v-else>아직 문제를 해결하지 않은 게으른 사람입니다.</p>
           <div class="btns">
             <div class="problem-btn" v-for="problemID of problems" :key="problemID">
@@ -49,38 +40,29 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { QuestionFilled } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import { useAppStore } from '@/store/app'
-import { useUserStore } from '@/store/user'
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const userStore = useUserStore()
 
 const username = ref('')
 const profile = ref({})
 const problems = ref([])
 
-const refreshVisible = computed(() => {
-  if (!username.value) return true
-  if (username.value && userStore.user.username === username.value) return true
-  return false
-})
-
 function getSolvedProblems () {
   const ACMProblems = profile.value.acm_problems_status?.problems || {}
   const OIProblems = profile.value.oi_problems_status?.problems || {}
+  // 키가 곧 문제 번호다(pk). 숫자 정렬을 해야 9 가 10 보다 앞에 온다.
   const ACProblems = []
   for (const p of [ACMProblems, OIProblems]) {
     Object.keys(p).forEach((problemID) => {
-      if (p[problemID].status === 0) ACProblems.push(p[problemID]._id)
+      if (p[problemID].status === 0) ACProblems.push(problemID)
     })
   }
-  ACProblems.sort()
+  ACProblems.sort((a, b) => Number(a) - Number(b))
   problems.value = ACProblems
 }
 
@@ -96,12 +78,6 @@ function goProblem (problemID) {
   router.push({ name: 'problem-details', params: { problemID } })
 }
 
-function freshProblemDisplayID () {
-  api.freshDisplayID().then(() => {
-    ElMessage.success('수정되었습니다')
-    init()
-  })
-}
 
 onMounted(init)
 watch(() => route.fullPath, init)

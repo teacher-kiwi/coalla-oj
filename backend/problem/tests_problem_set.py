@@ -15,9 +15,9 @@ from utils.api.tests import APITestCase
 from .models import Problem, ProblemSetAssignment, ProblemSetItem
 
 
-def create_problem(_id, created_by, contest=None, visible=True, visibility="public"):
+def create_problem(name, created_by, contest=None, visible=True, visibility="public"):
     return Problem.objects.create(
-        _id=_id, title=f"문제 {_id}", description="d", input_description="i",
+        title=f"문제 {name}", description="d", input_description="i",
         output_description="o", samples=[], test_case_id="x", test_case_score=[],
         hint="", languages=["Python3"], template={}, time_limit=1000,
         memory_limit=256, spj=False, rule_type="ACM", visible=visible,
@@ -89,7 +89,7 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         self.assertEqual(resp.data["data"]["added"], 2)
 
         detail = self.client.get(self.set_url + f"?id={set_id}").data["data"]
-        self.assertEqual([i["problem"]["display_id"] for i in detail["items"]], ["P1", "P2"])
+        self.assertEqual([i["problem"]["title"] for i in detail["items"]], ["문제 P1", "문제 P2"])
 
     def test_duplicate_problem_ignored(self):
         set_id = self._create_set()
@@ -116,7 +116,7 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         self.assertSuccess(self.client.put(self.item_url, data={"problem_set": set_id,
                                                                 "items": reversed_ids}))
         detail = self.client.get(self.set_url + f"?id={set_id}").data["data"]
-        self.assertEqual([i["problem"]["display_id"] for i in detail["items"]], ["P2", "P1"])
+        self.assertEqual([i["problem"]["title"] for i in detail["items"]], ["문제 P2", "문제 P1"])
 
     def test_reorder_rejects_stale_list(self):
         set_id = self._create_set()
@@ -250,7 +250,7 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         self._login_student()
         resp = self.client.get(self.detail_url + f"?id={self.set_id}")
         self.assertSuccess(resp)
-        self.assertEqual([p["display_id"] for p in resp.data["data"]["problems"]], ["P1", "P2"])
+        self.assertEqual([p["title"] for p in resp.data["data"]["problems"]], ["문제 P1", "문제 P2"])
 
     def test_closed_assignment_is_hidden(self):
         ProblemSetAssignment.objects.filter(id=self.assignment_id).update(is_open=False)
@@ -309,7 +309,7 @@ class ProblemSetProgressTest(ProblemSetTestBase):
         resp = self.client.get(self._url())
         self.assertSuccess(resp)
         data = resp.data["data"]
-        self.assertEqual([p["display_id"] for p in data["problems"]], ["P1", "P2"])
+        self.assertEqual([p["title"] for p in data["problems"]], ["문제 P1", "문제 P2"])
 
         first, second = data["students"]
         self.assertEqual(first["number"], 1)
@@ -356,7 +356,7 @@ class TeacherStudentSubmissionTest(ProblemSetTestBase):
         self.assertSuccess(resp)
         results = resp.data["data"]["results"]
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["problem"], "P1")
+        self.assertEqual(results[0]["problem"], self.problem.display_id)
         self.assertNotIn("code", results[0])   # 목록에는 코드를 싣지 않는다
 
     def test_can_read_code(self):
@@ -395,7 +395,7 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
             school_class_id=self.class_id, number=1).student.username
 
     def _open_detail(self, problem):
-        return self.client.get(self.problem_url + f"?problem_id={problem._id}")
+        return self.client.get(self.problem_url + f"?problem_id={problem.id}")
 
     def _login_student(self):
         self.client.logout()
@@ -410,8 +410,8 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
         resp = self.client.get(self.problem_url + "?limit=100")
         self.assertSuccess(resp)
         ids = [p["display_id"] for p in resp.data["data"]["results"]]
-        self.assertIn(self.problem._id, ids)
-        self.assertNotIn(self.private._id, ids)
+        self.assertIn(self.problem.display_id, ids)
+        self.assertNotIn(self.private.display_id, ids)
 
     def test_mine_flag_shows_public_and_my_own(self):
         # 문제집에 담을 문제를 고르는 화면이 쓰는 경로다.
@@ -419,15 +419,15 @@ class PrivateProblemAccessTest(ProblemSetTestBase):
         resp = self.client.get(self.problem_url + "?limit=100&mine=1")
         self.assertSuccess(resp)
         ids = [p["display_id"] for p in resp.data["data"]["results"]]
-        self.assertIn(self.private._id, ids)
-        self.assertIn(self.problem._id, ids)
+        self.assertIn(self.private.display_id, ids)
+        self.assertIn(self.problem.display_id, ids)
 
     def test_mine_flag_does_not_show_another_teachers_private_problem(self):
         other = self.create_teacher(username="박선생", login=False)
         hidden = create_problem("3000", other, visibility="private")
         ids = [p["display_id"] for p in
                self.client.get(self.problem_url + "?limit=100&mine=1").data["data"]["results"]]
-        self.assertNotIn(hidden._id, ids)
+        self.assertNotIn(hidden.display_id, ids)
 
     def test_owner_can_open_own_private_problem(self):
         self.assertSuccess(self._open_detail(self.private))
@@ -483,12 +483,12 @@ class HiddenProblemInProblemSetTest(ProblemSetTestBase):
 
     def test_student_can_solve_while_visible(self):
         self._login_student()
-        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"))
+        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem.id}"))
 
     def test_hidden_problem_cannot_be_opened_by_student(self):
         self._hide()
         self._login_student()
-        self.assertFailed(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"),
+        self.assertFailed(self.client.get(self.problem_url + f"?problem_id={self.problem.id}"),
                           "문제가 존재하지 않습니다")
 
     def test_hidden_problem_cannot_be_submitted(self):
@@ -511,7 +511,7 @@ class HiddenProblemInProblemSetTest(ProblemSetTestBase):
     def test_owner_teacher_can_still_open_it(self):
         # 고칠 수 있어야 하므로 만든 사람은 볼 수 있다
         self._hide()
-        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem._id}"))
+        self.assertSuccess(self.client.get(self.problem_url + f"?problem_id={self.problem.id}"))
 
     def test_teacher_problem_set_shows_the_state(self):
         self._hide()

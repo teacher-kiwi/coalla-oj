@@ -383,10 +383,10 @@ class TeacherAccountDeleteTest(SchoolClassTestBase):
         public.refresh_from_db()
         self.assertIsNone(public.created_by_id)
 
-    def _make_problem(self, display_id, visibility):
+    def _make_problem(self, name, visibility):
         from problem.models import Problem
         return Problem.objects.create(
-            _id=display_id, title="t", description="d", input_description="i",
+            title=f"문제 {name}", description="d", input_description="i",
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
@@ -470,7 +470,7 @@ class StudentIdentityTest(SchoolClassTestBase):
         from problem.models import Problem
         from submission.models import Submission
         problem = Problem.objects.create(
-            _id="P1", title="t", description="d", input_description="i",
+            title="t", description="d", input_description="i",
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
@@ -524,7 +524,7 @@ class MyStudentsFilterTest(SchoolClassTestBase):
         from problem.models import Problem
         from submission.models import Submission
         problem = Problem.objects.create(
-            _id="P1", title="t", description="d", input_description="i",
+            title="t", description="d", input_description="i",
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,
@@ -742,7 +742,7 @@ class TeacherDataCleanupTest(SchoolClassTestBase):
         from problem.models import Problem
         from submission.models import Submission
         problem = Problem.objects.create(
-            _id="9100", title="t", description="d", input_description="i",
+            title="t", description="d", input_description="i",
             output_description="o", samples=[], test_case_id="x", test_case_score=[],
             hint="", languages=["Python3"], template={}, time_limit=1000,
             memory_limit=256, spj=False, rule_type="ACM", visible=True,

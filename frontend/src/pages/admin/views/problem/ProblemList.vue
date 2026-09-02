@@ -5,17 +5,9 @@
         <el-input v-model="keyword" :prefix-icon="SearchIcon" placeholder="검색어" />
       </template>
       <el-table v-loading="loading" :data="problemList" @row-dblclick="handleDblclick" class="full-width">
-        <el-table-column width="100" prop="id" label="ID" />
-        <el-table-column width="150" label="표시 ID">
-          <template #default="{ row }">
-            <!-- 대회 문제의 표시(A, B, C)는 순서가 정하므로 고칠 수 없다 -->
-            <span v-if="contestId">{{ row.display_id }}</span>
-            <template v-else>
-              <span v-show="!row.isEditing">{{ row._id }}</span>
-              <el-input v-show="row.isEditing" v-model="row._id" @keyup.enter="handleInlineEdit(row)" />
-            </template>
-          </template>
-        </el-table-column>
+        <!-- 공개 문제는 번호가 곧 pk 이고, 대회 문제는 담은 순서가 정한다.
+             어느 쪽도 사람이 고치지 않는다. -->
+        <el-table-column width="120" prop="display_id" label="번호" />
         <el-table-column prop="title" label="제목">
           <template #default="{ row }">
             <span v-show="!row.isEditing">{{ row.title }}</span>
@@ -64,7 +56,7 @@
     <el-dialog title="문제를 수정하시겠습니까?" width="20%" v-model="inlineEditDialogVisible"
                :close-on-click-modal="false">
       <div>
-        <p>표시 ID: {{ contestId ? currentRow.display_id : currentRow._id }}</p>
+        <p>번호: {{ currentRow.display_id }}</p>
         <p>제목: {{ currentRow.title }}</p>
       </div>
       <template #footer>
@@ -161,9 +153,10 @@ function deleteProblem (id) {
 }
 
 function makeContestProblemPublic (problemID) {
-  ElMessageBox.prompt('공개 문제의 표시 ID를 입력하세요', '확인').then(({ value }) => {
-    api.makeContestProblemPublic({ id: problemID, display_id: value }).catch(() => {})
-  }, () => {})
+  ElMessageBox.confirm('이 문제를 공개 문제로 내보내시겠습니까? 사본이 만들어집니다.', '공개로 전환')
+    .then(() => {
+      api.makeContestProblemPublic({ id: problemID }).catch(() => {})
+    }, () => {})
 }
 
 function updateProblem (row) {

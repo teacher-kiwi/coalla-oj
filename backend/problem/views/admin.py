@@ -7,7 +7,6 @@ from wsgiref.util import FileWrapper
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Q
 from django.http import StreamingHttpResponse, FileResponse
 
 from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
@@ -28,7 +27,7 @@ from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
                            TagSerializer, CreateProblemTagSerializer,
                            EditProblemTagSerializer, ReviewProblemPublishSerializer)
 from ..utils import (build_problem_template, filter_problem_tags_by_keyword,
-                     normalize_tag_aliases)
+                     filter_problems_by_keyword, normalize_tag_aliases)
 
 
 # 업로드된 테스트케이스 디렉터리 이름(rand_str 결과). 경로 조작을 막으려고 형태를 확인한다.
@@ -379,12 +378,6 @@ class ProblemAPI(ProblemBase):
     @validate_serializer(CreateProblemSerializer)
     def post(self, request):
         data = request.data
-        # 표시 번호는 서버가 매긴다. 직접 넣은 값이 있으면 그것을 쓴다(옛 데이터 이관용).
-        _id = data["_id"] or Problem.next_display_id()
-        data["_id"] = _id
-        if Problem.objects.filter(_id=_id, contest_id__isnull=True).exists():
-            return self.error("이미 사용 중인 표시 ID입니다")
-
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
@@ -394,12 +387,7 @@ class ProblemAPI(ProblemBase):
         if error:
             return self.error(error)
         data["created_by"] = request.user
-        try:
-            problem = Problem.objects.create(**data)
-        except IntegrityError:
-            # 위 검사와 저장 사이에 다른 요청이 같은 번호를 먼저 쓴 경우다.
-            # DB 제약(uniq_public_display_id)이 막아준 것이라 안내만 하면 된다.
-            return self.error("이미 사용 중인 표시 ID입니다")
+        problem = Problem.objects.create(**data)
         problem.tags.set(tag_objs)
         return self.success(ProblemAdminSerializer(problem).data)
 
@@ -423,9 +411,7 @@ class ProblemAPI(ProblemBase):
             else:
                 problems = problems.filter(rule_type=rule_type)
 
-        keyword = request.GET.get("keyword", "").strip()
-        if keyword:
-            problems = problems.filter(Q(title__icontains=keyword) | Q(_id__icontains=keyword))
+        problems = filter_problems_by_keyword(problems, request.GET.get("keyword"))
         if not user.can_mgmt_all_problem():
             problems = problems.filter(created_by=user)
         return self.success(self.paginate_data(request, problems, ProblemAdminSerializer))
@@ -441,12 +427,6 @@ class ProblemAPI(ProblemBase):
             ensure_created_by(problem, request.user)
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
-
-        # 빈 값으로 오면 기존 번호를 유지한다(출제 화면에 번호 칸이 없다)
-        _id = data["_id"] or problem._id
-        data["_id"] = _id
-        if Problem.objects.exclude(id=problem_id).filter(_id=_id, contest_id__isnull=True).exists():
-            return self.error("이미 사용 중인 표시 ID입니다")
 
         error_info = self.common_checks(request)
         if error_info:
@@ -592,10 +572,6 @@ class MakeContestProblemPublicAPIView(APIView):
     @problem_permission_required
     def post(self, request):
         data = request.data
-        display_id = data.get("display_id")
-        if Problem.objects.filter(_id=display_id, contest_id__isnull=True).exists():
-            return self.error("이미 사용 중인 표시 ID입니다")
-
         try:
             problem = Problem.objects.get(id=data["id"])
         except Problem.DoesNotExist:
@@ -610,7 +586,6 @@ class MakeContestProblemPublicAPIView(APIView):
         tags = problem.tags.all()
         problem.pk = None
         problem.contest = None
-        problem._id = display_id
         # 대회 안 순서는 공개 문제에서 뜻이 없다. 남겨두면 목록에서 앞으로 튀어나온다.
         problem.order = 0
         problem.visible = False
@@ -639,7 +614,6 @@ class AddContestProblemAPI(APIView):
         problem.contest = contest
         problem.is_public = True
         problem.visible = True
-        problem._id = None
         problem.order = Problem.next_order(contest)
         problem.submission_number = problem.accepted_number = 0
         problem.statistic_info = {}
@@ -740,7 +714,6 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                             if error:
                                 return self.error(error)
 
-                        problem_info["display_id"] = problem_info["display_id"][:24]
                         for k, v in problem_info["template"].items():
                             problem_info["template"][k] = build_problem_template(v["prepend"], v["template"],
                                                                                  v["append"])
@@ -751,8 +724,7 @@ class ImportProblemAPI(CSRFExemptAPIView, TestCaseZipProcessor):
 
                         _, test_case_id = self.process_zip(tmp_file, spj=spj, dir=f"{i}/testcase/")
 
-                        problem_obj = Problem.objects.create(_id=problem_info["display_id"],
-                                                             title=problem_info["title"],
+                        problem_obj = Problem.objects.create(title=problem_info["title"],
                                                              description=problem_info["description"]["value"],
                                                              input_description=problem_info["input_description"][
                                                                  "value"],

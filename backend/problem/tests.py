@@ -23,7 +23,7 @@ from .views.admin import TestCaseAPI
 from .utils import filter_problem_tags_by_keyword, parse_problem_template
 from utils.management.commands.seed_problem_tags import DEFAULT_TAGS
 
-DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test</p>", "input_description": "test",
+DEFAULT_PROBLEM_DATA = {"title": "test", "description": "<p>test</p>", "input_description": "test",
                         "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
                         "visible": True, "tags": ["test"], "languages": ["C", "C++", "Java", "Python3"], "template": {},
                         "samples": [{"input": "test", "output": "test"}], "spj": False, "spj_language": "C",
@@ -201,35 +201,27 @@ class TestCaseUploadAPITest(APITestCase):
 
 
 class DisplayIdTest(ProblemCreateTestBase):
-    """공개 문제의 표시 번호는 서버가 매긴다."""
+    """공개 문제의 번호는 pk 다."""
     def setUp(self):
         self.admin = self.create_admin(login=False)
         ProblemTag.objects.create(name="test")
 
-    def test_first_problem_starts_at_1000(self):
-        self.assertEqual(Problem.next_display_id(), "1000")
+    def _add(self):
+        return self.add_problem(copy.deepcopy(DEFAULT_PROBLEM_DATA), self.admin)
 
-    def test_next_number_follows_the_largest(self):
-        for display_id in ("1000", "1001"):
-            data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
-            data["_id"] = display_id
-            self.add_problem(data, self.admin)
-        self.assertEqual(Problem.next_display_id(), "1002")
+    def test_number_is_the_primary_key(self):
+        problem = self._add()
+        self.assertEqual(problem.display_id, str(problem.id))
 
-    def test_letters_are_ignored(self):
-        # 대회 문제는 A·B·C 를 쓰므로 숫자만 본다
-        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
-        data["_id"] = "A"
-        self.add_problem(data, self.admin)
-        self.assertEqual(Problem.next_display_id(), "1000")
+    def test_numbers_do_not_repeat(self):
+        numbers = [self._add().display_id for _ in range(3)]
+        self.assertEqual(len(set(numbers)), 3)
 
-    def test_problems_are_ordered_by_number_not_text(self):
-        for display_id in ("1002", "999", "1000"):
-            data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
-            data["_id"] = display_id
-            self.add_problem(data, self.admin)
-        # 문자열 정렬이면 1000, 1002, 999 순서가 된다
-        self.assertEqual([p._id for p in Problem.objects.all()], ["999", "1000", "1002"])
+    def test_problems_are_ordered_by_number(self):
+        for _ in range(3):
+            self._add()
+        numbers = [p.id for p in Problem.objects.all()]
+        self.assertEqual(numbers, sorted(numbers))
 
 
 class ProblemAdminAPITest(APITestCase):
@@ -244,12 +236,6 @@ class ProblemAdminAPITest(APITestCase):
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         return resp
-
-    def test_duplicate_display_id(self):
-        self.test_create_problem()
-
-        resp = self.client.post(self.url, data=self.data)
-        self.assertFailed(resp, "이미 사용 중인 표시 ID입니다")
 
     def test_spj(self):
         data = copy.deepcopy(self.data)
@@ -355,8 +341,63 @@ class ProblemAPITest(ProblemCreateTestBase):
         self.assertSuccess(resp)
 
     def get_one_problem(self):
-        resp = self.client.get(self.url + "?id=" + self.problem._id)
+        resp = self.client.get(self.url + "?id=" + str(self.problem.id))
         self.assertSuccess(resp)
+
+
+class PublicProblemLookupTest(ProblemCreateTestBase):
+    """공개 문제는 번호(pk)로 연다. 주소에는 아무 값이나 들어온다."""
+    def setUp(self):
+        self.url = self.reverse("problem_api")
+        admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="test")
+        self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
+
+    def _get(self, problem_id):
+        return self.client.get(f"{self.url}?problem_id={problem_id}")
+
+    def test_open_by_number(self):
+        resp = self._get(self.problem.id)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["display_id"], str(self.problem.id))
+
+    def test_unreadable_number_is_not_an_error(self):
+        # 번호가 정수 컬럼을 넘거나 숫자가 아니면 DB 에 넘기기 전에 걸러야 한다.
+        # 그대로 넘기면 500 이 난다.
+        # 빈 값은 목록 요청이라 여기서 보지 않는다
+        for value in ("abc", "-1", "0", "99999999999999999999", "1.5"):
+            self.assertFailed(self._get(value), "문제가 존재하지 않습니다")
+
+    def test_missing_number_is_not_an_error(self):
+        self.assertFailed(self._get(self.problem.id + 1000), "문제가 존재하지 않습니다")
+
+
+class ProblemKeywordSearchTest(ProblemCreateTestBase):
+    """목록 검색. 번호가 pk 라 부분 일치는 뜻이 없어 정확히 그 번호만 본다."""
+    def setUp(self):
+        self.url = self.reverse("problem_api")
+        admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="test")
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["title"] = "거북이 그리기"
+        self.problem = self.add_problem(data, admin)
+        data["title"] = "다른 문제"
+        self.other = self.add_problem(data, admin)
+
+    def _search(self, keyword):
+        resp = self.client.get(f"{self.url}?limit=10&keyword={keyword}")
+        self.assertSuccess(resp)
+        return [p["display_id"] for p in resp.data["data"]["results"]]
+
+    def test_search_by_title(self):
+        self.assertEqual(self._search("거북이"), [str(self.problem.id)])
+
+    def test_search_by_number(self):
+        self.assertEqual(self._search(self.problem.id), [str(self.problem.id)])
+
+    def test_number_too_big_is_not_an_error(self):
+        # 정수 컬럼 범위를 넘는 값을 그대로 넘기면 DB 가 거절해 500 이 난다
+        self.assertEqual(self._search("99999999999999999999"), [])
 
 
 class ContestProblemAdminTest(APITestCase):
@@ -400,7 +441,6 @@ class ContestProblemTest(ProblemCreateTestBase):
         self.contest = self.client.post(url, data=contest_data).data["data"]
         self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
         self.problem.contest_id = self.contest["id"]
-        self.problem._id = None
         self.problem.order = 1
         self.problem.save()
         self.url = self.reverse("contest_problem_api")
@@ -455,7 +495,6 @@ class AddProblemFromPublicProblemAPITest(ProblemCreateTestBase):
         copied = Problem.objects.get(contest_id=self.contest["id"])
         # 담은 순서가 대회 안 표시를 정한다
         self.assertEqual(copied.display_id, "A")
-        self.assertIsNone(copied._id)
 
 
 class ParseProblemTemplateTest(APITestCase):
@@ -515,8 +554,8 @@ class ContestProblemLabelTest(APITestCase):
         for value in ("", None, "AB", "가", "0", "-1"):
             self.assertIsNone(contest_problem_order(value))
 
-    def test_public_problem_shows_its_number(self):
-        problem = Problem(_id="1000", order=0)
+    def test_public_problem_shows_its_primary_key(self):
+        problem = Problem(id=1000, order=0)
         self.assertEqual(problem.display_id, "1000")
 
 
@@ -538,19 +577,18 @@ class MakeContestProblemPublicTest(ProblemCreateTestBase):
         """공개 문제에는 대회 안 순서가 없다. 남겨두면 목록에서 앞으로 튀어나온다."""
         self.assertEqual(self.contest_problem.order, 1)
         resp = self.client.post(self.reverse("make_public_api"),
-                                data={"id": self.contest_problem.id, "display_id": "2000"})
+                                data={"id": self.contest_problem.id})
         self.assertSuccess(resp)
-        copied = Problem.objects.get(_id="2000", contest__isnull=True)
+        copied = Problem.objects.get(contest__isnull=True)
         self.assertEqual(copied.order, 0)
-        self.assertEqual(copied.display_id, "2000")
+        self.assertEqual(copied.display_id, str(copied.id))
 
 
-class DisplayIdUniqueTest(APITestCase):
-    """표시가 겹치지 않는 것은 DB 가 지킨다.
+class ContestProblemOrderUniqueTest(APITestCase):
+    """대회 안 순서가 겹치지 않는 것은 DB 가 지킨다.
 
-    공개 문제는 표시 번호(_id)로, 대회 문제는 대회 안 순서(order)로 지킨다. 둘 다
-    contest 가 NULL 이냐 아니냐로 나뉘는 부분 인덱스다. 그냥 유니크로 걸면 유니크
-    인덱스에서 NULL 이 서로 다른 값으로 취급되어 아무것도 막지 못한다.
+    contest 가 NULL 이냐 아니냐로 나뉘는 부분 인덱스다. 그냥 유니크로 걸면 공개
+    문제끼리도 걸린다(전부 order 가 0 이다).
     """
     def setUp(self):
         self.admin = self.create_super_admin()
@@ -560,17 +598,10 @@ class DisplayIdUniqueTest(APITestCase):
             title=title, description="d", rule_type="ACM", real_time_rank=True,
             start_time=now(), end_time=now() + timedelta(days=1), created_by=self.admin)
 
-    def _create(self, display_id=None, contest=None, order=0):
+    def _create(self, contest=None, order=0):
         data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
         data.pop("tags")
-        data["_id"] = display_id
         return Problem.objects.create(created_by=self.admin, contest=contest, order=order, **data)
-
-    def test_duplicate_public_display_id_is_rejected(self):
-        self._create("1000")
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                self._create("1000")
 
     def test_duplicate_order_in_one_contest_is_rejected(self):
         """같은 대회에 순서가 겹치면 라벨도 겹친다(A 가 둘)."""
@@ -588,6 +619,6 @@ class DisplayIdUniqueTest(APITestCase):
 
     def test_public_problems_do_not_collide_on_order(self):
         """공개 문제는 order 가 모두 0 이다. 제약이 여기까지 걸리면 안 된다."""
-        self._create("1000")
-        self._create("1001")
+        self._create()
+        self._create()
         self.assertEqual(Problem.objects.filter(order=0).count(), 2)

@@ -45,8 +45,8 @@ class TeacherProblemCreateTest(TeacherProblemTestBase):
         problem = Problem.objects.get(id=resp.data["data"]["id"])
         self.assertEqual(problem.visibility, ProblemVisibility.private)
         self.assertEqual(problem.created_by, self.teacher)
-        # 표시 번호는 서버가 매긴다
-        self.assertEqual(problem._id, "1000")
+        # 번호는 pk 다. 사람이 정하지 않는다.
+        self.assertEqual(problem.display_id, str(problem.id))
 
     def test_only_checked_cases_become_samples(self):
         resp = self._create()

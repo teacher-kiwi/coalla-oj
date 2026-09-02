@@ -1,11 +1,15 @@
 from copy import deepcopy
+from datetime import timedelta
 from unittest import mock
 
+from django.utils.timezone import now
+
+from contest.tests import DEFAULT_CONTEST_DATA
 from problem.models import Problem, ProblemTag
 from utils.api.tests import APITestCase
 from .models import Submission
 
-DEFAULT_PROBLEM_DATA = {"_id": "A-110", "title": "test", "description": "<p>test</p>", "input_description": "test",
+DEFAULT_PROBLEM_DATA = {"title": "test", "description": "<p>test</p>", "input_description": "test",
                         "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
                         "visible": True, "tags": ["test"], "languages": ["C", "C++", "Java", "Python2"], "template": {},
                         "samples": [{"input": "test", "output": "test"}], "spj": False, "spj_language": "C",
@@ -23,9 +27,6 @@ DEFAULT_SUBMISSION_DATA = {
     "language": "C",
     "statistic_info": {}
 }
-
-
-# TODO: 대회 제출 테스트 추가
 
 
 class SubmissionPrepare(APITestCase):
@@ -54,6 +55,53 @@ class SubmissionListTest(SubmissionPrepare):
     def test_get_submission_list(self):
         resp = self.client.get(self.url, data={"limit": "10"})
         self.assertSuccess(resp)
+
+    def test_filter_by_problem_number(self):
+        """주소에 들어오는 문제 번호는 pk 다."""
+        resp = self.client.get(self.url, data={"limit": "10", "problem_id": self.problem.id})
+        self.assertSuccess(resp)
+        self.assertEqual(len(resp.data["data"]["results"]), 1)
+
+    def test_unreadable_problem_number_is_not_an_error(self):
+        # 번호를 그대로 조회에 넘기면 500 이 난다
+        for value in ("abc", "-1", "99999999999999999999"):
+            self.assertFailed(self.client.get(self.url, data={"limit": "10", "problem_id": value}),
+                              "문제가 존재하지 않습니다")
+
+
+class ContestSubmissionListTest(APITestCase):
+    """대회 제출 목록은 대회 안 표시(A, B, C)로 거른다."""
+    def setUp(self):
+        self.admin = self.create_admin("teacher", "test123")
+        contest_data = deepcopy(DEFAULT_CONTEST_DATA)
+        contest_data["password"] = ""
+        contest_data["start_time"] = str(now() - timedelta(hours=1))
+        contest_data["end_time"] = str(now() + timedelta(hours=1))
+        self.contest = self.client.post(self.reverse("contest_admin_api"),
+                                        data=contest_data).data["data"]
+        problem_data = deepcopy(DEFAULT_PROBLEM_DATA)
+        problem_data.pop("tags")
+        problem_data["created_by"] = self.admin
+        self.problem = Problem.objects.create(contest_id=self.contest["id"], order=1,
+                                              **problem_data)
+        self.submission = Submission.objects.create(
+            problem=self.problem, contest_id=self.contest["id"], user=self.admin,
+            code="x", language="C", result=-2)
+        self.url = self.reverse("contest_submission_list_api")
+
+    def _get(self, **params):
+        params.setdefault("limit", "10")
+        params["contest_id"] = self.contest["id"]
+        return self.client.get(self.url, data=params)
+
+    def test_filter_by_label(self):
+        resp = self._get(problem_id="A")
+        self.assertSuccess(resp)
+        self.assertEqual(len(resp.data["data"]["results"]), 1)
+
+    def test_unreadable_label_is_not_an_error(self):
+        for value in ("abc", "가", "-1"):
+            self.assertFailed(self._get(problem_id=value), "문제가 존재하지 않습니다")
 
 
 @mock.patch("submission.views.oj.judge_task.send")

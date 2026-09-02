@@ -89,8 +89,8 @@ class User(AbstractBaseUser):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # 푼 문제 현황. 문제 id 를 키로 갖는다.
-    # {"problems": {"1": {"status": JudgeStatus.ACCEPTED, "_id": "1000"}},
+    # 푼 문제 현황. 문제 id 를 키로 갖는다(그 id 가 곧 화면에 보이는 문제 번호다).
+    # {"problems": {"1": {"status": JudgeStatus.ACCEPTED}},
     #  "contest_problems": {...}}
     acm_problems_status = JSONField(default=dict)
     # 위와 같고 "score" 가 하나 더 붙는다

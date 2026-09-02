@@ -8,9 +8,9 @@ from utils.api.tests import APITestCase
 from .models import ClassContestAssignment, Contest
 
 
-def make_problem(display_id, created_by, visibility=ProblemVisibility.private, contest=None):
+def make_problem(name, created_by, visibility=ProblemVisibility.private, contest=None):
     return Problem.objects.create(
-        _id=display_id, title="t", description="d", input_description="i",
+        title=f"문제 {name}", description="d", input_description="i",
         output_description="o", samples=[], test_case_id="x", test_case_score=[],
         hint="", languages=["Python3"], template={}, time_limit=1000,
         memory_limit=256, spj=False, rule_type="ACM", visible=True,
@@ -201,8 +201,6 @@ class ClassContestProblemTest(ClassContestTestBase):
         problems = Problem.objects.filter(contest_id=self.contest_id).order_by("order")
         self.assertEqual([p.order for p in problems], [1, 2, 3])
         self.assertEqual([p.display_id for p in problems], ["A", "B", "C"])
-        # 라벨은 만들어 쓰는 값이라 저장하지 않는다
-        self.assertEqual([p._id for p in problems], [None, None, None])
 
     def test_removed_letter_is_reused(self):
         """가운데 문제를 빼면 그 자리를 다시 쓴다. 라벨이 A, C, D 로 건너뛰면 안 된다."""

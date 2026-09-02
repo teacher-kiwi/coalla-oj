@@ -1,6 +1,5 @@
 from django.db import models
 from django.db.models import Q
-from django.db.models.functions import Length
 from utils.models import JSONField
 
 from account.models import SchoolClass, User
@@ -44,10 +43,6 @@ def _default_io_mode():
     return {"io_mode": ProblemIOMode.standard, "input": "input.txt", "output": "output.txt"}
 
 
-# 공개 문제의 표시 번호는 서버가 매긴다(백준처럼 1000 부터).
-# 사람이 직접 정하면 중복도 나고 정렬도 깨지고, 출제 화면에 칸이 하나 더 필요하다.
-FIRST_DISPLAY_ID = 1000
-
 # 대회 문제는 대회 안에서 A, B, C 로 보인다. 라벨을 저장하지 않고 order 로 만든다.
 # 저장하면 문제를 빼거나 순서를 바꿀 때마다 라벨을 다시 매겨야 한다.
 CONTEST_PROBLEM_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -72,9 +67,6 @@ def contest_problem_order(label):
 
 
 class Problem(models.Model):
-    # 공개 문제의 표시 번호(1000 등). DB pk 와 별개다.
-    # 대회 문제는 쓰지 않는다(대회 안 표시는 order 가 정한다).
-    _id = models.TextField(db_index=True, null=True)
     contest = models.ForeignKey(Contest, null=True, on_delete=models.CASCADE)
     # 대회 안에서의 순서(1부터). 화면에는 A, B, C 로 보인다. 공개 문제는 0 이다.
     order = models.PositiveIntegerField(default=0)
@@ -121,13 +113,6 @@ class Problem(models.Model):
     statistic_info = JSONField(default=dict)
 
     @classmethod
-    def next_display_id(cls):
-        """다음 공개 문제 번호. 대회 문제는 대회 안에서 A, B, C 로 보이므로 제외한다."""
-        used = cls.objects.filter(contest_id__isnull=True).values_list("_id", flat=True)
-        numbers = [int(v) for v in used if str(v).isdigit()]
-        return str(max(numbers) + 1) if numbers else str(FIRST_DISPLAY_ID)
-
-    @classmethod
     def next_order(cls, contest):
         """대회에 다음으로 넣을 문제의 순서.
 
@@ -142,9 +127,15 @@ class Problem(models.Model):
 
     @property
     def display_id(self):
-        """화면에 보이는 문제 번호. 공개 문제는 1000 같은 번호, 대회 문제는 A, B, C."""
+        """화면에 보이는 문제 번호. 공개 문제는 pk, 대회 문제는 A, B, C.
+
+        공개 문제의 번호를 따로 두지 않는 이유: 번호를 따로 매기면 "지금까지 쓴 것
+        중 가장 큰 값 + 1" 을 읽고 쓰는 사이에 다른 요청이 끼어들 수 있어 중복을
+        막는 장치가 필요하고, 문자열이라 정렬도 따로 손봐야 했다. pk 는 DB 가
+        겹치지 않게 발급한다.
+        """
         if self.contest_id is None:
-            return self._id
+            return str(self.id)
         return contest_problem_label(self.order)
 
     @property
@@ -154,19 +145,12 @@ class Problem(models.Model):
     class Meta:
         db_table = "problem"
         constraints = [
-            # 공개 문제는 contest 가 NULL 이라 ("_id", "contest") 유니크로는 막지 못한다.
-            # 유니크 인덱스에서 NULL 은 서로 다른 값으로 취급되어 ("1000", NULL) 이
-            # 몇 개든 들어간다. 그러면 조회(_id 로 get)에서 MultipleObjectsReturned 가
-            # 나는데, 만든 사람이 아니라 나중에 제출하는 학생에게서 터진다.
-            models.UniqueConstraint(fields=["_id"], condition=Q(contest__isnull=True),
-                                    name="uniq_public_display_id"),
             # 대회 문제는 순서가 겹치면 라벨도 겹친다(A 가 둘).
             models.UniqueConstraint(fields=["contest", "order"], condition=Q(contest__isnull=False),
                                     name="uniq_contest_problem_order"),
         ]
-        # 공개 문제는 order 가 0 이라 표시 번호 순으로, 대회 문제는 order 순으로 줄선다.
-        # 표시 번호는 문자열이라 그냥 정렬하면 12 가 2 보다 앞에 온다. 길이를 먼저 본다.
-        ordering = ("order", Length("_id"), "_id")
+        # 공개 문제는 order 가 0 이라 만든 순서(pk)대로, 대회 문제는 order 순으로 줄선다.
+        ordering = ("order", "id")
 
     def add_submission_number(self):
         self.submission_number = models.F("submission_number") + 1

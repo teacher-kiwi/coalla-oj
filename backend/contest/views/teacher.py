@@ -168,7 +168,6 @@ class TeacherContestProblemAPI(APIView):
                 tags = list(problem.tags.all())
                 problem.pk = None
                 problem.contest = contest
-                problem._id = None
                 problem.order = order
                 problem.is_public = False
                 problem.visible = True

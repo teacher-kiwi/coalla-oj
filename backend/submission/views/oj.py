@@ -4,7 +4,9 @@ from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
 from judge.tasks import judge_task
 from options.options import SysOptions
-from problem.models import can_access_problem, Problem, ProblemRuleType
+from problem.models import (can_access_problem, contest_problem_order, Problem,
+                            ProblemRuleType)
+from problem.utils import problem_id_or_none
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.throttling import TokenBucket
@@ -111,9 +113,12 @@ class SubmissionListAPI(APIView):
         result = request.GET.get("result")
         username = request.GET.get("username")
         if problem_id:
-            try:
-                problem = Problem.objects.get(_id=problem_id, contest_id__isnull=True, visible=True)
-            except Problem.DoesNotExist:
+            number = problem_id_or_none(problem_id)
+            problem = None
+            if number is not None:
+                problem = Problem.objects.filter(id=number, contest_id__isnull=True,
+                                                 visible=True).first()
+            if problem is None:
                 return self.error("문제가 존재하지 않습니다")
             submissions = submissions.filter(problem=problem)
         if (myself and myself == "1") or not SysOptions.submission_list_show_all:
@@ -145,9 +150,12 @@ class ContestSubmissionListAPI(APIView):
         result = request.GET.get("result")
         username = request.GET.get("username")
         if problem_id:
-            try:
-                problem = Problem.objects.get(_id=problem_id, contest_id=contest.id, visible=True)
-            except Problem.DoesNotExist:
+            order = contest_problem_order(problem_id)
+            problem = None
+            if order is not None:
+                problem = Problem.objects.filter(order=order, contest_id=contest.id,
+                                                 visible=True).first()
+            if problem is None:
                 return self.error("문제가 존재하지 않습니다")
             submissions = submissions.filter(problem=problem)
 

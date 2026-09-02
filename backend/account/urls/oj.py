@@ -3,8 +3,7 @@ from django.urls import re_path
 from ..views.oj import (UserChangePasswordAPI, UserRegisterAPI,
                         UserLoginAPI, UserLogoutAPI,
                         AvatarUploadAPI, UserProfileAPI,
-                        UserRankAPI, SessionManagementAPI,
-                        ProfileProblemDisplayIDRefreshAPI, SSOAPI)
+                        UserRankAPI, SessionManagementAPI, SSOAPI)
 
 from ..views.google import AccountDeleteAPI, GoogleLoginAPI, TeacherApplicationAPI
 
@@ -14,7 +13,6 @@ urlpatterns = [
     re_path(r"^register/?$", UserRegisterAPI.as_view(), name="user_register_api"),
     re_path(r"^change_password/?$", UserChangePasswordAPI.as_view(), name="user_change_password_api"),
     re_path(r"^profile/?$", UserProfileAPI.as_view(), name="user_profile_api"),
-    re_path(r"^profile/fresh_display_id", ProfileProblemDisplayIDRefreshAPI.as_view(), name="display_id_fresh"),
     re_path(r"^upload_avatar/?$", AvatarUploadAPI.as_view(), name="avatar_upload_api"),
     re_path(r"^user_rank/?$", UserRankAPI.as_view(), name="user_rank_api"),
     re_path(r"^sessions/?$", SessionManagementAPI.as_view(), name="session_management_api"),

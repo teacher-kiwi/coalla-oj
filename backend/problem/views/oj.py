@@ -5,7 +5,8 @@ from ..models import (can_access_problem, contest_problem_order, ProblemTag, Pro
                       ProblemRuleType, ProblemSet, ProblemSetAssignment, ProblemVisibility)
 from ..serializers import (ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
                            TagSerializer, ProblemSafeSerializer)
-from ..utils import filter_problem_tags_by_keyword
+from ..utils import (filter_problem_tags_by_keyword, filter_problems_by_keyword,
+                     problem_id_or_none)
 from contest.models import ContestRuleType
 from submission.models import JudgeStatus
 
@@ -57,8 +58,12 @@ class ProblemAPI(APIView):
     def get(self, request):
         problem_id = request.GET.get("problem_id")
         if problem_id:
-            problem = (Problem.objects.select_related("created_by")
-                       .filter(_id=problem_id, contest_id__isnull=True).first())
+            # 주소에는 문제 번호(pk)가 들어온다. 아무 값이나 들어오므로 먼저 거른다.
+            number = problem_id_or_none(problem_id)
+            problem = None
+            if number is not None:
+                problem = (Problem.objects.select_related("created_by")
+                           .filter(id=number, contest_id__isnull=True).first())
             # 비공개 문제는 만든 교사와 배포받은 학급 학생만 열 수 있다.
             # 없는 문제와 권한 없는 문제를 같은 문구로 돌려준다(존재 여부를 알리지 않는다).
             if problem is None or not can_access_problem(problem, request.user):
@@ -84,9 +89,7 @@ class ProblemAPI(APIView):
         if tag_text:
             problems = problems.filter(tags__name=tag_text)
 
-        keyword = request.GET.get("keyword", "").strip()
-        if keyword:
-            problems = problems.filter(Q(title__icontains=keyword) | Q(_id__icontains=keyword))
+        problems = filter_problems_by_keyword(problems, request.GET.get("keyword"))
 
         difficulty = request.GET.get("difficulty")
         if difficulty:
