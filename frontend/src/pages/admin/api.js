@@ -159,27 +159,17 @@ export default {
     params = utils.filterEmptyValue(params)
     return ajax('admin/problem', 'get', { params })
   },
+  // 대회 문제는 만들지 않고 담고 뺀다. 문제 자체는 문제 화면에서 만든다.
   getContestProblemList (params) {
     params = utils.filterEmptyValue(params)
     return ajax('admin/contest/problem', 'get', { params })
   },
-  getContestProblem (id) {
-    return ajax('admin/contest/problem', 'get', { params: { id } })
-  },
-  createContestProblem (data) {
+  addProblemToContest (data) {
     return ajax('admin/contest/problem', 'post', { data })
   },
-  editContestProblem (data) {
-    return ajax('admin/contest/problem', 'put', { data })
-  },
-  deleteContestProblem (id) {
-    return ajax('admin/contest/problem', 'delete', { params: { id } })
-  },
-  makeContestProblemPublic (data) {
-    return ajax('admin/contest_problem/make_public', 'post', { data })
-  },
-  addProblemFromPublic (data) {
-    return ajax('admin/contest/add_problem_from_public', 'post', { data })
+  removeProblemFromContest (contestId, problemId) {
+    return ajax('admin/contest/problem', 'delete',
+      { params: { contest_id: contestId, problem_id: problemId } })
   },
   getDashboardInfo () {
     return ajax('admin/dashboard_info', 'get')

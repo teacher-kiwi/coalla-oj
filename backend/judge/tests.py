@@ -7,11 +7,16 @@
 뒤의 처리만 직접 호출한다.
 """
 from copy import deepcopy
+from datetime import timedelta
+
+from django.utils.timezone import now
 
 from account.models import User
-from problem.models import Problem, ProblemRuleType, ProblemTag
+from contest.models import Contest
+from problem.models import ContestProblem, Problem, ProblemRuleType, ProblemTag
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
+from utils.constants import ContestRuleType
 
 from .dispatcher import JudgeDispatcher
 
@@ -258,3 +263,62 @@ class RejudgeTest(DispatcherTestBase):
         info = Problem.objects.get(id=self.problem.id).statistic_info
         self.assertEqual(info[str(JudgeStatus.WRONG_ANSWER)], 2)
         self.assertEqual(info[str(JudgeStatus.ACCEPTED)], 1)
+
+
+class ContestProblemStatusTest(DispatcherTestBase):
+    """대회 제출은 대회 안 통계와 문제 자체의 누적을 함께 올린다.
+
+    대회 화면은 앞의 것을 보여주고, 대회가 끝나 문제를 공개로 돌리면 뒤의 것이 보인다.
+    같이 두면 예전에 공개로 풀린 횟수가 대회 화면에 나와 난이도가 샌다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.contest = Contest.objects.create(
+            title="c", description="d", rule_type=ContestRuleType.ACM, real_time_rank=True,
+            start_time=now() - timedelta(hours=1), end_time=now() + timedelta(hours=1),
+            created_by=self.create_admin("teacher", "pass123", login=False))
+        self.entry = ContestProblem.objects.create(contest=self.contest, problem=self.problem,
+                                                   order=1)
+        # 이 문제는 대회 전에 공개로 풀린 적이 있다
+        Problem.objects.filter(id=self.problem.id).update(submission_number=7, accepted_number=5)
+
+    def _contest_submit(self, result):
+        submission = Submission.objects.create(
+            user_id=self.user.id, problem_id=self.problem.id, contest=self.contest,
+            code="print(1)", language="Python3", result=result)
+        JudgeDispatcher(submission.id, self.problem.id).update_contest_problem_status()
+
+    def test_contest_counters_start_from_zero(self):
+        self._contest_submit(JudgeStatus.ACCEPTED)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.submission_number, 1)
+        self.assertEqual(self.entry.accepted_number, 1)
+
+    def test_problem_totals_keep_counting(self):
+        self._contest_submit(JudgeStatus.ACCEPTED)
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.submission_number, 8)
+        self.assertEqual(problem.accepted_number, 6)
+
+    def test_contest_solve_marks_the_problem_solved(self):
+        """대회에서 푼 것도 그 문제를 푼 것이다.
+
+        문제 통계는 이미 대회 제출을 함께 세므로, 푼 문제 표시만 빼두면 어긋난다.
+        """
+        self._contest_submit(JudgeStatus.ACCEPTED)
+        profile = self._profile()
+        self.assertEqual(profile.acm_problems_status["problems"][str(self.problem.id)],
+                         {"status": JudgeStatus.ACCEPTED})
+        self.assertEqual(profile.accepted_number, 1)
+        # 대회 안 기록도 그대로 남는다(순위 화면이 본다). 대회 id 로 한 겹 나뉜다.
+        self.assertEqual(profile.acm_problems_status["contest_problems"],
+                         {str(self.contest.id): {str(self.problem.id):
+                                                 {"status": JudgeStatus.ACCEPTED}}})
+
+    def test_wrong_answer_in_a_contest_does_not_mark_it_solved(self):
+        self._contest_submit(JudgeStatus.WRONG_ANSWER)
+        profile = self._profile()
+        self.assertEqual(
+            profile.acm_problems_status["problems"][str(self.problem.id)]["status"],
+            JudgeStatus.WRONG_ANSWER)
+        self.assertEqual(profile.accepted_number, 0)

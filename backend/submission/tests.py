@@ -4,8 +4,9 @@ from unittest import mock
 
 from django.utils.timezone import now
 
+from contest.models import Contest
 from contest.tests import DEFAULT_CONTEST_DATA
-from problem.models import Problem, ProblemTag
+from problem.models import ContestProblem, Problem, ProblemTag
 from utils.api.tests import APITestCase
 from .models import Submission
 
@@ -82,8 +83,8 @@ class ContestSubmissionListTest(APITestCase):
         problem_data = deepcopy(DEFAULT_PROBLEM_DATA)
         problem_data.pop("tags")
         problem_data["created_by"] = self.admin
-        self.problem = Problem.objects.create(contest_id=self.contest["id"], order=1,
-                                              **problem_data)
+        self.problem = Problem.objects.create(**problem_data)
+        ContestProblem.objects.create(contest_id=self.contest["id"], problem=self.problem, order=1)
         self.submission = Submission.objects.create(
             problem=self.problem, contest_id=self.contest["id"], user=self.admin,
             code="x", language="C", result=-2)
@@ -102,6 +103,89 @@ class ContestSubmissionListTest(APITestCase):
     def test_unreadable_label_is_not_an_error(self):
         for value in ("abc", "가", "-1"):
             self.assertFailed(self._get(problem_id=value), "문제가 존재하지 않습니다")
+
+
+class SubmissionExistsScopeTest(APITestCase):
+    """이 문제에 제출한 적이 있는지는 묻는 자리마다 범위가 다르다."""
+    def setUp(self):
+        self.admin = self.create_admin("teacher", "test123", login=False)
+        problem_data = deepcopy(DEFAULT_PROBLEM_DATA)
+        problem_data.pop("tags")
+        problem_data["created_by"] = self.admin
+        self.problem = Problem.objects.create(**problem_data)
+        self.contest = Contest.objects.create(
+            title="c", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now() - timedelta(hours=1), end_time=now() + timedelta(hours=1),
+            created_by=self.admin)
+        ContestProblem.objects.create(contest=self.contest, problem=self.problem, order=1)
+        self.student = self.create_user("student", "test123")
+        self.url = self.reverse("submission_exists")
+
+    def _ask(self, contest=None):
+        params = {"problem_id": self.problem.id}
+        if contest is not None:
+            params["contest_id"] = contest.id
+        return self.client.get(self.url, data=params).data["data"]
+
+    def test_solving_outside_does_not_count_inside_the_contest(self):
+        Submission.objects.create(problem=self.problem, user=self.student, code="x",
+                                  language="C", result=0)
+        self.assertTrue(self._ask())
+        self.assertFalse(self._ask(self.contest))
+
+    def test_submitting_inside_counts_inside(self):
+        Submission.objects.create(problem=self.problem, user=self.student,
+                                  contest=self.contest, code="x", language="C", result=0)
+        self.assertTrue(self._ask(self.contest))
+
+    def test_running_contest_submission_does_not_count_outside(self):
+        Submission.objects.create(problem=self.problem, user=self.student,
+                                  contest=self.contest, code="x", language="C", result=0)
+        self.assertFalse(self._ask())
+
+    def test_unreadable_problem_number_is_not_an_error(self):
+        resp = self.client.get(self.url, data={"problem_id": "99999999999999999999"})
+        self.assertFailed(resp)
+
+
+class ContestSubmissionsJoinPublicListTest(APITestCase):
+    """대회가 끝나면 그 제출이 공개 목록에 함께 나온다.
+
+    합쳤다는 표시를 저장하지 않고 끝 시각으로 그때그때 판단한다. 대회를 다시
+    열면(끝 시각을 미루면) 도로 숨고, 되돌릴 상태가 남지 않는다.
+    """
+    def setUp(self):
+        self.admin = self.create_admin("teacher", "test123")
+        problem_data = deepcopy(DEFAULT_PROBLEM_DATA)
+        problem_data.pop("tags")
+        problem_data["created_by"] = self.admin
+        self.problem = Problem.objects.create(**problem_data)
+        self.contest = Contest.objects.create(
+            title="c", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now() - timedelta(hours=2), end_time=now() + timedelta(hours=1),
+            created_by=self.admin)
+        ContestProblem.objects.create(contest=self.contest, problem=self.problem, order=1)
+        Submission.objects.create(problem=self.problem, contest=self.contest, user=self.admin,
+                                  code="x", language="C", result=-2)
+        self.url = self.reverse("submission_list_api")
+
+    def _public_count(self):
+        resp = self.client.get(self.url, data={"limit": "10"})
+        self.assertSuccess(resp)
+        return len(resp.data["data"]["results"])
+
+    def test_hidden_while_the_contest_runs(self):
+        self.assertEqual(self._public_count(), 0)
+
+    def test_shown_after_the_contest_ends(self):
+        Contest.objects.filter(id=self.contest.id).update(end_time=now() - timedelta(minutes=1))
+        self.assertEqual(self._public_count(), 1)
+
+    def test_hidden_again_when_the_contest_is_extended(self):
+        Contest.objects.filter(id=self.contest.id).update(end_time=now() - timedelta(minutes=1))
+        self.assertEqual(self._public_count(), 1)
+        Contest.objects.filter(id=self.contest.id).update(end_time=now() + timedelta(hours=1))
+        self.assertEqual(self._public_count(), 0)
 
 
 @mock.patch("submission.views.oj.judge_task.send")

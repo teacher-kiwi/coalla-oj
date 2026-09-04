@@ -3,19 +3,18 @@ from datetime import timedelta
 from django.utils.timezone import now
 
 from account.models import ClassMembership, School
-from problem.models import Problem, ProblemVisibility
+from problem.models import ContestProblem, Problem, ProblemVisibility
 from utils.api.tests import APITestCase
 from .models import ClassContestAssignment, Contest
 
 
-def make_problem(name, created_by, visibility=ProblemVisibility.private, contest=None):
+def make_problem(name, created_by, visibility=ProblemVisibility.private):
     return Problem.objects.create(
         title=f"문제 {name}", description="d", input_description="i",
         output_description="o", samples=[], test_case_id="x", test_case_score=[],
         hint="", languages=["Python3"], template={}, time_limit=1000,
         memory_limit=256, spj=False, rule_type="ACM", visible=True,
-        difficulty="L1", source="", created_by=created_by,
-        visibility=visibility, contest=contest)
+        difficulty="L1", source="", created_by=created_by, visibility=visibility)
 
 
 class ClassContestTestBase(APITestCase):
@@ -182,40 +181,46 @@ class ClassContestProblemTest(ClassContestTestBase):
         super().setUp()
         self.contest_id = self._create_contest().data["data"]["id"]
 
-    def test_problem_is_copied_with_a_letter(self):
+    def test_problem_is_linked_not_copied(self):
         mine = make_problem("1000", self.teacher)
         resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
                                                         "problem_id": mine.id})
         self.assertSuccess(resp)
         self.assertEqual(resp.data["data"]["display_id"], "A")
-        # 원본은 그대로 남는다
-        mine.refresh_from_db()
-        self.assertIsNone(mine.contest_id)
-        self.assertEqual(Problem.objects.filter(contest_id=self.contest_id).count(), 1)
+        # 복사본이 생기지 않는다. 대회는 문제를 가리키기만 한다.
+        self.assertEqual(Problem.objects.count(), 1)
+        entry = ContestProblem.objects.get(contest_id=self.contest_id)
+        self.assertEqual(entry.problem_id, mine.id)
 
     def test_letters_go_in_order(self):
         for i in range(3):
             problem = make_problem(f"200{i}", self.teacher)
             self.client.post(self.problem_url, data={"contest_id": self.contest_id,
                                                      "problem_id": problem.id})
-        problems = Problem.objects.filter(contest_id=self.contest_id).order_by("order")
-        self.assertEqual([p.order for p in problems], [1, 2, 3])
-        self.assertEqual([p.display_id for p in problems], ["A", "B", "C"])
+        entries = ContestProblem.objects.filter(contest_id=self.contest_id).order_by("order")
+        self.assertEqual([e.order for e in entries], [1, 2, 3])
+        self.assertEqual([e.label for e in entries], ["A", "B", "C"])
 
-    def test_removed_letter_is_reused(self):
-        """가운데 문제를 빼면 그 자리를 다시 쓴다. 라벨이 A, C, D 로 건너뛰면 안 된다."""
-        copies = []
+    def test_letters_are_repacked_after_removal(self):
+        """가운데 문제를 빼면 뒤가 당겨진다. 라벨이 A, C 로 벌어지면 안 된다."""
+        added = []
         for i in range(3):
             problem = make_problem(f"210{i}", self.teacher)
-            copies.append(self.client.post(self.problem_url, data={
-                "contest_id": self.contest_id, "problem_id": problem.id}).data["data"]["id"])
+            added.append(problem)
+            self.client.post(self.problem_url, data={"contest_id": self.contest_id,
+                                                     "problem_id": problem.id})
         self.assertSuccess(self.client.delete(
-            self.problem_url + f"?contest_id={self.contest_id}&problem_id={copies[1]}"))
+            self.problem_url + f"?contest_id={self.contest_id}&problem_id={added[1].id}"))
 
+        entries = ContestProblem.objects.filter(contest_id=self.contest_id).order_by("order")
+        self.assertEqual([e.label for e in entries], ["A", "B"])
+        self.assertEqual([e.problem_id for e in entries], [added[0].id, added[2].id])
+
+        # 새로 넣으면 맨 뒤에 붙는다
         fresh = make_problem("2200", self.teacher)
         resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
                                                         "problem_id": fresh.id})
-        self.assertEqual(resp.data["data"]["display_id"], "B")
+        self.assertEqual(resp.data["data"]["display_id"], "C")
 
     def test_cannot_add_another_teachers_private_problem(self):
         self.client.logout()
@@ -241,14 +246,23 @@ class ClassContestProblemTest(ClassContestTestBase):
             "contest_id": started, "problem_id": mine.id}),
             "시작한 대회에는 문제를 넣을 수 없습니다")
 
-    def test_removing_a_problem_keeps_the_original(self):
+    def test_removing_from_the_contest_keeps_the_problem(self):
         mine = make_problem("6000", self.teacher)
-        copy_id = self.client.post(self.problem_url, data={
-            "contest_id": self.contest_id, "problem_id": mine.id}).data["data"]["id"]
+        self.client.post(self.problem_url, data={"contest_id": self.contest_id,
+                                                 "problem_id": mine.id})
         self.assertSuccess(self.client.delete(
-            self.problem_url + f"?contest_id={self.contest_id}&problem_id={copy_id}"))
-        self.assertFalse(Problem.objects.filter(id=copy_id).exists())
+            self.problem_url + f"?contest_id={self.contest_id}&problem_id={mine.id}"))
+        self.assertFalse(ContestProblem.objects.filter(contest_id=self.contest_id).exists())
         self.assertTrue(Problem.objects.filter(id=mine.id).exists())
+
+    def test_problem_in_a_contest_cannot_be_deleted(self):
+        """지우면 대회 제출이 함께 사라지고 순위표에 없는 문제 칸이 남는다."""
+        mine = make_problem("6100", self.teacher)
+        self.client.post(self.problem_url, data={"contest_id": self.contest_id,
+                                                 "problem_id": mine.id})
+        resp = self.client.delete(self.reverse("teacher_problem_api") + f"?id={mine.id}")
+        self.assertFailed(resp)
+        self.assertIn("대회에서 먼저 빼주세요", resp.data["data"])
 
 
 class ClassContestAssignmentModelTest(ClassContestTestBase):

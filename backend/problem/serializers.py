@@ -78,15 +78,6 @@ class EditProblemSerializer(CreateOrEditProblemSerializer):
     id = serializers.IntegerField()
 
 
-class CreateContestProblemSerializer(CreateOrEditProblemSerializer):
-    contest_id = serializers.IntegerField()
-
-
-class EditContestProblemSerializer(CreateOrEditProblemSerializer):
-    id = serializers.IntegerField()
-    contest_id = serializers.IntegerField()
-
-
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProblemTag
@@ -131,8 +122,24 @@ class ProblemSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("order", "test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("test_case_score", "test_case_id", "visible",
                    "spj_code", "spj_version", "spj_compile_ok")
+
+
+class _ContestProblemSerializer(serializers.Serializer):
+    """대회 화면용. 문제를 그대로 싣되 번호와 통계만 대회 것으로 바꾼다.
+
+    문제 자체의 누적 통계를 그대로 보여주면, 예전에 공개로 풀린 횟수가 대회
+    화면에 나와 난이도가 샌다.
+    """
+    problem_serializer = None
+
+    def to_representation(self, entry):
+        data = self.problem_serializer(entry.problem).data
+        data["display_id"] = entry.label
+        data["submission_number"] = entry.submission_number
+        data["accepted_number"] = entry.accepted_number
+        return data
 
 
 class ProblemListSerializer(serializers.ModelSerializer):
@@ -155,13 +162,22 @@ class ProblemSafeSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
-        exclude = ("order", "test_case_score", "test_case_id", "visible", "is_public",
+        exclude = ("test_case_score", "test_case_id", "visible",
                    "spj_code", "spj_version", "spj_compile_ok",
                    "difficulty", "submission_number", "accepted_number", "statistic_info")
 
 
-class ContestProblemMakePublicSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
+class ContestProblemAdminSerializer(_ContestProblemSerializer):
+    problem_serializer = ProblemAdminSerializer
+
+
+class ContestProblemDetailSerializer(_ContestProblemSerializer):
+    problem_serializer = ProblemSerializer
+
+
+class ContestProblemSafeSerializer(_ContestProblemSerializer):
+    """대회 중 채점 상세를 감출 때 쓴다(ACM 규칙)."""
+    problem_serializer = ProblemSafeSerializer
 
 
 class ExportProblemSerializer(serializers.ModelSerializer):

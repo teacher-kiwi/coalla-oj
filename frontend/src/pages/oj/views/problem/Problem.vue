@@ -298,7 +298,7 @@ function init () {
   api[func](problemID.value, contestID.value).then(res => {
     const prob = res.data.data
     appStore.changeDomTitle(prob.title)
-    api.submissionExists(prob.id).then(r => {
+    api.submissionExists(prob.id, contestID.value).then(r => {
       submissionExists.value = r.data.data
     })
     prob.languages = prob.languages.sort()

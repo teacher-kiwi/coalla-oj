@@ -16,13 +16,15 @@ from options.options import SysOptions
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, CSRFExemptAPIView, validate_serializer, APIError
 from utils.constants import Difficulty
-from utils.shortcuts import rand_str, natural_sort_key
+from utils.shortcuts import int_or_none, rand_str, natural_sort_key
 from utils.tasks import delete_files
-from ..models import Problem, ProblemRuleType, ProblemTag, ProblemVisibility
-from ..serializers import (CreateContestProblemSerializer, CompileSPJSerializer,
-                           CreateProblemSerializer, EditProblemSerializer, EditContestProblemSerializer,
-                           ProblemAdminSerializer, TestCaseUploadForm, ContestProblemMakePublicSerializer,
-                           AddContestProblemSerializer, ExportProblemSerializer,
+from ..models import (ContestProblem, MAX_CONTEST_PROBLEMS, Problem, ProblemRuleType,
+                      ProblemTag, ProblemVisibility)
+from ..serializers import (CompileSPJSerializer,
+                           CreateProblemSerializer, EditProblemSerializer,
+                           ProblemAdminSerializer, TestCaseUploadForm,
+                           AddContestProblemSerializer, ContestProblemAdminSerializer,
+                           ExportProblemSerializer,
                            ExportProblemRequestSerialzier, UploadProblemForm, ImportProblemSerializer,
                            TagSerializer, CreateProblemTagSerializer,
                            EditProblemTagSerializer, ReviewProblemPublishSerializer)
@@ -327,8 +329,7 @@ class ProblemPublishReviewAPI(APIView):
     """교사가 공개 신청한 문제를 관리자가 검토한다."""
     @admin_role_required
     def get(self, request):
-        problems = (Problem.objects.filter(visibility=ProblemVisibility.pending,
-                                           contest_id__isnull=True)
+        problems = (Problem.objects.filter(visibility=ProblemVisibility.pending)
                     .select_related("created_by").prefetch_related("tags"))
         return self.success(ProblemAdminSerializer(problems, many=True).data)
 
@@ -404,7 +405,7 @@ class ProblemAPI(ProblemBase):
             except Problem.DoesNotExist:
                 return self.error("문제가 존재하지 않습니다")
 
-        problems = Problem.objects.filter(contest_id__isnull=True).order_by("-create_time")
+        problems = Problem.objects.all().order_by("-create_time")
         if rule_type:
             if rule_type not in ProblemRuleType.choices():
                 return self.error("규칙 유형이 올바르지 않습니다")
@@ -449,154 +450,39 @@ class ProblemAPI(ProblemBase):
         if not id:
             return self.error("잘못된 요청입니다. id가 필요합니다")
         try:
-            problem = Problem.objects.get(id=id, contest_id__isnull=True)
+            problem = Problem.objects.get(id=id)
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
         ensure_created_by(problem, request.user)
+        entry = problem.contest_entries.select_related("contest").first()
+        if entry:
+            return self.error(f"대회 〈{entry.contest.title}〉에 담긴 문제입니다. "
+                              "대회에서 먼저 빼주세요")
         problem.delete()
         return self.success()
 
 
-class ContestProblemAPI(ProblemBase):
-    @validate_serializer(CreateContestProblemSerializer)
-    def post(self, request):
-        data = request.data
-        try:
-            contest = Contest.objects.get(id=data.pop("contest_id"))
-            ensure_created_by(contest, request.user)
-        except Contest.DoesNotExist:
-            return self.error("대회가 존재하지 않습니다")
+class ContestProblemAPI(APIView):
+    """대회에 담긴 문제. 문제를 복사하지 않고 관계만 잇는다.
 
-        if data["rule_type"] != contest.rule_type:
-            return self.error("규칙 유형이 올바르지 않습니다")
-
-        error_info = self.common_checks(request)
-        if error_info:
-            return self.error(error_info)
-
-        data["contest"] = contest
-        # 대회 안 표시(A, B, C)는 순서가 정한다. 새 문제는 맨 뒤에 붙는다.
-        data["order"] = Problem.next_order(contest)
-        tags = data.pop("tags")
-        tag_objs, error = get_existing_problem_tags(tags)
-        if error:
-            return self.error(error)
-        data["created_by"] = request.user
-        try:
-            problem = Problem.objects.create(**data)
-        except IntegrityError:
-            # 순서를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
-            return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
-        problem.tags.set(tag_objs)
-        return self.success(ProblemAdminSerializer(problem).data)
-
+    그래서 "대회 문제 만들기" 가 없다. 문제는 문제 화면에서 만들고(대회 전에는
+    비공개로 두면 된다) 여기서는 담고 빼기만 한다.
+    """
+    @problem_permission_required
     def get(self, request):
-        problem_id = request.GET.get("id")
-        contest_id = request.GET.get("contest_id")
-        user = request.user
-        if problem_id:
-            try:
-                problem = Problem.objects.get(id=problem_id)
-                ensure_created_by(problem.contest, user)
-            except Problem.DoesNotExist:
-                return self.error("문제가 존재하지 않습니다")
-            return self.success(ProblemAdminSerializer(problem).data)
-
-        if not contest_id:
+        contest_id = int_or_none(request.GET.get("contest_id"))
+        if contest_id is None:
             return self.error("잘못된 요청입니다. contest_id가 필요합니다")
         try:
             contest = Contest.objects.get(id=contest_id)
-            ensure_created_by(contest, user)
         except Contest.DoesNotExist:
             return self.error("대회가 존재하지 않습니다")
-        problems = Problem.objects.filter(contest=contest).order_by("-create_time")
-        if user.is_admin():
-            problems = problems.filter(contest__created_by=user)
-        keyword = request.GET.get("keyword")
-        if keyword:
-            problems = problems.filter(title__contains=keyword)
-        return self.success(self.paginate_data(request, problems, ProblemAdminSerializer))
+        ensure_created_by(contest, request.user)
+        entries = (ContestProblem.objects.filter(contest=contest)
+                   .select_related("problem__created_by").prefetch_related("problem__tags"))
+        return self.success(self.paginate_data(request, entries, ContestProblemAdminSerializer))
 
-    @validate_serializer(EditContestProblemSerializer)
-    def put(self, request):
-        data = request.data
-        user = request.user
-
-        try:
-            contest = Contest.objects.get(id=data.pop("contest_id"))
-            ensure_created_by(contest, user)
-        except Contest.DoesNotExist:
-            return self.error("대회가 존재하지 않습니다")
-
-        if data["rule_type"] != contest.rule_type:
-            return self.error("규칙 유형이 올바르지 않습니다")
-
-        problem_id = data.pop("id")
-
-        try:
-            problem = Problem.objects.get(id=problem_id, contest=contest)
-        except Problem.DoesNotExist:
-            return self.error("문제가 존재하지 않습니다")
-
-        error_info = self.common_checks(request)
-        if error_info:
-            return self.error(error_info)
-        tags = data.pop("tags")
-        tag_objs, error = get_existing_problem_tags(tags)
-        if error:
-            return self.error(error)
-
-        for k, v in data.items():
-            setattr(problem, k, v)
-        problem.save()
-        problem.tags.set(tag_objs)
-        return self.success()
-
-    def delete(self, request):
-        id = request.GET.get("id")
-        if not id:
-            return self.error("잘못된 요청입니다. id가 필요합니다")
-        try:
-            problem = Problem.objects.get(id=id, contest_id__isnull=False)
-        except Problem.DoesNotExist:
-            return self.error("문제가 존재하지 않습니다")
-        ensure_created_by(problem.contest, request.user)
-        if Submission.objects.filter(problem=problem).exists():
-            return self.error("제출 기록이 있어 문제를 삭제할 수 없습니다")
-        problem.delete()
-        return self.success()
-
-
-class MakeContestProblemPublicAPIView(APIView):
-    @validate_serializer(ContestProblemMakePublicSerializer)
     @problem_permission_required
-    def post(self, request):
-        data = request.data
-        try:
-            problem = Problem.objects.get(id=data["id"])
-        except Problem.DoesNotExist:
-            return self.error("문제가 존재하지 않습니다")
-
-        if not problem.contest or problem.is_public:
-            return self.error("이미 공개된 문제입니다")
-        problem.is_public = True
-        problem.save()
-        # pk 를 비우고 저장하면 복사본이 만들어진다
-        # https://docs.djangoproject.com/en/4.2/topics/db/queries/#copying-model-instances
-        tags = problem.tags.all()
-        problem.pk = None
-        problem.contest = None
-        # 대회 안 순서는 공개 문제에서 뜻이 없다. 남겨두면 목록에서 앞으로 튀어나온다.
-        problem.order = 0
-        problem.visible = False
-        problem.submission_number = problem.accepted_number = 0
-        problem.statistic_info = {}
-        problem.save()
-        problem.tags.set(tags)
-        return self.success()
-
-
-class AddContestProblemAPI(APIView):
     @validate_serializer(AddContestProblemSerializer)
     def post(self, request):
         data = request.data
@@ -605,24 +491,43 @@ class AddContestProblemAPI(APIView):
             problem = Problem.objects.get(id=data["problem_id"])
         except (Contest.DoesNotExist, Problem.DoesNotExist):
             return self.error("대회 또는 문제가 존재하지 않습니다")
+        ensure_created_by(contest, request.user)
 
-        if contest.status == ContestStatus.CONTEST_ENDED:
-            return self.error("종료된 대회입니다")
+        if contest.status != ContestStatus.CONTEST_NOT_START:
+            return self.error("시작한 대회에는 문제를 넣을 수 없습니다")
+        if ContestProblem.objects.filter(contest=contest, problem=problem).exists():
+            return self.error("이미 이 대회에 담긴 문제입니다")
+        if problem.rule_type != contest.rule_type:
+            return self.error("대회와 규칙 유형이 다른 문제입니다")
 
-        tags = problem.tags.all()
-        problem.pk = None
-        problem.contest = contest
-        problem.is_public = True
-        problem.visible = True
-        problem.order = Problem.next_order(contest)
-        problem.submission_number = problem.accepted_number = 0
-        problem.statistic_info = {}
+        order = ContestProblem.next_order(contest)
+        if order > MAX_CONTEST_PROBLEMS:
+            return self.error(f"대회에는 문제를 {MAX_CONTEST_PROBLEMS}개까지 넣을 수 있습니다")
         try:
-            problem.save()
+            ContestProblem.objects.create(contest=contest, problem=problem, order=order)
         except IntegrityError:
-            # 순서를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
+            # 자리를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
             return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
-        problem.tags.set(tags)
+        return self.success()
+
+    @problem_permission_required
+    def delete(self, request):
+        """대회에서 문제를 뺀다. 문제 자체는 남는다."""
+        contest_id = int_or_none(request.GET.get("contest_id"))
+        problem_id = int_or_none(request.GET.get("problem_id"))
+        if contest_id is None or problem_id is None:
+            return self.error("잘못된 요청입니다. contest_id 와 problem_id 가 필요합니다")
+        try:
+            contest = Contest.objects.get(id=contest_id)
+        except Contest.DoesNotExist:
+            return self.error("대회가 존재하지 않습니다")
+        ensure_created_by(contest, request.user)
+        # 시작한 뒤에 빼면 순위표(submission_info)에 없는 문제 칸이 남는다
+        if contest.status != ContestStatus.CONTEST_NOT_START:
+            return self.error("시작한 대회에서는 문제를 뺄 수 없습니다")
+        ContestProblem.objects.filter(contest=contest, problem_id=problem_id).delete()
+        # 가운데를 빼면 라벨이 A, C 로 벌어지므로 다시 붙인다
+        ContestProblem.repack(contest)
         return self.success()
 
 

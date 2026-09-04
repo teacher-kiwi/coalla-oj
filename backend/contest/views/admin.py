@@ -185,7 +185,7 @@ class ACMContestHelper(APIView):
 
 class DownloadContestSubmissions(APIView):
     def _dump_submissions(self, contest, exclude_admin=True):
-        problem_ids = contest.problem_set.all().values_list("id", "order")
+        problem_ids = contest.problems.all().values_list("problem_id", "order")
         id2display_id = {pk: contest_problem_label(order) for pk, order in problem_ids}
         ac_map = {pk: False for pk, _ in problem_ids}
         submissions = Submission.objects.filter(contest=contest, result=JudgeStatus.ACCEPTED).order_by("-create_time")

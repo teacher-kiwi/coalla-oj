@@ -1,5 +1,4 @@
 from django.db import models
-from django.db.models import Q
 from utils.models import JSONField
 
 from account.models import SchoolClass, User
@@ -46,6 +45,8 @@ def _default_io_mode():
 # 대회 문제는 대회 안에서 A, B, C 로 보인다. 라벨을 저장하지 않고 order 로 만든다.
 # 저장하면 문제를 빼거나 순서를 바꿀 때마다 라벨을 다시 매겨야 한다.
 CONTEST_PROBLEM_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+# 대회 안 표시는 라벨 개수까지만 만들 수 있다
+MAX_CONTEST_PROBLEMS = len(CONTEST_PROBLEM_LABELS)
 
 
 def contest_problem_label(order):
@@ -67,11 +68,6 @@ def contest_problem_order(label):
 
 
 class Problem(models.Model):
-    contest = models.ForeignKey(Contest, null=True, on_delete=models.CASCADE)
-    # 대회 안에서의 순서(1부터). 화면에는 A, B, C 로 보인다. 공개 문제는 0 이다.
-    order = models.PositiveIntegerField(default=0)
-    # 대회 문제를 공개 문제로도 열어둘지
-    is_public = models.BooleanField(default=False)
     title = models.TextField()
     description = models.TextField()
     input_description = models.TextField()
@@ -112,31 +108,15 @@ class Problem(models.Model):
     # 결과별 제출 수 {JudgeStatus.ACCEPTED: 3, JudgeStatus.WRONG_ANSWER: 11}
     statistic_info = JSONField(default=dict)
 
-    @classmethod
-    def next_order(cls, contest):
-        """대회에 다음으로 넣을 문제의 순서.
-
-        비어 있는 가장 앞자리를 쓴다. 뒤에만 붙이면 중간 문제를 뺐을 때 라벨이
-        A, C, D 처럼 건너뛰고, 26개를 넣지 않았는데도 자리가 없다고 나온다.
-        """
-        used = set(cls.objects.filter(contest=contest).values_list("order", flat=True))
-        order = 1
-        while order in used:
-            order += 1
-        return order
-
     @property
     def display_id(self):
-        """화면에 보이는 문제 번호. 공개 문제는 pk, 대회 문제는 A, B, C.
+        """화면에 보이는 문제 번호. pk 를 그대로 쓴다.
 
-        공개 문제의 번호를 따로 두지 않는 이유: 번호를 따로 매기면 "지금까지 쓴 것
-        중 가장 큰 값 + 1" 을 읽고 쓰는 사이에 다른 요청이 끼어들 수 있어 중복을
-        막는 장치가 필요하고, 문자열이라 정렬도 따로 손봐야 했다. pk 는 DB 가
-        겹치지 않게 발급한다.
+        번호를 따로 매기면 "지금까지 쓴 것 중 가장 큰 값 + 1" 을 읽고 쓰는 사이에
+        다른 요청이 끼어들 수 있어 중복을 막는 장치가 필요했다. pk 는 DB 가
+        겹치지 않게 발급한다. 대회 안에서 보이는 A, B, C 는 ContestProblem 이 정한다.
         """
-        if self.contest_id is None:
-            return str(self.id)
-        return contest_problem_label(self.order)
+        return str(self.id)
 
     @property
     def is_open_to_everyone(self):
@@ -144,13 +124,7 @@ class Problem(models.Model):
 
     class Meta:
         db_table = "problem"
-        constraints = [
-            # 대회 문제는 순서가 겹치면 라벨도 겹친다(A 가 둘).
-            models.UniqueConstraint(fields=["contest", "order"], condition=Q(contest__isnull=False),
-                                    name="uniq_contest_problem_order"),
-        ]
-        # 공개 문제는 order 가 0 이라 만든 순서(pk)대로, 대회 문제는 order 순으로 줄선다.
-        ordering = ("order", "id")
+        ordering = ("id",)
 
     def add_submission_number(self):
         self.submission_number = models.F("submission_number") + 1
@@ -159,6 +133,61 @@ class Problem(models.Model):
     def add_ac_number(self):
         self.accepted_number = models.F("accepted_number") + 1
         self.save(update_fields=["accepted_number"])
+
+
+class ContestProblem(models.Model):
+    """대회에 담긴 문제.
+
+    예전에는 문제를 복사해서 넣었다(Problem.contest FK). 그래서 같은 문제를 세 반
+    대회에 쓰면 세 벌이 생겨 오타 하나도 세 번 고쳐야 했고, 대회가 끝나고 문제를
+    공개로 돌리면 또 한 벌이 더 생겨 대회 때 제출 기록이 따라오지 않았다.
+
+    이제 문제 자체는 한 벌이고 대회는 그것을 가리키기만 한다. 대회가 끝난 뒤
+    문제를 공개로 돌리면 대회 때의 제출이 그대로 그 문제의 기록으로 남는다.
+    """
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name="problems")
+    # 대회에 담긴 문제는 지울 수 없다. 지우면 제출이 함께 사라지는데(Submission 이
+    # CASCADE) 순위표의 submission_info 는 문제 id 를 키로 든 JSON 이라 아무도
+    # 지우지 않는다. 없는 문제 칸이 순위표에 남고 정답 수도 계속 센다.
+    problem = models.ForeignKey(Problem, on_delete=models.PROTECT, related_name="contest_entries")
+    # 대회 안에서의 순서(1부터). 화면에는 A, B, C 로 보인다.
+    order = models.PositiveIntegerField()
+    # 대회 안에서만 센 값. 문제 자체의 누적과 따로 둔다. 같이 두면 예전에 공개로
+    # 풀린 횟수가 대회 화면에 그대로 나와 난이도가 샌다.
+    submission_number = models.BigIntegerField(default=0)
+    accepted_number = models.BigIntegerField(default=0)
+    statistic_info = JSONField(default=dict)
+
+    @property
+    def label(self):
+        return contest_problem_label(self.order)
+
+    @classmethod
+    def next_order(cls, contest):
+        """대회에 다음으로 넣을 자리. 맨 뒤에 붙인다."""
+        last = cls.objects.filter(contest=contest).aggregate(models.Max("order"))["order__max"]
+        return (last or 0) + 1
+
+    @classmethod
+    def repack(cls, contest):
+        """번호를 1부터 다시 붙인다.
+
+        가운데 문제를 빼면 라벨이 A, C 로 벌어진다. 문제를 빼는 것은 대회 시작
+        전에만 되고 그때는 제출도 순위도 없으므로, 번호가 바뀌어도 어긋날 것이 없다.
+
+        앞에서부터 당기므로 (대회, 순서) 유일 제약에 걸리지 않는다. i번째 항목의
+        현재 순서는 항상 i 이상이고, 그 자리는 이미 비워진 뒤다.
+        """
+        entries = cls.objects.filter(contest=contest).order_by("order")
+        for index, entry in enumerate(entries, start=1):
+            if entry.order != index:
+                cls.objects.filter(id=entry.id).update(order=index)
+
+    class Meta:
+        db_table = "contest_problem"
+        # 같은 문제를 한 대회에 두 번 담을 수 없고, 한 자리에 두 문제가 올 수 없다.
+        unique_together = (("contest", "problem"), ("contest", "order"))
+        ordering = ("order",)
 
 
 class ProblemSet(models.Model):
@@ -216,10 +245,12 @@ def can_access_problem(problem, user):
     - 공개 문제는 누구나 (단 운영상 감춘 문제 `visible=False` 는 제외)
     - 비공개·승인대기 문제는 만든 교사 본인, 최고관리자,
       그리고 그 문제가 담긴 문제집을 배포받은 학급의 학생
+
+    대회에 담겨 있는지는 보지 않는다. 대회 안에서 여는 것은 대회 권한 검사
+    (check_contest_permission)가 따로 판단하고, 대회 밖에서는 그 문제가 공개인지
+    비공개인지가 그대로 답이다. 대회용으로 만든 문제를 비공개로 두면 대회 밖에서
+    열리지 않고, 공개 문제로 대회를 열었다면 원래 열려 있던 문제다.
     """
-    if problem.contest_id is not None:
-        # 대회 문제는 대회 권한 검사(check_contest_permission)가 따로 판단한다
-        return False
     if problem.is_open_to_everyone:
         return True
     if not user.is_authenticated:

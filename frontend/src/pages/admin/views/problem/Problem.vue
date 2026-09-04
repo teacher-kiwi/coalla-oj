@@ -155,7 +155,7 @@
         <el-row :gutter="20">
           <el-col :span="4">
             <el-form-item label="유형">
-              <el-radio-group v-model="problem.rule_type" :disabled="disableRuleType">
+              <el-radio-group v-model="problem.rule_type">
                 <el-radio label="ACM">ACM</el-radio>
                 <el-radio label="OI">OI</el-radio>
               </el-radio-group>
@@ -236,14 +236,12 @@ const rules = {
 const loadingCompile = ref(false)
 const tagLoading = ref(false)
 const mode = ref('')
-const contest = ref({})
 const testCaseUploaded = ref(false)
 const allLanguage = ref({})
 const tagOptions = ref([])
 const template = ref({})
 const title = ref('')
 const spjMode = ref('')
-const disableRuleType = ref(false)
 const routeName = ref('')
 const error = reactive({ tags: '', spj: '', languages: '', testCase: '' })
 
@@ -263,27 +261,17 @@ const problem = ref(defaultProblem())
 onMounted(() => {
   getTagOptions()
   routeName.value = route.name
-  mode.value = (routeName.value === 'edit-problem' || routeName.value === 'edit-contest-problem') ? 'edit' : 'add'
+  mode.value = routeName.value === 'edit-problem' ? 'edit' : 'add'
 
   api.getLanguages().then(res => {
     problem.value = defaultProblem()
-
-    const contestID = route.params.contestId
-    if (contestID) {
-      problem.value.contest_id = contestID
-      disableRuleType.value = true
-      api.getContest(contestID).then(cRes => {
-        problem.value.rule_type = cRes.data.data.rule_type
-        contest.value = cRes.data.data
-      })
-    }
 
     problem.value.spj_language = 'C'
     allLanguage.value = res.data.data
 
     if (mode.value === 'edit') {
       title.value = '문제 수정'
-      const funcName = { 'edit-problem': 'getProblem', 'edit-contest-problem': 'getContestProblem' }[routeName.value]
+      const funcName = 'getProblem'
       api[funcName](route.params.problemId).then(problemRes => {
         const data = problemRes.data.data
         if (!data.spj_code) data.spj_code = ''
@@ -434,19 +422,9 @@ async function submit () {
     if (template.value[k].checked) problem.value.template[k] = template.value[k].code
   }
 
-  const funcName = {
-    'create-problem': 'createProblem', 'edit-problem': 'editProblem',
-    'create-contest-problem': 'createContestProblem', 'edit-contest-problem': 'editContestProblem'
-  }[routeName.value]
-
-  if (funcName === 'editContestProblem') problem.value.contest_id = contest.value.id
-
+  const funcName = routeName.value === 'create-problem' ? 'createProblem' : 'editProblem'
   api[funcName](problem.value).then(() => {
-    if (routeName.value === 'create-contest-problem' || routeName.value === 'edit-contest-problem') {
-      router.push({ name: 'contest-problem-list', params: { contestId: route.params.contestId } })
-    } else {
-      router.push({ name: 'problem-list' })
-    }
+    router.push({ name: 'problem-list' })
   }).catch(() => {})
 }
 </script>

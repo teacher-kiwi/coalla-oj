@@ -1,10 +1,12 @@
 from django.db.models import Q, Count
 from utils.api import APIView
 from account.decorators import check_contest_permission, login_required
-from ..models import (can_access_problem, contest_problem_order, ProblemTag, Problem,
-                      ProblemRuleType, ProblemSet, ProblemSetAssignment, ProblemVisibility)
-from ..serializers import (ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
-                           TagSerializer, ProblemSafeSerializer)
+from ..models import (can_access_problem, ContestProblem, contest_problem_order, ProblemTag,
+                      Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment,
+                      ProblemVisibility)
+from ..serializers import (ContestProblemDetailSerializer, ContestProblemSafeSerializer,
+                           ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
+                           TagSerializer)
 from ..utils import (filter_problem_tags_by_keyword, filter_problems_by_keyword,
                      problem_id_or_none)
 from contest.models import ContestRuleType
@@ -29,8 +31,7 @@ class ProblemTagAPI(APIView):
 
 class PickOneAPI(APIView):
     def get(self, request):
-        problem = (Problem.objects.filter(contest_id__isnull=True, visible=True,
-                                          visibility=ProblemVisibility.public)
+        problem = (Problem.objects.filter(visible=True, visibility=ProblemVisibility.public)
                    .order_by("?").first())
         if problem is None:
             return self.error("선택할 문제가 없습니다")
@@ -63,7 +64,7 @@ class ProblemAPI(APIView):
             problem = None
             if number is not None:
                 problem = (Problem.objects.select_related("created_by")
-                           .filter(id=number, contest_id__isnull=True).first())
+                           .filter(id=number).first())
             # 비공개 문제는 만든 교사와 배포받은 학급 학생만 열 수 있다.
             # 없는 문제와 권한 없는 문제를 같은 문구로 돌려준다(존재 여부를 알리지 않는다).
             if problem is None or not can_access_problem(problem, request.user):
@@ -76,8 +77,7 @@ class ProblemAPI(APIView):
         if not limit:
             return self.error("limit 값이 필요합니다")
 
-        problems = Problem.objects.prefetch_related("tags").filter(
-            contest_id__isnull=True, visible=True)
+        problems = Problem.objects.prefetch_related("tags").filter(visible=True)
         # 교사가 문제집에 담을 문제를 고르는 화면은 "공개 문제 + 내가 만든 문제"를 함께 본다.
         # 그 밖의 경로(학생 문제 목록 등)는 공개 문제만 본다.
         if request.GET.get("mine") == "1" and request.user.is_authenticated:
@@ -103,38 +103,38 @@ class ContestProblemAPI(APIView):
     def _add_problem_status(self, request, queryset_values):
         if request.user.is_authenticated:
             profile = request.user.userprofile
+            # 대회별로 나뉘어 있다. 한 문제가 여러 대회에 담길 수 있어서,
+            # 문제 id 만 보면 다른 대회에서 푼 것이 여기서도 풀린 것으로 보인다.
             if self.contest.rule_type == ContestRuleType.ACM:
-                problems_status = profile.acm_problems_status.get("contest_problems", {})
+                by_contest = profile.acm_problems_status.get("contest_problems", {})
             else:
-                problems_status = profile.oi_problems_status.get("contest_problems", {})
+                by_contest = profile.oi_problems_status.get("contest_problems", {})
+            problems_status = by_contest.get(str(self.contest.id), {})
             for problem in queryset_values:
                 problem["my_status"] = problems_status.get(str(problem["id"]), {}).get("status")
 
     @check_contest_permission(check_type="problems")
     def get(self, request):
+        detailed = self.contest.problem_details_permission(request.user)
+        serializer = ContestProblemDetailSerializer if detailed else ContestProblemSafeSerializer
+        entries = (ContestProblem.objects.filter(contest=self.contest, problem__visible=True)
+                   .select_related("problem__created_by"))
+
         problem_id = request.GET.get("problem_id")
         if problem_id:
             # 주소에는 대회 안 표시(A, B, C)가 들어온다
             order = contest_problem_order(problem_id)
-            problem = None
-            if order is not None:
-                problem = (Problem.objects.select_related("created_by")
-                           .filter(order=order, contest=self.contest, visible=True).first())
-            if problem is None:
+            entry = entries.filter(order=order).first() if order is not None else None
+            if entry is None:
                 return self.error("문제가 존재하지 않습니다.")
-            if self.contest.problem_details_permission(request.user):
-                problem_data = ProblemSerializer(problem).data
+            problem_data = serializer(entry).data
+            if detailed:
                 self._add_problem_status(request, [problem_data, ])
-            else:
-                problem_data = ProblemSafeSerializer(problem).data
             return self.success(problem_data)
 
-        contest_problems = Problem.objects.select_related("created_by").filter(contest=self.contest, visible=True)
-        if self.contest.problem_details_permission(request.user):
-            data = ProblemSerializer(contest_problems, many=True).data
+        data = serializer(entries, many=True).data
+        if detailed:
             self._add_problem_status(request, data)
-        else:
-            data = ProblemSafeSerializer(contest_problems, many=True).data
         return self.success(data)
 
 

@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils.timezone import now
 from django.core.cache import cache
 
-from problem.models import Problem
+from problem.models import ContestProblem
 from utils.api import APIView, validate_serializer
 from utils.constants import CacheKey, CONTEST_PASSWORD_SESSION_KEY
 from utils.shortcuts import datetime2str, check_is_id
@@ -169,8 +169,10 @@ class ContestRankAPI(APIView):
 
         if download_csv:
             data = serializer(qs, many=True, is_contest_admin=is_contest_admin).data
-            contest_problems = Problem.objects.filter(contest=self.contest, visible=True).order_by("order")
-            problem_ids = [item.id for item in contest_problems]
+            contest_problems = list(ContestProblem.objects
+                                    .filter(contest=self.contest, problem__visible=True)
+                                    .select_related("problem").order_by("order"))
+            problem_ids = [entry.problem_id for entry in contest_problems]
 
             f = io.BytesIO()
             workbook = xlsxwriter.Workbook(f)
@@ -179,8 +181,8 @@ class ContestRankAPI(APIView):
             worksheet.write("B1", "Username")
             if self.contest.rule_type == ContestRuleType.OI:
                 worksheet.write("C1", "Total Score")
-                for item in range(contest_problems.count()):
-                    worksheet.write(self.column_string(4 + item) + "1", f"{contest_problems[item].title}")
+                for item in range(len(contest_problems)):
+                    worksheet.write(self.column_string(4 + item) + "1", f"{contest_problems[item].problem.title}")
                 for index, item in enumerate(data):
                     worksheet.write_string(index + 1, 0, str(item["user"]["id"]))
                     worksheet.write_string(index + 1, 1, item["user"]["username"])
@@ -191,8 +193,8 @@ class ContestRankAPI(APIView):
                 worksheet.write("C1", "AC")
                 worksheet.write("D1", "Total Submission")
                 worksheet.write("E1", "Total Time")
-                for item in range(contest_problems.count()):
-                    worksheet.write(self.column_string(6 + item) + "1", f"{contest_problems[item].title}")
+                for item in range(len(contest_problems)):
+                    worksheet.write(self.column_string(6 + item) + "1", f"{contest_problems[item].problem.title}")
 
                 for index, item in enumerate(data):
                     worksheet.write_string(index + 1, 0, str(item["user"]["id"]))

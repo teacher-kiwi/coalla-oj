@@ -280,8 +280,10 @@ export default {
   getSubmission (id) {
     return ajax('submission', 'get', { params: { id } })
   },
-  submissionExists (problemID) {
-    return ajax('submission_exists', 'get', { params: { problem_id: problemID } })
+  // 대회 안에서는 그 대회 안 제출만 본다(문제는 대회 밖에서도 쓰인다)
+  submissionExists (problemID, contestID) {
+    return ajax('submission_exists', 'get',
+      { params: { problem_id: problemID, contest_id: contestID || undefined } })
   },
   submissionRejudge (id) {
     return ajax('admin/submission/rejudge', 'get', { params: { id } })

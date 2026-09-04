@@ -145,7 +145,7 @@ class ClassContestSerializer(serializers.ModelSerializer):
         return obj.assignments.count()
 
     def get_problem_count(self, obj):
-        return obj.problem_set.count()
+        return obj.problems.count()
 
 
 class ClassContestAssignmentSerializer(serializers.ModelSerializer):

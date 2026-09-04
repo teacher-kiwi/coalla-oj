@@ -104,10 +104,12 @@ class ProblemSetProblemAPI(APIView):
             return self.error("문제집이 존재하지 않습니다")
 
         # 공개 문제와 "내가 만든 문제"만 담을 수 있다.
-        # 대회 문제는 대회 전에 내용이 새어나가므로 제외한다.
+        # 아직 끝나지 않은 대회에 담긴 문제는 제외한다. 문제집으로 배포하면
+        # 대회 전에 내용이 새어나간다. 끝난 대회의 문제는 복습용으로 담아도 된다.
         problems = Problem.objects.filter(
             Q(visibility=ProblemVisibility.public) | Q(created_by=request.user),
-            id__in=request.data["problems"], contest_id__isnull=True, visible=True)
+            id__in=request.data["problems"], visible=True) \
+            .exclude(contest_entries__contest__end_time__gte=now())
         if not problems:
             return self.error("문제가 존재하지 않습니다")
 
@@ -332,7 +334,7 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
                 return self.error("문제가 존재하지 않습니다")
             return self.success(ProblemAdminSerializer(problem).data)
 
-        problems = (Problem.objects.filter(created_by=request.user, contest_id__isnull=True)
+        problems = (Problem.objects.filter(created_by=request.user)
                     .prefetch_related("tags"))
         return self.success(TeacherProblemListSerializer(problems, many=True).data)
 
@@ -416,6 +418,10 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
             return self.error("문제가 존재하지 않습니다")
         if problem.visibility == ProblemVisibility.public:
             return self.error("공개된 문제는 삭제할 수 없습니다. 관리자에게 문의하세요")
+        entry = problem.contest_entries.select_related("contest").first()
+        if entry:
+            return self.error(f"대회 〈{entry.contest.title}〉에 담긴 문제입니다. "
+                              "대회에서 먼저 빼주세요")
         if Submission.objects.filter(problem=problem).exists():
             return self.error("이미 제출 기록이 있어 삭제할 수 없습니다")
         problem.delete()
@@ -425,8 +431,7 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
     def _owned(user, problem_id):
         if problem_id is None:
             return None
-        return Problem.objects.filter(id=problem_id, created_by=user,
-                                      contest_id__isnull=True).first()
+        return Problem.objects.filter(id=problem_id, created_by=user).first()
 
 
 class TeacherProblemPublishAPI(APIView):

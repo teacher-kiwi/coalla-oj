@@ -12,17 +12,16 @@ from contest.models import Contest, ContestRuleType
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 
-from .models import Problem, ProblemSetAssignment, ProblemSetItem
+from .models import ContestProblem, Problem, ProblemSetAssignment, ProblemSetItem
 
 
-def create_problem(name, created_by, contest=None, visible=True, visibility="public"):
+def create_problem(name, created_by, visible=True, visibility="public"):
     return Problem.objects.create(
         title=f"문제 {name}", description="d", input_description="i",
         output_description="o", samples=[], test_case_id="x", test_case_score=[],
         hint="", languages=["Python3"], template={}, time_limit=1000,
         memory_limit=256, spj=False, rule_type="ACM", visible=visible,
-        visibility=visibility, difficulty="L1", source="", created_by=created_by,
-        contest=contest)
+        visibility=visibility, difficulty="L1", source="", created_by=created_by)
 
 
 class ProblemSetTestBase(APITestCase):
@@ -98,15 +97,27 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         self.assertEqual(resp.data["data"]["added"], 1)
         self.assertEqual(ProblemSetItem.objects.filter(problem_set_id=set_id).count(), 2)
 
-    def test_contest_problem_cannot_be_added(self):
-        """대회 문제를 담으면 대회 시작 전에 내용이 새어나간다"""
-        contest = Contest.objects.create(
+    def _contest(self, ends_in):
+        return Contest.objects.create(
             title="교내대회", description="d", real_time_rank=True,
             rule_type=ContestRuleType.ACM, created_by=self.teacher,
-            start_time=now(), end_time=now() + timedelta(days=1))
-        hidden = create_problem("C1", self.teacher, contest=contest)
+            start_time=now() - timedelta(days=1), end_time=now() + ends_in)
+
+    def test_problem_in_an_open_contest_cannot_be_added(self):
+        """문제집으로 배포하면 대회가 끝나기 전에 내용이 새어나간다"""
+        problem = create_problem("C1", self.teacher)
+        ContestProblem.objects.create(contest=self._contest(timedelta(days=1)),
+                                      problem=problem, order=1)
         set_id = self._create_set()
-        self.assertFailed(self._add_problems(set_id, [hidden.id]))
+        self.assertFailed(self._add_problems(set_id, [problem.id]))
+
+    def test_problem_from_a_finished_contest_can_be_added(self):
+        """끝난 대회의 문제는 복습용으로 담을 수 있다"""
+        problem = create_problem("C2", self.teacher)
+        ContestProblem.objects.create(contest=self._contest(-timedelta(hours=1)),
+                                      problem=problem, order=1)
+        set_id = self._create_set()
+        self.assertSuccess(self._add_problems(set_id, [problem.id]))
 
     def test_reorder(self):
         set_id = self._create_set()

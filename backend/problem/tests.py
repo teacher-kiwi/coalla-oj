@@ -10,10 +10,13 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 
+from judge.dispatcher import JudgeDispatcher
+from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 
 from .models import ProblemTag, ProblemIOMode
-from .models import contest_problem_label, contest_problem_order, Problem, ProblemRuleType
+from .models import (contest_problem_label, contest_problem_order, ContestProblem,
+                     Problem, ProblemRuleType)
 from contest.models import Contest
 from contest.tests import DEFAULT_CONTEST_DATA
 
@@ -400,34 +403,80 @@ class ProblemKeywordSearchTest(ProblemCreateTestBase):
         self.assertEqual(self._search("99999999999999999999"), [])
 
 
-class ContestProblemAdminTest(APITestCase):
+class ContestProblemAdminTest(ProblemCreateTestBase):
+    """대회 문제는 만들지 않고 담고 뺀다. 문제를 복사하지 않는다."""
     def setUp(self):
         self.url = self.reverse("contest_problem_admin_api")
-        self.create_admin()
+        self.admin = self.create_admin()
         ProblemTag.objects.create(name="test")
         create_test_case_dir()
-        self.contest = self.client.post(self.reverse("contest_admin_api"), data=DEFAULT_CONTEST_DATA).data["data"]
+        contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
+        contest_data["start_time"] = str(now() + timedelta(hours=1))
+        contest_data["end_time"] = str(now() + timedelta(hours=2))
+        self.contest = self.client.post(self.reverse("contest_admin_api"),
+                                        data=contest_data).data["data"]
+        self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, self.admin)
 
-    def test_create_contest_problem(self):
+    def _add(self, problem=None):
+        return self.client.post(self.url, data={"contest_id": self.contest["id"],
+                                                "problem_id": (problem or self.problem).id})
+
+    def test_add_problem(self):
+        self.assertSuccess(self._add())
+        entry = ContestProblem.objects.get(contest_id=self.contest["id"])
+        self.assertEqual(entry.problem_id, self.problem.id)
+        self.assertEqual(entry.label, "A")
+        # 문제는 복사되지 않는다
+        self.assertEqual(Problem.objects.count(), 1)
+
+    def test_same_problem_cannot_be_added_twice(self):
+        self.assertSuccess(self._add())
+        self.assertFailed(self._add(), "이미 이 대회에 담긴 문제입니다")
+
+    def test_list_shows_the_contest_label(self):
+        self.assertSuccess(self._add())
+        resp = self.client.get(self.url + "?contest_id=" + str(self.contest["id"]))
+        self.assertSuccess(resp)
+        results = resp.data["data"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["display_id"], "A")
+
+    def test_remove_keeps_the_problem(self):
+        self.assertSuccess(self._add())
+        contest_id = self.contest["id"]
+        self.assertSuccess(self.client.delete(
+            f"{self.url}?contest_id={contest_id}&problem_id={self.problem.id}"))
+        self.assertFalse(ContestProblem.objects.exists())
+        self.assertTrue(Problem.objects.filter(id=self.problem.id).exists())
+
+    def test_labels_are_repacked_after_removal(self):
+        """가운데를 빼면 A, C 로 벌어진다. 시작 전이라 번호를 다시 붙여도 안전하다."""
+        problems = [self.problem] + [self.add_problem(DEFAULT_PROBLEM_DATA, self.admin)
+                                     for _ in range(2)]
+        for problem in problems:
+            self.assertSuccess(self._add(problem))
+        contest_id = self.contest["id"]
+        self.assertSuccess(self.client.delete(
+            f"{self.url}?contest_id={contest_id}&problem_id={problems[1].id}"))
+
+        entries = ContestProblem.objects.filter(contest_id=contest_id).order_by("order")
+        self.assertEqual([e.label for e in entries], ["A", "B"])
+        self.assertEqual([e.problem_id for e in entries], [problems[0].id, problems[2].id])
+
+    def test_rule_type_must_match_the_contest(self):
         data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
-        data["contest_id"] = self.contest["id"]
-        resp = self.client.post(self.url, data=data)
-        self.assertSuccess(resp)
-        return resp.data["data"]
+        data["rule_type"] = ProblemRuleType.OI
+        # OI 는 테스트케이스마다 점수가 있어야 한다
+        data["test_case_score"] = [dict(item, score=100) for item in data["test_case_score"]]
+        oi_problem = self.add_problem(data, self.admin)
+        self.assertFailed(self._add(oi_problem), "대회와 규칙 유형이 다른 문제입니다")
 
-    def test_get_contest_problem(self):
-        self.test_create_contest_problem()
-        contest_id = self.contest["id"]
-        resp = self.client.get(self.url + "?contest_id=" + str(contest_id))
-        self.assertSuccess(resp)
-        self.assertEqual(len(resp.data["data"]["results"]), 1)
-
-    def test_get_one_contest_problem(self):
-        contest_problem = self.test_create_contest_problem()
-        contest_id = self.contest["id"]
-        problem_id = contest_problem["id"]
-        resp = self.client.get(f"{self.url}?contest_id={contest_id}&id={problem_id}")
-        self.assertSuccess(resp)
+    def test_problem_in_a_contest_cannot_be_deleted(self):
+        """지우면 제출이 함께 사라지고 순위표에 없는 문제 칸이 남는다."""
+        self.assertSuccess(self._add())
+        resp = self.client.delete(self.reverse("problem_admin_api") + f"?id={self.problem.id}")
+        self.assertFailed(resp)
+        self.assertIn("대회에서 먼저 빼주세요", resp.data["data"])
 
 
 class ContestProblemTest(ProblemCreateTestBase):
@@ -440,9 +489,7 @@ class ContestProblemTest(ProblemCreateTestBase):
         contest_data["start_time"] = contest_data["start_time"] + timedelta(hours=1)
         self.contest = self.client.post(url, data=contest_data).data["data"]
         self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
-        self.problem.contest_id = self.contest["id"]
-        self.problem.order = 1
-        self.problem.save()
+        ContestProblem.objects.create(contest_id=self.contest["id"], problem=self.problem, order=1)
         self.url = self.reverse("contest_problem_api")
 
     def test_admin_get_contest_problem_list(self):
@@ -470,31 +517,6 @@ class ContestProblemTest(ProblemCreateTestBase):
         contest.save()
         resp = self.client.get(self.url + "?contest_id=" + str(self.contest["id"]))
         self.assertSuccess(resp)
-
-
-class AddProblemFromPublicProblemAPITest(ProblemCreateTestBase):
-    def setUp(self):
-        admin = self.create_admin()
-        ProblemTag.objects.create(name="test")
-        url = self.reverse("contest_admin_api")
-        contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
-        contest_data["password"] = ""
-        contest_data["start_time"] = contest_data["start_time"] + timedelta(hours=1)
-        self.contest = self.client.post(url, data=contest_data).data["data"]
-        self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
-        self.url = self.reverse("add_contest_problem_from_public_api")
-        self.data = {
-            "contest_id": self.contest["id"],
-            "problem_id": self.problem.id
-        }
-
-    def test_add_contest_problem(self):
-        resp = self.client.post(self.url, data=self.data)
-        self.assertSuccess(resp)
-        self.assertTrue(Problem.objects.all().exists())
-        copied = Problem.objects.get(contest_id=self.contest["id"])
-        # 담은 순서가 대회 안 표시를 정한다
-        self.assertEqual(copied.display_id, "A")
 
 
 class ParseProblemTemplateTest(APITestCase):
@@ -538,6 +560,67 @@ ddd
         self.assertEqual(ret["append"], "ccc\n")
 
 
+class ContestProblemStatusIsolationTest(APITestCase):
+    """대회 안 "푼 문제" 표시는 그 대회 안 제출만 본다.
+
+    문제를 복사하지 않으므로 한 문제가 여러 대회와 공개 목록에 동시에 있다.
+    범위를 나누지 않으면 대회 밖에서 미리 푼 것이 대회 안에서 풀린 것으로 보인다.
+    """
+    def setUp(self):
+        self.admin = self.create_admin("teacher", "test123", login=False)
+        ProblemTag.objects.create(name="test")
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data.pop("tags")
+        data["created_by"] = self.admin
+        self.problem = Problem.objects.create(**data)
+        self.student = self.create_user("student", "test123")
+        self.contest = self._contest("이번 대회")
+        ContestProblem.objects.create(contest=self.contest, problem=self.problem, order=1)
+
+    def _contest(self, title):
+        return Contest.objects.create(
+            title=title, description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now() - timedelta(hours=1), end_time=now() + timedelta(hours=1),
+            created_by=self.admin, visible=True)
+
+    def _solve(self, contest=None):
+        submission = Submission.objects.create(
+            problem=self.problem, user=self.student, contest=contest, code="x",
+            language="C", result=JudgeStatus.ACCEPTED)
+        dispatcher = JudgeDispatcher(submission.id, self.problem.id)
+        if contest is None:
+            dispatcher.update_problem_status()
+        else:
+            dispatcher.update_contest_problem_status()
+
+    def _contest_status(self):
+        resp = self.client.get(self.reverse("contest_problem_api")
+                               + f"?contest_id={self.contest.id}")
+        self.assertSuccess(resp)
+        return resp.data["data"][0].get("my_status")
+
+    def test_solving_outside_does_not_mark_it_solved_in_the_contest(self):
+        self._solve()
+        self.assertIsNone(self._contest_status())
+
+    def test_solving_in_another_contest_does_not_leak(self):
+        other = self._contest("다른 대회")
+        ContestProblem.objects.create(contest=other, problem=self.problem, order=1)
+        self._solve(contest=other)
+        self.assertIsNone(self._contest_status())
+
+    def test_solving_in_this_contest_marks_it_solved(self):
+        self._solve(contest=self.contest)
+        self.assertEqual(self._contest_status(), JudgeStatus.ACCEPTED)
+
+    def test_public_list_still_shows_it_solved(self):
+        """대회 밖에서 푼 것은 공개 목록에 그대로 남는다."""
+        self._solve()
+        resp = self.client.get(self.reverse("problem_api") + "?limit=10")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["results"][0]["my_status"], JudgeStatus.ACCEPTED)
+
+
 class ContestProblemLabelTest(APITestCase):
     """대회 안 표시(A, B, C)는 저장하지 않고 순서로 만든다."""
     def test_label_and_order_round_trip(self):
@@ -554,34 +637,8 @@ class ContestProblemLabelTest(APITestCase):
         for value in ("", None, "AB", "가", "0", "-1"):
             self.assertIsNone(contest_problem_order(value))
 
-    def test_public_problem_shows_its_primary_key(self):
-        problem = Problem(id=1000, order=0)
-        self.assertEqual(problem.display_id, "1000")
-
-
-class MakeContestProblemPublicTest(ProblemCreateTestBase):
-    def setUp(self):
-        self.admin = self.create_super_admin()
-        ProblemTag.objects.create(name="test")
-        create_test_case_dir()
-        contest_data = copy.deepcopy(DEFAULT_CONTEST_DATA)
-        contest_data["password"] = ""
-        self.contest = self.client.post(self.reverse("contest_admin_api"), data=contest_data).data["data"]
-        # 대회에서 직접 출제한 문제여야 한다. 공개 문제에서 담아온 것은 이미 공개다.
-        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
-        data["contest_id"] = self.contest["id"]
-        self.assertSuccess(self.client.post(self.reverse("contest_problem_admin_api"), data=data))
-        self.contest_problem = Problem.objects.get(contest_id=self.contest["id"])
-
-    def test_copy_leaves_the_contest_order_behind(self):
-        """공개 문제에는 대회 안 순서가 없다. 남겨두면 목록에서 앞으로 튀어나온다."""
-        self.assertEqual(self.contest_problem.order, 1)
-        resp = self.client.post(self.reverse("make_public_api"),
-                                data={"id": self.contest_problem.id})
-        self.assertSuccess(resp)
-        copied = Problem.objects.get(contest__isnull=True)
-        self.assertEqual(copied.order, 0)
-        self.assertEqual(copied.display_id, str(copied.id))
+    def test_problem_number_is_its_primary_key(self):
+        self.assertEqual(Problem(id=1000).display_id, "1000")
 
 
 class ContestProblemOrderUniqueTest(APITestCase):
@@ -598,27 +655,40 @@ class ContestProblemOrderUniqueTest(APITestCase):
             title=title, description="d", rule_type="ACM", real_time_rank=True,
             start_time=now(), end_time=now() + timedelta(days=1), created_by=self.admin)
 
-    def _create(self, contest=None, order=0):
+    def _problem(self):
         data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
         data.pop("tags")
-        return Problem.objects.create(created_by=self.admin, contest=contest, order=order, **data)
+        return Problem.objects.create(created_by=self.admin, **data)
 
     def test_duplicate_order_in_one_contest_is_rejected(self):
         """같은 대회에 순서가 겹치면 라벨도 겹친다(A 가 둘)."""
         contest = self._make_contest("c")
-        self._create(contest=contest, order=1)
+        ContestProblem.objects.create(contest=contest, problem=self._problem(), order=1)
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                self._create(contest=contest, order=1)
+                ContestProblem.objects.create(contest=contest, problem=self._problem(), order=1)
+
+    def test_same_problem_twice_in_one_contest_is_rejected(self):
+        contest = self._make_contest("c")
+        problem = self._problem()
+        ContestProblem.objects.create(contest=contest, problem=problem, order=1)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ContestProblem.objects.create(contest=contest, problem=problem, order=2)
 
     def test_same_order_allowed_in_different_contests(self):
         """대회 안의 A, B, C 는 대회마다 따로 쓴다. 제약이 그것까지 막으면 안 된다."""
+        problem = self._problem()
         for i in range(2):
-            self._create(contest=self._make_contest(f"c{i}"), order=1)
-        self.assertEqual(Problem.objects.filter(order=1).count(), 2)
+            ContestProblem.objects.create(contest=self._make_contest(f"c{i}"),
+                                          problem=problem, order=1)
+        self.assertEqual(ContestProblem.objects.filter(order=1).count(), 2)
 
-    def test_public_problems_do_not_collide_on_order(self):
-        """공개 문제는 order 가 모두 0 이다. 제약이 여기까지 걸리면 안 된다."""
-        self._create()
-        self._create()
-        self.assertEqual(Problem.objects.filter(order=0).count(), 2)
+    def test_one_problem_can_be_in_several_contests(self):
+        """같은 문제를 여러 학급 대회에 쓴다. 예전에는 대회마다 복사본이 생겼다."""
+        problem = self._problem()
+        for i in range(3):
+            ContestProblem.objects.create(contest=self._make_contest(f"c{i}"),
+                                          problem=problem, order=1)
+        self.assertEqual(Problem.objects.count(), 1)
+        self.assertEqual(problem.contest_entries.count(), 3)

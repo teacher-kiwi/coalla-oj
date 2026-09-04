@@ -37,9 +37,7 @@ const router = createRouter({
         { path: '/contest', name: 'contest-list', component: ContestList },
         { path: '/contest/:contestId/edit', name: 'edit-contest', component: Contest },
         { path: '/contest/:contestId/announcement', name: 'contest-announcement', component: Announcement },
-        { path: '/contest/:contestId/problems', name: 'contest-problem-list', component: ProblemList },
-        { path: '/contest/:contestId/problem/create', name: 'create-contest-problem', component: Problem },
-        { path: '/contest/:contestId/problem/:problemId/edit', name: 'edit-contest-problem', component: Problem }
+        { path: '/contest/:contestId/problems', name: 'contest-problem-list', component: ProblemList }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/login' }

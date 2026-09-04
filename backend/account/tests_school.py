@@ -1,6 +1,8 @@
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib import auth
+from django.utils.timezone import now
 
 from options.options import SysOptions
 from utils.api.tests import APITestCase
@@ -662,7 +664,6 @@ class NeisSyncTest(APITestCase):
 
     def test_stale_running_can_be_restarted(self):
         """워커가 죽어 running 인 채 멈춘 작업은 다시 시작할 수 있어야 한다"""
-        from datetime import timedelta
         from django.utils.timezone import now
         from .neis import is_running
         SysOptions.school_sync_status = {
@@ -736,6 +737,51 @@ class TeacherDataCleanupTest(SchoolClassTestBase):
         self.assertSuccess(resp)
         self.teacher.refresh_from_db()
         self.assertEqual(self.teacher.admin_type, "Regular User")
+
+    def test_cleanup_removes_class_contests_and_their_problems(self):
+        """대회를 남기면 거기 담긴 비공개 문제를 지울 수 없어 정리가 막힌다."""
+        from contest.models import Contest
+        from problem.models import ContestProblem, Problem
+        problem = Problem.objects.create(
+            title="t", description="d", input_description="i", output_description="o",
+            samples=[], test_case_id="x", test_case_score=[], hint="", languages=["Python3"],
+            template={}, time_limit=1000, memory_limit=256, spj=False, rule_type="ACM",
+            visible=True, difficulty="L1", source="", created_by=self.teacher,
+            visibility="private")
+        contest = Contest.objects.create(
+            title="우리반 대회", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1),
+            created_by=self.teacher, is_class_contest=True)
+        ContestProblem.objects.create(contest=contest, problem=problem, order=1)
+
+        summary = self.client.get(self.data_url + f"?id={self.teacher.id}").data["data"]
+        self.assertEqual(summary["contest_count"], 1)
+        self.assertEqual(summary["private_problem_count"], 1)
+
+        self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
+        self.assertFalse(Contest.objects.filter(id=contest.id).exists())
+        self.assertFalse(Problem.objects.filter(id=problem.id).exists())
+
+    def test_cleanup_keeps_a_problem_used_by_someone_elses_contest(self):
+        """남의 대회에 담긴 문제는 그 대회의 제출과 순위가 매달려 있어 남긴다."""
+        from contest.models import Contest
+        from problem.models import ContestProblem, Problem
+        problem = Problem.objects.create(
+            title="t", description="d", input_description="i", output_description="o",
+            samples=[], test_case_id="x", test_case_score=[], hint="", languages=["Python3"],
+            template={}, time_limit=1000, memory_limit=256, spj=False, rule_type="ACM",
+            visible=True, difficulty="L1", source="", created_by=self.teacher,
+            visibility="private")
+        others = Contest.objects.create(
+            title="교내대회", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1), created_by=self.admin)
+        ContestProblem.objects.create(contest=others, problem=problem, order=1)
+
+        summary = self.client.get(self.data_url + f"?id={self.teacher.id}").data["data"]
+        self.assertEqual(summary["private_problem_count"], 0)
+
+        self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
+        self.assertTrue(Problem.objects.filter(id=problem.id).exists())
 
     def test_cleanup_keeps_the_teachers_own_submissions(self):
         """교사 본인이 푼 기록은 일반 사용자도 갖는 데이터라 남긴다."""

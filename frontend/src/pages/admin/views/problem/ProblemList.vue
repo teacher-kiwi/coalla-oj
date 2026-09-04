@@ -38,16 +38,20 @@
         <el-table-column fixed="right" label="관리" width="250">
           <template #default="{ row }">
             <icon-btn name="수정" icon="Edit" @click="goEdit(row.id)" />
-            <icon-btn v-if="contestId" name="공개로 전환" icon="CopyDocument" @click="makeContestProblemPublic(row.id)" />
             <icon-btn icon="Download" name="테스트 케이스 내려받기" @click="downloadTestCase(row.id)" />
-            <icon-btn icon="Delete" name="문제 삭제" @click="deleteProblem(row.id)" />
+            <!-- 대회 화면에서는 문제를 지우지 않고 대회에서 빼기만 한다.
+                 문제는 대회 밖에서도 쓰이고, 지우면 제출 기록이 함께 사라진다. -->
+            <icon-btn v-if="contestId" icon="Remove" name="대회에서 빼기"
+                      @click="removeFromContest(row.id)" />
+            <icon-btn v-else icon="Delete" name="문제 삭제" @click="deleteProblem(row.id)" />
           </template>
         </el-table-column>
       </el-table>
       <div class="panel-options">
-        <el-button type="primary" size="small" @click="goCreateProblem" :icon="Plus">생성</el-button>
-        <el-button v-if="contestId" type="primary" size="small" :icon="Plus"
-                   @click="addProblemDialogVisible = true">공개 문제에서 추가</el-button>
+        <el-button v-if="!contestId" type="primary" size="small"
+                   @click="goCreateProblem" :icon="Plus">생성</el-button>
+        <el-button v-else type="primary" size="small" :icon="Plus"
+                   @click="addProblemDialogVisible = true">문제 담기</el-button>
         <el-pagination class="page" layout="prev, pager, next"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
       </div>
@@ -65,7 +69,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-if="contestId" title="대회 문제 추가" width="80%" v-model="addProblemDialogVisible"
+    <el-dialog v-if="contestId" title="대회에 문제 담기" width="80%" v-model="addProblemDialogVisible"
                :close-on-click-modal="false">
       <AddProblemComponent :contestID="contestId" @on-change="getProblemList" />
     </el-dialog>
@@ -108,20 +112,13 @@ function lockedReason (row) {
 
 function handleDblclick (row) { row.isEditing = true }
 
+// 대회 문제도 그냥 문제다. 어느 화면에서 왔든 같은 수정 화면으로 간다.
 function goEdit (problemId) {
-  if (routeName.value === 'problem-list') {
-    router.push({ name: 'edit-problem', params: { problemId } })
-  } else if (routeName.value === 'contest-problem-list') {
-    router.push({ name: 'edit-contest-problem', params: { problemId, contestId: contestId.value } })
-  }
+  router.push({ name: 'edit-problem', params: { problemId } })
 }
 
 function goCreateProblem () {
-  if (routeName.value === 'problem-list') {
-    router.push({ name: 'create-problem' })
-  } else if (routeName.value === 'contest-problem-list') {
-    router.push({ name: 'create-contest-problem', params: { contestId: contestId.value } })
-  }
+  router.push({ name: 'create-problem' })
 }
 
 function currentChange (page) {
@@ -147,28 +144,21 @@ function deleteProblem (id) {
   ElMessageBox.confirm('이 문제를 삭제하시겠습니까? 관련 제출 기록도 함께 삭제됩니다.', '문제 삭제', {
     type: 'warning'
   }).then(() => {
-    const funcName = routeName.value === 'problem-list' ? 'deleteProblem' : 'deleteContestProblem'
-    api[funcName](id).then(() => getProblemList(currentPage.value - 1)).catch(() => {})
+    api.deleteProblem(id).then(() => getProblemList(currentPage.value - 1)).catch(() => {})
   }, () => {})
 }
 
-function makeContestProblemPublic (problemID) {
-  ElMessageBox.confirm('이 문제를 공개 문제로 내보내시겠습니까? 사본이 만들어집니다.', '공개로 전환')
+function removeFromContest (problemId) {
+  ElMessageBox.confirm('이 문제를 대회에서 빼시겠습니까? 문제 자체는 남습니다.', '대회에서 빼기')
     .then(() => {
-      api.makeContestProblemPublic({ id: problemID }).catch(() => {})
+      api.removeProblemFromContest(contestId.value, problemId)
+        .then(() => getProblemList(currentPage.value)).catch(() => {})
     }, () => {})
 }
 
 function updateProblem (row) {
   const data = Object.assign({}, row)
-  let funcName = ''
-  if (contestId.value) {
-    data.contest_id = contestId.value
-    funcName = 'editContestProblem'
-  } else {
-    funcName = 'editProblem'
-  }
-  api[funcName](data).then(() => {
+  api.editProblem(data).then(() => {
     inlineEditDialogVisible.value = false
     getProblemList(currentPage.value)
   }).catch(() => { inlineEditDialogVisible.value = false })
