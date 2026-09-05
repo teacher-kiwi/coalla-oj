@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 from datetime import timedelta
+from unittest import mock
 from zipfile import ZipFile
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from django.utils.timezone import now
 from judge.dispatcher import JudgeDispatcher
 from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
+from utils.shortcuts import rand_str
 
 from .models import ProblemTag, ProblemIOMode
 from .models import (contest_problem_label, contest_problem_order, ContestProblem,
@@ -401,6 +403,63 @@ class ProblemKeywordSearchTest(ProblemCreateTestBase):
     def test_number_too_big_is_not_an_error(self):
         # 정수 컬럼 범위를 넘는 값을 그대로 넘기면 DB 가 거절해 500 이 난다
         self.assertEqual(self._search("99999999999999999999"), [])
+
+
+class RejudgeOnTestCaseChangeTest(APITestCase):
+    """테스트케이스를 갈아끼우면 다시 채점한다. 그러지 않으면 옛 결과가 남는다."""
+    def setUp(self):
+        self.create_super_admin()
+        ProblemTag.objects.create(name="test")
+        create_test_case_dir()
+        self.url = self.reverse("problem_admin_api")
+        self.problem = self.client.post(self.url, data=copy.deepcopy(DEFAULT_PROBLEM_DATA)).data["data"]
+
+    def _edit(self, **changes):
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["id"] = self.problem["id"]
+        data.update(changes)
+        with mock.patch("problem.views.admin.rejudge_problem_task.send") as send:
+            resp = self.client.put(self.url, data=data)
+        self.assertSuccess(resp)
+        return resp.data["data"], send
+
+    def test_new_test_cases_start_a_rejudge(self):
+        # 테스트케이스 디렉터리는 테스트끼리 공유하므로 쓰고 나서 치운다
+        new_id = rand_str()
+        create_test_case_dir(new_id)
+        self.addCleanup(shutil.rmtree,
+                        os.path.join(settings.TEST_CASE_DIR, new_id), ignore_errors=True)
+        data, send = self._edit(test_case_id=new_id)
+        send.assert_called_once_with(self.problem["id"])
+        self.assertTrue(data["rejudging"])
+
+    def test_editing_something_else_does_not(self):
+        """제목만 고쳤는데 전부 다시 채점하면 대회 중에 채점 서버가 멈춘다."""
+        data, send = self._edit(title="제목만 고침")
+        send.assert_not_called()
+        self.assertFalse(data["rejudging"])
+
+
+class TestCaseDownloadTest(ProblemCreateTestBase):
+    """테스트케이스 내려받기. 대회에 담긴 문제도 그냥 문제다."""
+    def setUp(self):
+        self.admin = self.create_super_admin()
+        ProblemTag.objects.create(name="test")
+        create_test_case_dir()
+        self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, self.admin)
+        self.url = self.reverse("test_case_api")
+
+    def test_download(self):
+        resp = self.client.get(self.url + f"?problem_id={self.problem.id}")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_download_a_problem_that_is_in_a_contest(self):
+        contest = Contest.objects.create(
+            title="c", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1), created_by=self.admin)
+        ContestProblem.objects.create(contest=contest, problem=self.problem, order=1)
+        resp = self.client.get(self.url + f"?problem_id={self.problem.id}")
+        self.assertEqual(resp.status_code, 200)
 
 
 class ContestProblemAdminTest(ProblemCreateTestBase):

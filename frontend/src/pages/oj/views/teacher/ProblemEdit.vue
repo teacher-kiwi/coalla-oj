@@ -191,7 +191,13 @@ function save () {
   request.then(() => {
     saving.value = false
     dirty.value = false
-    ElMessage.success(isEdit.value ? '수정했습니다' : '문제를 만들었습니다')
+    if (isEdit.value && casesTouched.value) {
+      // 테스트 케이스가 바뀌면 서버가 이 문제의 제출을 전부 다시 채점한다
+      ElMessage.warning('테스트 케이스가 바뀌어 이 문제의 제출을 다시 채점합니다. ' +
+        '정답률과 대회 순위는 채점이 끝난 뒤 반영됩니다.')
+    } else {
+      ElMessage.success(isEdit.value ? '수정했습니다' : '문제를 만들었습니다')
+    }
     goList()
   }, () => {
     saving.value = false

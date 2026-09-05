@@ -27,6 +27,7 @@ from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSe
                            ProblemSetDetailSerializer, ProblemSetItemOrderSerializer,
                            ProblemSetProblemSerializer, ProblemSetSerializer,
                            TeacherProblemListSerializer, TeacherProblemSerializer)
+from judge.tasks import rejudge_problem_task
 from .admin import get_existing_problem_tags, TestCaseZipProcessor
 
 
@@ -409,6 +410,11 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         problem.last_update_time = now()
         problem.save()
         problem.tags.set(tag_objs)
+
+        # 테스트케이스가 바뀌면 이미 채점된 결과가 실제와 어긋난다. 다시 채점하고
+        # 거기서 나온 값(정답률·대회 순위·푼 문제 표시)도 함께 다시 만든다.
+        if cases:
+            rejudge_problem_task.send(problem.id)
         return self.success(TeacherProblemListSerializer(problem).data)
 
     @teacher_required

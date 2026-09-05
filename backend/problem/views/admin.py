@@ -12,6 +12,7 @@ from django.http import StreamingHttpResponse, FileResponse
 from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
 from contest.models import Contest, ContestStatus
 from judge.dispatcher import SPJCompiler
+from judge.tasks import rejudge_problem_task
 from options.options import SysOptions
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, CSRFExemptAPIView, validate_serializer, APIError
@@ -276,10 +277,7 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
 
-        if problem.contest:
-            ensure_created_by(problem.contest, request.user)
-        else:
-            ensure_created_by(problem, request.user)
+        ensure_created_by(problem, request.user)
 
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         if not os.path.isdir(test_case_dir):
@@ -437,12 +435,18 @@ class ProblemAPI(ProblemBase):
         if error:
             return self.error(error)
 
+        # 테스트케이스가 바뀌면 이미 채점된 결과가 실제와 어긋난다. 다시 채점하고
+        # 거기서 나온 값(정답률·대회 순위·푼 문제 표시)도 함께 다시 만든다.
+        test_cases_changed = data.get("test_case_id") != problem.test_case_id
+
         for k, v in data.items():
             setattr(problem, k, v)
         problem.save()
         problem.tags.set(tag_objs)
 
-        return self.success()
+        if test_cases_changed:
+            rejudge_problem_task.send(problem.id)
+        return self.success({"rejudging": test_cases_changed})
 
     @problem_permission_required
     def delete(self, request):
@@ -566,12 +570,9 @@ class ExportProblemAPI(APIView):
 
     @validate_serializer(ExportProblemRequestSerialzier)
     def get(self, request):
-        problems = Problem.objects.filter(id__in=request.data["problem_id"]).select_related("contest")
+        problems = Problem.objects.filter(id__in=request.data["problem_id"])
         for problem in problems:
-            if problem.contest:
-                ensure_created_by(problem.contest, request.user)
-            else:
-                ensure_created_by(problem, request.user)
+            ensure_created_by(problem, request.user)
         path = f"/tmp/{rand_str()}.zip"
         with zipfile.ZipFile(path, "w") as zip_file:
             for index, problem in enumerate(problems):

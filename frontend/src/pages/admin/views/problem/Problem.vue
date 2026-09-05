@@ -423,7 +423,13 @@ async function submit () {
   }
 
   const funcName = routeName.value === 'create-problem' ? 'createProblem' : 'editProblem'
-  api[funcName](problem.value).then(() => {
+  api[funcName](problem.value).then(res => {
+    // 테스트케이스를 갈아끼우면 서버가 이 문제의 제출을 전부 다시 채점한다.
+    // 정답률과 대회 순위가 잠시 뒤 바뀌므로 알려준다.
+    if (res.data.data?.rejudging) {
+      ElMessage.warning('테스트 케이스가 바뀌어 이 문제의 제출을 다시 채점합니다. ' +
+        '정답률과 대회 순위는 채점이 끝난 뒤 반영됩니다.')
+    }
     router.push({ name: 'problem-list' })
   }).catch(() => {})
 }

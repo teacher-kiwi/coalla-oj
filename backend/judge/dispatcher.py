@@ -125,7 +125,15 @@ class JudgeDispatcher(DispatcherBase):
                 return
             self.submission.statistic_info["score"] = score
 
-    def judge(self):
+    def judge(self, update_stats=True):
+        """채점하고 결과를 저장한다.
+
+        update_stats=False 는 여러 제출을 한꺼번에 다시 채점할 때 쓴다. 통계와
+        순위를 하나씩 고치면 제출 순서에 따라 값이 어긋나므로, 결과만 저장해두고
+        다 끝난 뒤에 judge.recompute 로 한 번에 다시 만든다.
+
+        :return: 채점했으면 True. 빈 채점 서버가 없어 못 했으면 False.
+        """
         language = self.submission.language
         # Block Coding은 Python3로 채점
         if language == "Block Coding":
@@ -139,7 +147,7 @@ class JudgeDispatcher(DispatcherBase):
             self.submission.statistic_info["err_info"] = f"언어 {language} 의 설정이 없습니다"
             self.submission.statistic_info["score"] = 0
             self.submission.save()
-            return
+            return True
         spj_config = {}
         if self.problem.spj_code:
             for lang in SysOptions.spj_languages:
@@ -169,15 +177,19 @@ class JudgeDispatcher(DispatcherBase):
 
         with ChooseJudgeServer() as server:
             if not server:
+                if not update_stats:
+                    # 한꺼번에 다시 채점하는 중이다. 대기열에 넣으면 나중에 통계를
+                    # 올리며 채점되어 두 번 세어진다. 부른 쪽이 다시 시도한다.
+                    return False
                 data = {"submission_id": self.submission.id, "problem_id": self.problem.id}
                 cache.lpush(CacheKey.waiting_queue, json.dumps(data))
-                return
+                return True
             Submission.objects.filter(id=self.submission.id).update(result=JudgeStatus.JUDGING)
             resp = self._request(urljoin(server.service_url, "/judge"), data=data)
 
         if not resp:
             Submission.objects.filter(id=self.submission.id).update(result=JudgeStatus.SYSTEM_ERROR)
-            return
+            return True
 
         if resp["err"]:
             self.submission.result = JudgeStatus.COMPILE_ERROR
@@ -198,12 +210,15 @@ class JudgeDispatcher(DispatcherBase):
                 self.submission.result = JudgeStatus.PARTIALLY_ACCEPTED
         self.submission.save()
 
+        if not update_stats:
+            return True
+
         if self.contest_id:
             if self.contest.status != ContestStatus.CONTEST_UNDERWAY or \
                     User.objects.get(id=self.submission.user_id).is_contest_admin(self.contest):
                 logger.info(
                     "Contest debug mode, id: " + str(self.contest_id) + ", submission id: " + self.submission.id)
-                return
+                return True
             with transaction.atomic():
                 self.update_contest_problem_status()
                 self.update_contest_rank()
@@ -215,6 +230,7 @@ class JudgeDispatcher(DispatcherBase):
 
         # 채점이 끝났으니 대기열에 남은 것을 이어서 처리한다
         process_pending_task()
+        return True
 
     def update_problem_status_rejudge(self):
         result = str(self.submission.result)
