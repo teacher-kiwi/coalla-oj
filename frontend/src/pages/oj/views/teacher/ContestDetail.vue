@@ -69,6 +69,32 @@
       </p>
     </Panel>
 
+    <Panel shadow class="section">
+      <template #title>공지</template>
+      <template #extra>
+        <el-button type="primary" :icon="Plus" @click="openAnnouncement()">공지 쓰기</el-button>
+      </template>
+
+      <el-table v-loading="loading.announcements" :data="announcements" class="full-width">
+        <el-table-column label="제목" prop="title" />
+        <el-table-column label="올린 때" width="180">
+          <template #default="{ row }">{{ localtime(row.create_time) }}</template>
+        </el-table-column>
+        <el-table-column label="관리" width="160">
+          <template #default="{ row }">
+            <el-button size="small" @click="openAnnouncement(row)">수정</el-button>
+            <el-button size="small" type="danger" @click="removeAnnouncement(row)">삭제</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <p v-if="!loading.announcements && !announcements.length" class="empty">
+        공지가 없습니다. 대회 중에 알릴 것이 생기면 여기에 씁니다.
+      </p>
+      <p v-if="notStarted && announcements.length" class="empty">
+        공지는 대회가 시작한 뒤부터 학생에게 보입니다.
+      </p>
+    </Panel>
+
     <el-dialog v-model="editDialog" title="대회 수정" width="520px"
                :close-on-click-modal="false">
       <el-form label-width="80px">
@@ -105,6 +131,24 @@
       <p class="guide">줄을 누르면 대회에 들어갑니다. 원본은 그대로 남습니다.</p>
     </el-dialog>
 
+    <el-dialog v-model="announcementDialog"
+               :title="announcementForm.id ? '공지 수정' : '공지 쓰기'" width="560px"
+               :close-on-click-modal="false">
+      <el-form label-width="60px">
+        <el-form-item label="제목" required>
+          <el-input v-model="announcementForm.title" maxlength="128" />
+        </el-form-item>
+        <el-form-item label="내용" required>
+          <el-input v-model="announcementForm.content" type="textarea" :rows="5"
+                    placeholder="대회에 들어온 학생에게 보입니다" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="announcementDialog = false">취소</el-button>
+        <el-button type="primary" :loading="saving" @click="submitAnnouncement">저장</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="classDialog" title="학급에 배포" width="520px">
       <el-table :data="myClasses" @row-click="addClass" class="pick-table">
         <el-table-column label="학교" prop="school_name" />
@@ -119,7 +163,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
@@ -145,12 +189,15 @@ const problems = ref([])
 const assignments = ref([])
 const myClasses = ref([])
 const candidates = ref([])
+const announcements = ref([])
 const problemDialog = ref(false)
 const classDialog = ref(false)
 const editDialog = ref(false)
+const announcementDialog = ref(false)
 const saving = ref(false)
 const form = reactive({ title: '', description: '', start_time: '', end_time: '' })
-const loading = reactive({ problems: false, classes: false })
+const announcementForm = reactive({ id: null, title: '', content: '' })
+const loading = reactive({ problems: false, classes: false, announcements: false })
 
 const notStarted = computed(() => contest.value.status === CONTEST_STATUS.NOT_START)
 
@@ -282,10 +329,57 @@ function removeClass (row) {
   }, () => {})
 }
 
+function loadAnnouncements () {
+  loading.announcements = true
+  api.getMyContestAnnouncements(contestId).then(res => {
+    announcements.value = res.data.data
+    loading.announcements = false
+  }, () => {
+    loading.announcements = false
+  })
+}
+
+// 인자가 없으면 새로 쓰기, 있으면 그 공지를 고친다
+function openAnnouncement (row) {
+  announcementForm.id = row ? row.id : null
+  announcementForm.title = row ? row.title : ''
+  announcementForm.content = row ? row.content : ''
+  announcementDialog.value = true
+}
+
+function submitAnnouncement () {
+  if (!announcementForm.title.trim() || !announcementForm.content.trim()) {
+    ElMessage.error('제목과 내용을 입력해주세요')
+    return
+  }
+  saving.value = true
+  const request = announcementForm.id
+    ? api.editMyContestAnnouncement(announcementForm.id, announcementForm.title,
+      announcementForm.content)
+    : api.createMyContestAnnouncement(contestId, announcementForm.title,
+      announcementForm.content)
+  request.then(() => {
+    saving.value = false
+    announcementDialog.value = false
+    ElMessage.success(announcementForm.id ? '공지를 고쳤습니다' : '공지를 올렸습니다')
+    loadAnnouncements()
+  }, () => {
+    saving.value = false
+  })
+}
+
+function removeAnnouncement (row) {
+  ElMessageBox.confirm('이 공지를 삭제하시겠습니까?', '공지 삭제', { type: 'warning' })
+    .then(() => {
+      api.deleteMyContestAnnouncement(row.id).then(() => loadAnnouncements(), () => {})
+    }, () => {})
+}
+
 onMounted(() => {
   loadContest()
   loadProblems()
   loadAssignments()
+  loadAnnouncements()
 })
 </script>
 

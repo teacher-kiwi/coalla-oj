@@ -122,6 +122,19 @@ export default {
     return ajax('teacher/contest/problem', 'delete',
       { params: { contest_id: contestId, problem_id: problemId } })
   },
+  getMyContestAnnouncements (contestId) {
+    return ajax('teacher/contest/announcement', 'get', { params: { contest_id: contestId } })
+  },
+  createMyContestAnnouncement (contestId, title, content) {
+    return ajax('teacher/contest/announcement', 'post',
+      { data: { contest_id: contestId, title, content } })
+  },
+  editMyContestAnnouncement (id, title, content) {
+    return ajax('teacher/contest/announcement', 'put', { data: { id, title, content } })
+  },
+  deleteMyContestAnnouncement (id) {
+    return ajax('teacher/contest/announcement', 'delete', { params: { id } })
+  },
 
   // ---- 교사 출제 ----
   getMyProblems () {

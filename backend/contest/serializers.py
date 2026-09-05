@@ -171,3 +171,20 @@ class AssignClassContestSerializer(serializers.Serializer):
 class AddClassContestProblemSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
     problem_id = serializers.IntegerField()
+
+
+class CreateClassContestAnnouncementSerializer(serializers.Serializer):
+    """교사용 대회 공지.
+
+    관리자와 달리 visible 을 받지 않는다. 감출 일이 있으면 지우면 되고, 수업 중에
+    쓰는 공지라 "썼는데 안 보인다" 가 더 헷갈린다.
+    """
+    contest_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=128)
+    content = serializers.CharField()
+
+
+class EditClassContestAnnouncementSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField(max_length=128)
+    content = serializers.CharField()

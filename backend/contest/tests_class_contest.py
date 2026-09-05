@@ -5,7 +5,7 @@ from django.utils.timezone import now
 from account.models import ClassMembership, School
 from problem.models import ContestProblem, Problem, ProblemVisibility
 from utils.api.tests import APITestCase
-from .models import ClassContestAssignment, Contest
+from .models import ClassContestAssignment, Contest, ContestAnnouncement
 
 
 def make_problem(name, created_by, visibility=ProblemVisibility.private):
@@ -273,3 +273,92 @@ class ClassContestAssignmentModelTest(ClassContestTestBase):
         self.assertEqual(ClassContestAssignment.objects.count(), 1)
         self.assertSuccess(self.client.delete(self.contest_url + f"?id={contest_id}"))
         self.assertEqual(ClassContestAssignment.objects.count(), 0)
+
+
+class ClassContestAnnouncementTest(ClassContestTestBase):
+    """교사가 자기 대회에 공지를 올린다. 수업 중에 바로 알려야 할 때 쓴다."""
+    def setUp(self):
+        super().setUp()
+        self.url = self.reverse("teacher_contest_announcement_api")
+        # 학생이 읽으려면 대회가 시작해 있어야 한다(시작 전 대회는 설명만 열린다)
+        self.contest_id = self._create_contest(hours_from_now=-1).data["data"]["id"]
+
+    def _write(self, title="안내", content="3번 문제 입력 조건을 고쳤습니다"):
+        return self.client.post(self.url, data={"contest_id": self.contest_id,
+                                                "title": title, "content": content})
+
+    def test_write_and_list(self):
+        resp = self._write()
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["title"], "안내")
+        self.assertEqual(resp.data["data"]["created_by"]["username"], self.teacher.username)
+
+        listed = self.client.get(self.url + f"?contest_id={self.contest_id}")
+        self.assertSuccess(listed)
+        self.assertEqual(len(listed.data["data"]), 1)
+
+    def test_written_announcements_are_visible(self):
+        """교사는 visible 을 정하지 않는다. 쓰면 바로 보인다."""
+        announcement_id = self._write().data["data"]["id"]
+        self.assertTrue(ContestAnnouncement.objects.get(id=announcement_id).visible)
+
+    def test_edit_and_delete(self):
+        announcement_id = self._write().data["data"]["id"]
+        self.assertSuccess(self.client.put(self.url, data={
+            "id": announcement_id, "title": "고침", "content": "내용도 고침"}))
+        self.assertEqual(ContestAnnouncement.objects.get(id=announcement_id).title, "고침")
+
+        self.assertSuccess(self.client.delete(self.url + f"?id={announcement_id}"))
+        self.assertFalse(ContestAnnouncement.objects.filter(id=announcement_id).exists())
+
+    def test_cannot_touch_another_teachers_contest(self):
+        announcement_id = self._write().data["data"]["id"]
+        mine = self.contest_id
+        self.client.logout()
+        self.create_teacher(username="박선생", password="teacher")
+
+        self.assertFailed(self.client.post(self.url, data={
+            "contest_id": mine, "title": "끼어들기", "content": "x"}), "대회가 존재하지 않습니다")
+        self.assertFailed(self.client.get(self.url + f"?contest_id={mine}"),
+                          "대회가 존재하지 않습니다")
+        self.assertFailed(self.client.put(self.url, data={
+            "id": announcement_id, "title": "x", "content": "x"}), "공지가 존재하지 않습니다")
+        self.assertFailed(self.client.delete(self.url + f"?id={announcement_id}"),
+                          "공지가 존재하지 않습니다")
+
+    def test_cannot_touch_an_admin_contest(self):
+        """관리자 대회는 관리자 화면에서만 다룬다."""
+        admin = self.create_super_admin(username="root", login=False)
+        contest = Contest.objects.create(
+            title="교내대회", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1), created_by=admin)
+        self.client.login(username=self.teacher.username, password="teacher")
+        self.assertFailed(self.client.post(self.url, data={
+            "contest_id": contest.id, "title": "x", "content": "x"}),
+            "대회가 존재하지 않습니다")
+
+    def test_students_of_the_class_can_read_it(self):
+        self._write()
+        self.assertSuccess(self.client.post(self.class_url, data={
+            "contest_id": self.contest_id, "class_id": self.class_id}))
+        self._create_students(self.class_id, 1, 1)
+        membership = ClassMembership.objects.get(school_class_id=self.class_id, number=1)
+
+        self.client.logout()
+        self.client.force_login(membership.student)
+        resp = self.client.get(self.reverse("contest_announcement_api")
+                               + f"?contest_id={self.contest_id}")
+        self.assertSuccess(resp)
+        self.assertEqual(len(resp.data["data"]), 1)
+
+    def test_a_student_outside_the_class_cannot_read_it(self):
+        self._write()
+        self.client.logout()
+        self.create_user("stranger", "test123")
+        self.assertFailed(self.client.get(self.reverse("contest_announcement_api")
+                                          + f"?contest_id={self.contest_id}"))
+
+    def test_bad_id_is_not_an_error(self):
+        for value in ("abc", "", "-1"):
+            self.assertFailed(self.client.delete(self.url + f"?id={value}"),
+                              "공지가 존재하지 않습니다")

@@ -15,10 +15,13 @@ from problem.models import (ContestProblem, MAX_CONTEST_PROBLEMS, Problem,
 from utils.api import APIView, validate_serializer
 from utils.constants import ContestRuleType, ContestStatus
 from utils.shortcuts import int_or_none
-from ..models import ClassContestAssignment, Contest
+from ..models import ClassContestAssignment, Contest, ContestAnnouncement
 from ..serializers import (AddClassContestProblemSerializer, AssignClassContestSerializer,
                            ClassContestAssignmentSerializer, ClassContestSerializer,
-                           CreateClassContestSerializer, EditClassContestSerializer)
+                           ContestAnnouncementSerializer,
+                           CreateClassContestAnnouncementSerializer,
+                           CreateClassContestSerializer,
+                           EditClassContestAnnouncementSerializer, EditClassContestSerializer)
 
 
 def owned_contest(user, contest_id):
@@ -191,3 +194,61 @@ class TeacherContestProblemAPI(APIView):
         # 가운데를 빼면 라벨이 A, C 로 벌어지므로 다시 붙인다
         ContestProblem.repack(contest)
         return self.success()
+
+
+class TeacherContestAnnouncementAPI(APIView):
+    """교사가 자기 대회에 올리는 공지.
+
+    수업 중에 "3번 문제 입력 조건이 잘못됐습니다" 같은 것을 바로 알리는 용도다.
+    학생이 읽는 쪽은 관리자 대회와 같은 API 를 쓴다(ContestAnnouncementListAPI).
+    """
+    @teacher_required
+    def get(self, request):
+        contest = owned_contest(request.user, request.GET.get("contest_id"))
+        if not contest:
+            return self.error("대회가 존재하지 않습니다")
+        announcements = (ContestAnnouncement.objects.filter(contest=contest)
+                         .select_related("created_by"))
+        return self.success(ContestAnnouncementSerializer(announcements, many=True).data)
+
+    @validate_serializer(CreateClassContestAnnouncementSerializer)
+    @teacher_required
+    def post(self, request):
+        data = request.data
+        contest = owned_contest(request.user, data["contest_id"])
+        if not contest:
+            return self.error("대회가 존재하지 않습니다")
+        announcement = ContestAnnouncement.objects.create(
+            contest=contest, title=data["title"], content=data["content"],
+            created_by=request.user)
+        return self.success(ContestAnnouncementSerializer(announcement).data)
+
+    @validate_serializer(EditClassContestAnnouncementSerializer)
+    @teacher_required
+    def put(self, request):
+        data = request.data
+        announcement = self._owned(request.user, data["id"])
+        if not announcement:
+            return self.error("공지가 존재하지 않습니다")
+        announcement.title = data["title"]
+        announcement.content = data["content"]
+        announcement.save(update_fields=["title", "content"])
+        return self.success(ContestAnnouncementSerializer(announcement).data)
+
+    @teacher_required
+    def delete(self, request):
+        announcement = self._owned(request.user, request.GET.get("id"))
+        if not announcement:
+            return self.error("공지가 존재하지 않습니다")
+        announcement.delete()
+        return self.success()
+
+    @staticmethod
+    def _owned(user, announcement_id):
+        """내가 연 학급 대회의 공지만 돌려준다. 아니면 None."""
+        announcement_id = int_or_none(announcement_id)
+        if announcement_id is None:
+            return None
+        return ContestAnnouncement.objects.filter(
+            id=announcement_id, contest__created_by=user,
+            contest__is_class_contest=True).first()
