@@ -61,6 +61,9 @@ find $DATA/test_case -type f -exec chmod 640 {} \;
 if [ "$OJ_ENV" = "prod" ]; then
     exec supervisord -c /app/deploy/supervisord.conf
 else
-    python manage.py rundramatiq --processes 1 --threads 4 &
+    # runserver 는 소스가 바뀌면 알아서 다시 읽지만 워커는 그렇지 않다. 그대로 두면
+    # 모델을 고쳤을 때 웹은 멀쩡한데 채점만 옛 모델로 돌아 엉뚱한 DB 오류가 난다.
+    # 바인드 마운트 너머로는 inotify 가 잘 오지 않아 폴링으로 감시한다.
+    python manage.py rundramatiq --processes 1 --threads 4 --reload --reload-use-polling &
     exec python manage.py runserver 0.0.0.0:8000
 fi

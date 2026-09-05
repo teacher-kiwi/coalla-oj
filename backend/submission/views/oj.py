@@ -26,7 +26,7 @@ class SubmissionAPI(APIView):
                                   redis_conn=cache, **SysOptions.throttling["user"])
         can_consume, wait = user_bucket.consume()
         if not can_consume:
-            return "Please wait %d seconds" % (int(wait))
+            return f"제출이 너무 잦습니다. {int(wait)}초 후에 다시 시도해주세요"
 
     @check_contest_permission(check_type="problems")
     def check_contest_permission(self, request):

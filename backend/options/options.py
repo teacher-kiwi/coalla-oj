@@ -117,8 +117,10 @@ class OptionDefaultValue:
     allow_register = True
     submission_list_show_all = True
     judge_server_token = default_token
-    throttling = {"ip": {"capacity": 100, "fill_rate": 0.1, "default_capacity": 50},
-                  "user": {"capacity": 20, "fill_rate": 0.03, "default_capacity": 10}}
+    # 제출 빈도 제한. 계정 단위로만 센다. IP 단위는 한 교실 30명이 같은 공인 IP 를
+    # 쓰기 때문에 수업 중에 반 전체가 함께 막힌다(학생 로그인 잠금도 같은 이유로
+    # 계정 단위다. account/login_throttle.py 참고).
+    throttling = {"user": {"capacity": 20, "fill_rate": 0.03, "default_capacity": 10}}
     languages = languages
     google_client_id = ""
     max_students_per_teacher = 500

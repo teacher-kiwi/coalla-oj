@@ -9,6 +9,7 @@ from contest.tests import DEFAULT_CONTEST_DATA
 from problem.models import ContestProblem, Problem, ProblemTag
 from utils.api.tests import APITestCase
 from .models import Submission
+from .views.oj import SubmissionAPI
 
 DEFAULT_PROBLEM_DATA = {"title": "test", "description": "<p>test</p>", "input_description": "test",
                         "output_description": "test", "time_limit": 1000, "memory_limit": 256, "difficulty": "L1",
@@ -103,6 +104,32 @@ class ContestSubmissionListTest(APITestCase):
     def test_unreadable_label_is_not_an_error(self):
         for value in ("abc", "가", "-1"):
             self.assertFailed(self._get(problem_id=value), "문제가 존재하지 않습니다")
+
+
+class SubmissionThrottlingTest(APITestCase):
+    """제출 빈도 제한. 실제 토큰버킷은 레디스를 쓰므로 결과만 흉내낸다."""
+    def setUp(self):
+        self.user = self.create_user("student", "test123")
+        self.request = mock.MagicMock()
+        self.request.user = self.user
+
+    @mock.patch("submission.views.oj.TokenBucket")
+    def test_allowed_returns_nothing(self, bucket):
+        bucket.return_value.consume.return_value = (True, 0)
+        self.assertIsNone(SubmissionAPI().throttling(self.request))
+
+    @mock.patch("submission.views.oj.TokenBucket")
+    def test_blocked_message_is_korean(self, bucket):
+        bucket.return_value.consume.return_value = (False, 12.7)
+        message = SubmissionAPI().throttling(self.request)
+        self.assertEqual(message, "제출이 너무 잦습니다. 12초 후에 다시 시도해주세요")
+
+    @mock.patch("submission.views.oj.TokenBucket")
+    def test_bucket_is_per_account(self, bucket):
+        """IP 단위로 세면 한 교실 30명이 같은 공인 IP 를 써서 함께 막힌다."""
+        bucket.return_value.consume.return_value = (True, 0)
+        SubmissionAPI().throttling(self.request)
+        self.assertEqual(bucket.call_args.kwargs["key"], str(self.user.id))
 
 
 class SubmissionExistsScopeTest(APITestCase):
