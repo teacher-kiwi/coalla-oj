@@ -7,6 +7,9 @@ from django.utils.timezone import now
 from options.options import SysOptions
 from utils.api.tests import APITestCase
 from .login_throttle import MAX_FAILURES, clear_login_failures
+from judge.recompute import rebuild_after_rejudge
+from problem.models import Problem
+from submission.models import JudgeStatus, Submission
 from .models import ClassMembership, STUDENT_USERNAME_RE, School, SchoolClass, User
 
 
@@ -263,6 +266,44 @@ class StudentAccountAPITest(SchoolClassTestBase):
         self.assertEqual(resp.data["data"]["deleted_students"], 3)
         self.assertEqual(User.objects.filter(created_by=self.teacher).count(), 0)
         self.assertEqual(SchoolClass.objects.count(), 0)
+
+
+class ClassDeletionKeepsProblemStatisticsTest(SchoolClassTestBase):
+    """학급을 지워도 문제의 정답률은 남아야 한다.
+
+    학생이 쓴 코드와 제출은 학년이 끝나면 지운다. 다만 "지금까지 몇 명이
+    도전해 몇 번 맞혔나" 는 문제의 난이도를 보여주는 값이라 남긴다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 2)
+        self.problem = Problem.objects.create(
+            title="문제", description="d", input_description="i", output_description="o",
+            samples=[], test_case_id="x", test_case_score=[], time_limit=1000,
+            memory_limit=256, languages=["C"], template={}, created_by=self.teacher,
+            rule_type="ACM", io_mode={}, difficulty="L1")
+        for membership in ClassMembership.objects.filter(school_class_id=self.class_id):
+            Submission.objects.create(problem=self.problem, user=membership.student,
+                                      code="x", language="C", result=JudgeStatus.ACCEPTED)
+        Problem.objects.filter(id=self.problem.id).update(
+            submission_number=2, accepted_number=2,
+            statistic_info={str(JudgeStatus.ACCEPTED): 2})
+
+    def test_counters_survive_deleting_the_class(self):
+        resp = self.client.delete(self.class_url + f"?id={self.class_id}")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["deleted_students"], 2)
+        self.assertEqual(Submission.objects.count(), 0)
+
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.archived_submission_number, 2)
+        self.assertEqual(problem.archived_accepted_number, 2)
+        # 다시 채점해도 살아 있다
+        rebuild_after_rejudge(problem)
+        problem.refresh_from_db()
+        self.assertEqual(problem.submission_number, 2)
+        self.assertEqual(problem.accepted_number, 2)
 
 
 class StudentLoginAPITest(SchoolClassTestBase):

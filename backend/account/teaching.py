@@ -17,6 +17,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from contest.models import Contest
+from judge.recompute import preserve_statistics
 from problem.models import Problem, ProblemSet, ProblemVisibility
 from submission.models import Submission
 from .models import ClassMembership, SchoolClass, User
@@ -79,5 +80,8 @@ def purge_teaching_data(teacher):
     # 학급을 지우면 소속(ClassMembership)만 사라지고 학생 계정은 남는다.
     # 다른 교사의 학급에도 속한 학생은 그 학급이 남으므로 계정을 지우지 않는다.
     SchoolClass.objects.filter(teacher=teacher).delete()
-    User.objects.filter(id__in=student_ids, class_memberships__isnull=True).delete()
+    orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
+    # 제출이 사라지기 전에 정답률 몫을 문제로 옮긴다(학급 삭제와 같은 이유)
+    preserve_statistics(Submission.objects.filter(user_id__in=orphans))
+    orphans.delete()
     return summary

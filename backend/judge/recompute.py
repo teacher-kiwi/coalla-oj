@@ -78,11 +78,53 @@ def _count(counters, result):
 
 
 @transaction.atomic
+def _add_counters(into, other):
+    """other 의 몫을 into 에 더한다."""
+    into["submission_number"] += other["submission_number"]
+    into["accepted_number"] += other["accepted_number"]
+    for key, value in other["statistic_info"].items():
+        into["statistic_info"][key] = into["statistic_info"].get(key, 0) + value
+    return into
+
+
+def preserve_statistics(submissions):
+    """지워질 제출의 몫을 문제의 보존 칸으로 옮긴다.
+
+    제출을 지우기 **전에** 불러야 한다. 지운 뒤에는 셀 근거가 없다.
+    이렇게 옮겨 두어야 나중에 그 문제를 재채점해도 지워진 학생들의 몫이 남는다.
+
+    대회별 통계(ContestProblem)는 보존하지 않는다. 학생이 지워지면 그 대회의
+    순위 행도 함께 사라지므로, 대회 화면은 남아 있는 제출만 보여주는 쪽이 맞다.
+    """
+    by_problem = {}
+    for submission in submissions.select_related("contest", "user"):
+        if _is_debug_submission(submission, submission.contest):
+            continue
+        _count(by_problem.setdefault(submission.problem_id, _blank_counters()),
+               submission.result)
+
+    for problem in Problem.objects.filter(id__in=by_problem).only(
+            "id", "archived_submission_number", "archived_accepted_number",
+            "archived_statistic_info"):
+        counters = _add_counters({
+            "submission_number": problem.archived_submission_number,
+            "accepted_number": problem.archived_accepted_number,
+            "statistic_info": dict(problem.archived_statistic_info or {}),
+        }, by_problem[problem.id])
+        Problem.objects.filter(id=problem.id).update(
+            archived_submission_number=counters["submission_number"],
+            archived_accepted_number=counters["accepted_number"],
+            archived_statistic_info=counters["statistic_info"])
+
+
 def rebuild_problem_statistics(problem):
     """문제와 대회별 통계를 다시 센다.
 
     문제 자체는 평생 누적이라 대회 제출까지 함께 세고, 대회별 통계는 그 대회
     제출만 센다(대회 화면에 예전에 공개로 풀린 횟수가 나오면 난이도가 샌다).
+
+    문제의 값에는 지워진 학생들의 몫(archived_*)을 함께 더한다. 살아 있는
+    제출만 세면 학급을 지운 뒤 재채점하는 순간 예전 기록이 사라진다.
     """
     total = _blank_counters()
     per_contest = {entry.contest_id: _blank_counters()
@@ -93,6 +135,15 @@ def rebuild_problem_statistics(problem):
         if contest is not None and contest.id in per_contest:
             _count(per_contest[contest.id], submission.result)
 
+    # 넘겨받은 인스턴스가 오래됐을 수 있어 보존 칸은 DB 에서 다시 읽는다
+    archived = Problem.objects.filter(id=problem.id).values(
+        "archived_submission_number", "archived_accepted_number",
+        "archived_statistic_info").first() or {}
+    _add_counters(total, {
+        "submission_number": archived.get("archived_submission_number", 0),
+        "accepted_number": archived.get("archived_accepted_number", 0),
+        "statistic_info": archived.get("archived_statistic_info") or {},
+    })
     Problem.objects.filter(id=problem.id).update(**total)
     for contest_id, counters in per_contest.items():
         ContestProblem.objects.filter(problem=problem, contest_id=contest_id).update(**counters)

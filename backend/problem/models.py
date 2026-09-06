@@ -106,10 +106,19 @@ class Problem(models.Model):
     source = models.TextField(null=True)
     # OI 규칙에서만 쓴다
     total_score = models.IntegerField(default=0)
+    # 화면에 보이는 값. 지워진 몫(archived_*)과 지금 남아 있는 제출을 합친 결과다.
     submission_number = models.BigIntegerField(default=0)
     accepted_number = models.BigIntegerField(default=0)
     # 결과별 제출 수 {JudgeStatus.ACCEPTED: 3, JudgeStatus.WRONG_ANSWER: 11}
     statistic_info = JSONField(default=dict)
+
+    # 지워진 학생들이 남긴 몫. 정답률은 "지금까지 몇 명이 도전해 몇 번 맞혔나" 라
+    # 학생이 학년을 마치고 떠난 뒤에도 남아야 하는 값이다. 그런데 제출을 지우면
+    # 셀 근거가 사라지므로, 지우기 직전에 여기로 옮겨 둔다.
+    # 재채점은 살아 있는 제출만 다시 세고 여기에 더해서 위의 값을 만든다.
+    archived_submission_number = models.BigIntegerField(default=0)
+    archived_accepted_number = models.BigIntegerField(default=0)
+    archived_statistic_info = JSONField(default=dict)
 
     @property
     def display_id(self):

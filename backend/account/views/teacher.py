@@ -14,6 +14,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 
 from options.options import SysOptions
+from judge.recompute import preserve_statistics
 from submission.models import Submission
 from submission.serializers import TeacherStudentSubmissionSerializer
 from utils.api import APIView, validate_serializer
@@ -127,10 +128,9 @@ class SchoolClassAPI(APIView):
         것이면 is_archived 로 끄면 된다(기록이 남고 다시 켤 수 있다).
 
         제출 기록, 즐겨찾기, 대회 순위가 CASCADE 로 함께 사라진다.
-        문제의 정답률(submission_number/accepted_number)은 일부러 다시 세지 않는다.
-        "지금까지 몇 명이 도전해 몇 번 맞혔나" 는 학생이 떠난 뒤에도 남아야 하는
-        값이라서다. 다만 그 문제에 재채점이 일어나면 살아 있는 제출만으로 다시
-        세므로 지워진 몫이 그때 사라진다(judge/recompute.py). 아직 못 맞춘 부분이다.
+        문제의 정답률은 "지금까지 몇 명이 도전해 몇 번 맞혔나" 라 학생이 떠난
+        뒤에도 남아야 한다. 그래서 지우기 직전에 그 몫을 문제의 보존 칸으로
+        옮긴다(preserve_statistics). 나중에 그 문제를 재채점해도 살아남는다.
         """
         class_id = request.GET.get("id")
         if not class_id:
@@ -146,6 +146,8 @@ class SchoolClassAPI(APIView):
             # 그래서 소속 수가 아니라 실제로 지운 계정 수를 돌려준다.
             orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
             deleted_students = orphans.count()
+            # 제출이 사라지기 전에 정답률 몫을 문제로 옮긴다
+            preserve_statistics(Submission.objects.filter(user_id__in=orphans))
             orphans.delete()
         return self.success({"deleted_students": deleted_students})
 

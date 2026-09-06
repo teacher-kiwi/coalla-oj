@@ -16,7 +16,7 @@ from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 from utils.constants import ContestRuleType
 
-from .recompute import rebuild_after_rejudge, rebuild_contest_rank
+from .recompute import preserve_statistics, rebuild_after_rejudge, rebuild_contest_rank
 from .rejudge import rejudge_problem
 from .tests import DEFAULT_PROBLEM_DATA
 
@@ -91,6 +91,75 @@ class ProblemStatisticsRebuildTest(RecomputeTestBase):
         self.assertEqual(problem.accepted_number, 2)
         self.assertEqual(problem.statistic_info,
                          {str(JudgeStatus.ACCEPTED): 2, str(JudgeStatus.WRONG_ANSWER): 1})
+
+    def test_deleted_students_are_kept_through_a_rejudge(self):
+        """학년이 끝나 학생을 지워도 "몇 명이 도전해 몇 번 맞혔나" 는 남아야 한다.
+
+        지우기 직전에 몫을 옮겨 두지 않으면, 그 문제를 다시 채점하는 순간
+        살아 있는 제출만으로 다시 세어져 예전 기록이 사라진다.
+        """
+        leaving = self.students[0]
+        self._submit(leaving, JudgeStatus.WRONG_ANSWER)
+        self._submit(leaving, JudgeStatus.ACCEPTED)
+        self._submit(self.students[1], JudgeStatus.ACCEPTED)
+        rebuild_after_rejudge(self.problem)
+        self.assertEqual(Problem.objects.get(id=self.problem.id).submission_number, 3)
+
+        # 학년 종료: 제출을 지우기 전에 몫을 옮기고 계정을 지운다
+        preserve_statistics(Submission.objects.filter(user=leaving))
+        leaving.delete()
+
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.archived_submission_number, 2)
+        self.assertEqual(problem.archived_accepted_number, 1)
+
+        # 나중에 테스트케이스를 고쳐 다시 채점해도 그 몫이 살아 있어야 한다
+        rebuild_after_rejudge(self.problem)
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.submission_number, 3)
+        self.assertEqual(problem.accepted_number, 2)
+        self.assertEqual(problem.statistic_info,
+                         {str(JudgeStatus.ACCEPTED): 2, str(JudgeStatus.WRONG_ANSWER): 1})
+
+    def test_preserving_twice_adds_up(self):
+        """해마다 학급을 지운다. 지울 때마다 쌓여야 한다."""
+        for student in self.students[:2]:
+            self._submit(student, JudgeStatus.ACCEPTED)
+            preserve_statistics(Submission.objects.filter(user=student))
+            student.delete()
+
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.archived_submission_number, 2)
+        self.assertEqual(problem.archived_accepted_number, 2)
+        self.assertEqual(problem.archived_statistic_info, {str(JudgeStatus.ACCEPTED): 2})
+
+    def test_contest_admin_submissions_are_not_preserved(self):
+        """통계에 넣지 않는 제출은 보존 칸에도 들어가면 안 된다(두 번 세어진다)."""
+        contest = self._contest()
+        self._submit(self.admin, JudgeStatus.ACCEPTED, contest=contest)
+
+        preserve_statistics(Submission.objects.filter(user=self.admin))
+
+        problem = Problem.objects.get(id=self.problem.id)
+        self.assertEqual(problem.archived_submission_number, 0)
+        self.assertEqual(problem.archived_statistic_info, {})
+
+    def test_contest_counters_do_not_keep_deleted_students(self):
+        """대회별 통계는 보존하지 않는다. 학생이 지워지면 순위 행도 함께 사라져,
+        남아 있는 제출만 보여주는 쪽이 순위표와 앞뒤가 맞는다."""
+        contest = self._contest()
+        leaving = self.students[0]
+        self._submit(leaving, JudgeStatus.ACCEPTED, contest=contest)
+        self._submit(self.students[1], JudgeStatus.ACCEPTED, contest=contest)
+
+        preserve_statistics(Submission.objects.filter(user=leaving))
+        leaving.delete()
+        rebuild_after_rejudge(self.problem)
+
+        entry = ContestProblem.objects.get(contest=contest, problem=self.problem)
+        self.assertEqual(entry.submission_number, 1)
+        # 문제 쪽은 지워진 몫까지 합쳐 둘이다
+        self.assertEqual(Problem.objects.get(id=self.problem.id).submission_number, 2)
 
     def test_contest_counters_are_separate_from_the_lifetime_total(self):
         contest = self._contest()
