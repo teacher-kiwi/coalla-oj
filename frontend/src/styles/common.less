@@ -44,6 +44,33 @@ body {
   position: relative;
 }
 
+// el-icon 은 display: inline-flex 인데 vertical-align 을 주지 않아 기본값(baseline)이다.
+// inline-flex 상자의 기준선은 첫 자식(svg, 대체 요소)의 기준선이고, 대체 요소의
+// 기준선은 그 아래 끝이다. 그래서 아이콘의 밑변이 글자의 기준선에 얹혀 위로 떠 보인다.
+// 글 속에 섞여 있는 아이콘은 이 값으로 눌러 준다(아이콘 정렬의 관용값이고,
+// 이 저장소에서도 두 군데가 손으로 -2px, -0.15em 을 찾아 쓰고 있었다).
+// vertical-align: middle 은 기준선 + x높이의 절반에 가운데를 맞추는 것이라
+// 글꼴의 내림 공간만큼 이번에는 아래로 처진다. 가운데를 원하면 아래의 .icon-label 을 쓴다.
+.el-icon {
+  vertical-align: -0.125em;
+}
+
+// 아이콘과 글자를 한 줄에 나란히 둘 때. 기준선과 글꼴 치수에 기대지 않고
+// 상자 가운데끼리 맞춰서, 아이콘 크기가 달라져도 흔들리지 않는다.
+.icon-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// 표 칸에 아이콘만 있을 때. el-table-column 의 class-name 으로 붙인다.
+// 칸의 line-height(23px)와 기준선에 기대면 아이콘만 위나 아래로 쏠린다.
+.icon-cell .cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 // href 가 없는 a 는 브라우저가 링크로 보지 않아(a:any-link 에 걸리지 않는다)
 // 손가락 커서가 붙지 않고 글자 선택 커서(I)가 나온다. 이 앱에서는 라우터로
 // 이동시키려고 href 없이 클릭만 붙인 a 가 여럿이라 커서를 직접 준다.

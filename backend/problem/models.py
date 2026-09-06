@@ -240,6 +240,23 @@ class ProblemSetAssignment(models.Model):
         ordering = ("-assigned_at",)
 
 
+class ProblemFavorite(models.Model):
+    """사용자가 담아둔 문제.
+
+    문제 목록의 하트로 켜고 끈다. 푼 문제 표시(UserProfile 의 상태값)와는 다른
+    축이다. 그쪽은 채점 결과라 사용자가 바꿀 수 없고, 이것은 "나중에 다시 볼 것"
+    이라는 표시다.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="problem_favorites")
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name="favorites")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "problem_favorite"
+        unique_together = (("user", "problem"),)
+        ordering = ("-created_at",)
+
+
 def can_access_problem(problem, user):
     """이 사용자가 이 문제를 열어볼 수 있는지.
 

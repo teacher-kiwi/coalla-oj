@@ -21,6 +21,10 @@
                 </template>
               </el-dropdown>
             </li>
+            <li v-if="userStore.isAuthenticated" class="switch-filter">
+              <span class="switch-label">즐겨찾기</span>
+              <el-switch :model-value="query.favorite === '1'" @change="filterByFavorite" />
+            </li>
             <li class="switch-filter">
               <span class="switch-label">태그</span>
               <el-switch v-model="tagsVisible" />
@@ -35,9 +39,9 @@
             </li>
           </ul>
         </template>
-        <el-table :key="`${statusColumnVisible}-${tagsVisible}`" :data="problemList"
+        <el-table :key="`${statusColumnVisible}-${tagsVisible}-${userStore.isAuthenticated}`" :data="problemList"
                   v-loading="loadings.table" class="problem-table">
-          <el-table-column v-if="statusColumnVisible" width="50" align="center">
+          <el-table-column v-if="statusColumnVisible" width="50" class-name="icon-cell">
             <template #default="{ row }">
               <template v-if="row.my_status === 0">
                 <el-icon color="#19be6b" :size="16"><CircleCheck /></el-icon>
@@ -45,6 +49,11 @@
               <template v-else-if="row.my_status !== null && row.my_status !== undefined">
                 <el-icon color="#ed3f14" :size="16"><CircleClose /></el-icon>
               </template>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="userStore.isAuthenticated" width="50" class-name="icon-cell">
+            <template #default="{ row }">
+              <FavoriteHeart :on="!!row.my_favorite" @toggle="toggleFavorite(row)" />
             </template>
           </el-table-column>
           <el-table-column label="#" width="80">
@@ -112,6 +121,7 @@ import utils from '@/utils/utils'
 import { DIFFICULTY, DIFFICULTY_LABEL } from '@/utils/constants'
 import DifficultyTag from '@oj/components/DifficultyTag.vue'
 import Pagination from '@oj/components/Pagination.vue'
+import FavoriteHeart from '@oj/components/FavoriteHeart.vue'
 import { useUserStore } from '@/store/user'
 
 const route = useRoute()
@@ -124,7 +134,7 @@ const total = ref(0)
 const loadings = reactive({ table: true, tag: true })
 const tagsVisible = ref(false)
 const statusColumnVisible = ref(false)
-const query = reactive({ keyword: '', difficulty: '', tag: '', page: 1, limit: 10 })
+const query = reactive({ keyword: '', difficulty: '', tag: '', favorite: '', page: 1, limit: 10 })
 
 function getACRate (ac, total) {
   return utils.getACRate(ac, total)
@@ -135,6 +145,7 @@ function init (simulate = false) {
   query.difficulty = q.difficulty || ''
   query.keyword = q.keyword || ''
   query.tag = q.tag || ''
+  query.favorite = q.favorite === '1' ? '1' : ''
   query.page = parseInt(q.page) || 1
   if (query.page < 1) query.page = 1
   query.limit = parseInt(q.limit) || 10
@@ -174,6 +185,27 @@ function filterByTag (tagName) {
   query.tag = tagName
   query.page = 1
   pushRouter()
+}
+
+// 목록 자체가 달라지므로 주소에 남긴다(새로고침·뒤로가기가 그대로 동작한다)
+function filterByFavorite (on) {
+  query.favorite = on ? '1' : ''
+  query.page = 1
+  pushRouter()
+}
+
+// 화면에서 먼저 뒤집고 서버에 알린다. 실패하면 되돌린다.
+function toggleFavorite (row) {
+  const next = !row.my_favorite
+  row.my_favorite = next
+  const request = next ? api.addProblemFavorite(row.display_id)
+                       : api.removeProblemFavorite(row.display_id)
+  request.then(() => {
+    // 즐겨찾기만 보는 중에 뺐으면 그 줄은 목록에서 빠져야 한다
+    if (!next && query.favorite === '1') getProblemList()
+  }, () => {
+    row.my_favorite = !next
+  })
 }
 
 function filterByDifficulty (difficulty) {

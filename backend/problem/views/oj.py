@@ -1,8 +1,8 @@
 from django.db.models import Q, Count
 from utils.api import APIView
 from account.decorators import check_contest_permission, login_required
-from ..models import (can_access_problem, ContestProblem, contest_problem_order, ProblemTag,
-                      Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment,
+from ..models import (can_access_problem, ContestProblem, contest_problem_order, ProblemFavorite,
+                      ProblemTag, Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment,
                       ProblemVisibility)
 from ..serializers import (ContestProblemDetailSerializer, ContestProblemSafeSerializer,
                            ProblemBriefSerializer, ProblemListSerializer, ProblemSerializer,
@@ -50,11 +50,17 @@ class ProblemAPI(APIView):
                 problems = results
             else:
                 problems = [queryset_values, ]
+            # 담아둔 문제는 한 번에 모아 읽는다(문제마다 조회하면 목록에서 N+1 이 된다)
+            favorites = set(ProblemFavorite.objects
+                            .filter(user=request.user,
+                                    problem_id__in=[p["id"] for p in problems])
+                            .values_list("problem_id", flat=True))
             for problem in problems:
                 if problem["rule_type"] == ProblemRuleType.ACM:
                     problem["my_status"] = acm_problems_status.get(str(problem["id"]), {}).get("status")
                 else:
                     problem["my_status"] = oi_problems_status.get(str(problem["id"]), {}).get("status")
+                problem["my_favorite"] = problem["id"] in favorites
 
     def get(self, request):
         problem_id = request.GET.get("problem_id")
@@ -94,9 +100,48 @@ class ProblemAPI(APIView):
         difficulty = request.GET.get("difficulty")
         if difficulty:
             problems = problems.filter(difficulty=difficulty)
+
+        # 담아둔 문제만 보기. 로그인하지 않았으면 담아둔 것이 없으므로 빈 목록이다.
+        if request.GET.get("favorite") == "1":
+            if not request.user.is_authenticated:
+                problems = problems.none()
+            else:
+                problems = problems.filter(favorites__user=request.user)
+
         data = self.paginate_data(request, problems, ProblemListSerializer)
         self._add_problem_status(request, data)
         return self.success(data)
+
+
+class ProblemFavoriteAPI(APIView):
+    """문제 즐겨찾기를 켜고 끈다. 열어볼 수 없는 문제는 담을 수 없다."""
+
+    def _problem(self, request):
+        number = problem_id_or_none(request.data.get("problem_id")
+                                    if request.method == "POST"
+                                    else request.GET.get("problem_id"))
+        if number is None:
+            return None
+        problem = Problem.objects.filter(id=number).first()
+        if problem is None or not can_access_problem(problem, request.user):
+            return None
+        return problem
+
+    @login_required
+    def post(self, request):
+        problem = self._problem(request)
+        if problem is None:
+            return self.error("문제가 존재하지 않습니다")
+        ProblemFavorite.objects.get_or_create(user=request.user, problem=problem)
+        return self.success()
+
+    @login_required
+    def delete(self, request):
+        problem = self._problem(request)
+        if problem is None:
+            return self.error("문제가 존재하지 않습니다")
+        ProblemFavorite.objects.filter(user=request.user, problem=problem).delete()
+        return self.success()
 
 
 class ContestProblemAPI(APIView):

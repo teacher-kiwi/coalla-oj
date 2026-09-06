@@ -113,8 +113,20 @@
 
     <el-dialog v-model="problemDialogVisible" title="문제 추가" width="720px"
                :close-on-click-modal="false">
-      <el-input v-model="keyword" placeholder="문제 제목이나 번호로 검색 (Enter)"
-                clearable @keyup.enter="searchProblems(1)" />
+      <!-- 문제 목록(/problem)과 같은 기준으로 고른다. 거기서 하트로 담아둔 문제를
+           여기서 바로 꺼내 쓸 수 있다. -->
+      <div class="picker-filter">
+        <el-input v-model="keyword" placeholder="문제 제목이나 번호로 검색 (Enter)"
+                  clearable @keyup.enter="searchProblems(1)" />
+        <el-select v-model="difficulty" placeholder="난이도" clearable class="picker-difficulty"
+                   @change="searchProblems(1)">
+          <el-option v-for="d in DIFFICULTY" :key="d.value" :value="d.value" :label="d.label" />
+        </el-select>
+        <span class="picker-switch">
+          <span class="picker-switch-label">즐겨찾기</span>
+          <el-switch v-model="favoriteOnly" @change="searchProblems(1)" />
+        </span>
+      </div>
       <el-table v-loading="searching" :data="candidates"
                 class="full-width candidate-table" @selection-change="onSelectionChange">
         <el-table-column type="selection" width="45" />
@@ -153,6 +165,7 @@ import api from '@oj/api'
 import DifficultyTag from '@oj/components/DifficultyTag.vue'
 import ScopeTag from '@oj/components/ScopeTag.vue'
 import Pagination from '@oj/components/Pagination.vue'
+import { DIFFICULTY } from '@/utils/constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,6 +182,8 @@ const editForm = reactive({ title: '', description: '' })
 const problemDialogVisible = ref(false)
 const searching = ref(false)
 const keyword = ref('')
+const difficulty = ref('')
+const favoriteOnly = ref(false)
 const candidates = ref([])
 const candidateTotal = ref(0)
 const candidatePage = ref(1)
@@ -240,6 +255,8 @@ function goProblem (problemID) {
 
 function openProblemDialog () {
   keyword.value = ''
+  difficulty.value = ''
+  favoriteOnly.value = false
   selected.value = []
   problemDialogVisible.value = true
   searchProblems(1)
@@ -248,8 +265,15 @@ function openProblemDialog () {
 function searchProblems (page) {
   candidatePage.value = page
   searching.value = true
-  // 공개 문제와 내가 만든 학급 문제를 함께 고를 수 있어야 한다
-  api.getProblemList((page - 1) * 10, 10, { keyword: keyword.value, mine: 1 }).then(res => {
+  // 공개 문제와 내가 만든 학급 문제를 함께 고를 수 있어야 한다.
+  // 빈 값은 getProblemList 가 알아서 뺀다.
+  const params = {
+    keyword: keyword.value,
+    difficulty: difficulty.value,
+    favorite: favoriteOnly.value ? '1' : '',
+    mine: 1
+  }
+  api.getProblemList((page - 1) * 10, 10, params).then(res => {
     searching.value = false
     candidates.value = res.data.data.results
     candidateTotal.value = res.data.data.total
@@ -333,6 +357,30 @@ onMounted(() => {
    색·줄간격·줄바꿈은 마크다운 쪽이 정하므로 여기서는 간격만 잡는다. */
 .description {
   margin-bottom: 12px;
+}
+
+.picker-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.picker-difficulty {
+  width: 130px;
+  flex: none;
+}
+
+.picker-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.picker-switch-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
 }
 
 .picker-guide {

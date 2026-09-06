@@ -242,6 +242,13 @@ export default {
     })
     return ajax('problem', 'get', { params })
   },
+  // 즐겨찾기를 켜고 끈다
+  addProblemFavorite (problemID) {
+    return ajax('problem/favorite', 'post', { data: { problem_id: problemID } })
+  },
+  removeProblemFavorite (problemID) {
+    return ajax('problem/favorite', 'delete', { params: { problem_id: problemID } })
+  },
   pickone () {
     return ajax('pickone', 'get')
   },

@@ -141,7 +141,7 @@
 
       <el-card id="info">
         <template #header>
-          <div class="header">
+          <div class="header icon-label">
             <el-icon><InfoFilled /></el-icon>
             <span class="card-title">정보</span>
           </div>
@@ -154,6 +154,10 @@
           <!-- 출제 교사가 탈퇴해도 공개 문제는 남는다(created_by 가 null 이 된다) -->
           <li><p>작성자</p><p>{{ problem.created_by?.username || '(삭제된 사용자)' }}</p></li>
           <li v-if="problem.difficulty"><p>난이도</p><p>{{ DIFFICULTY_LABEL[problem.difficulty] }}</p></li>
+          <li v-if="!contestID && userStore.isAuthenticated">
+            <p>즐겨찾기</p>
+            <p><FavoriteHeart :on="!!problem.my_favorite" @toggle="toggleFavorite" /></p>
+          </li>
           <li v-if="problem.total_score"><p>점수</p><p>{{ problem.total_score }}</p></li>
           <li>
             <p>태그</p>
@@ -169,7 +173,7 @@
 
       <el-card id="pieChart" :body-style="{ padding: 0 }" v-if="!contestID || OIContestRealTimePermission">
         <template #header>
-          <div class="chart-header">
+          <div class="chart-header icon-label">
             <el-icon><DataAnalysis /></el-icon>
             <span class="card-title">통계</span>
             <el-button size="small" id="detail" @click="graphVisible = !graphVisible">자세히</el-button>
@@ -209,9 +213,11 @@ import VerticalMenuItem from '@oj/components/verticalMenu/verticalMenu-item.vue'
 import storage from '@/utils/storage'
 import { JUDGE_STATUS, CONTEST_STATUS, buildProblemCodeKey, DIFFICULTY_LABEL } from '@/utils/constants'
 import api from '@oj/api'
+import FavoriteHeart from '@oj/components/FavoriteHeart.vue'
 import { pie as pieData, largePie as largePieData } from './chartData'
 import { useContestStore } from '@/store/contest'
 import { useAppStore } from '@/store/app'
+import { useUserStore } from '@/store/user'
 
 function structuredCloneWithFunctions (obj) {
   if (obj === null || typeof obj !== 'object') return obj
@@ -229,6 +235,7 @@ const route = useRoute()
 const router = useRouter()
 const contestStore = useContestStore()
 const appStore = useAppStore()
+const userStore = useUserStore()
 
 const statusVisible = ref(false)
 const graphVisible = ref(false)
@@ -249,6 +256,7 @@ const problem = ref({
   description: '',
   hint: '',
   my_status: '',
+  my_favorite: false,
   template: {},
   languages: [],
   created_by: null,
@@ -257,6 +265,15 @@ const problem = ref({
 })
 const pie = ref(structuredCloneWithFunctions(pieData))
 const largePie = ref(structuredCloneWithFunctions(largePieData))
+
+// 화면에서 먼저 뒤집고 서버에 알린다. 실패하면 되돌린다.
+function toggleFavorite () {
+  const next = !problem.value.my_favorite
+  problem.value.my_favorite = next
+  const request = next ? api.addProblemFavorite(problem.value.display_id)
+                       : api.removeProblemFavorite(problem.value.display_id)
+  request.catch(() => { problem.value.my_favorite = !next })
+}
 
 let refreshStatus = null
 
@@ -499,10 +516,6 @@ watch(() => route.fullPath, () => {
 </script>
 
 <style lang="less" scoped>
-.card-title {
-  margin-left: 8px;
-}
-
 .flex-container {
   #problem-main {
     flex: auto;

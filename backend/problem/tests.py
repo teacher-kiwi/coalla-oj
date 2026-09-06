@@ -16,7 +16,7 @@ from submission.models import JudgeStatus, Submission
 from utils.api.tests import APITestCase
 from utils.shortcuts import rand_str
 
-from .models import ProblemTag, ProblemIOMode
+from .models import ProblemFavorite, ProblemTag, ProblemIOMode
 from .models import (contest_problem_label, contest_problem_order, ContestProblem,
                      Problem, ProblemRuleType)
 from contest.models import Contest
@@ -348,6 +348,88 @@ class ProblemAPITest(ProblemCreateTestBase):
     def get_one_problem(self):
         resp = self.client.get(self.url + "?id=" + str(self.problem.id))
         self.assertSuccess(resp)
+
+
+class ProblemFavoriteAPITest(ProblemCreateTestBase):
+    """즐겨찾기. 푼 문제 표시와 달리 사용자가 직접 켜고 끄는 값이다."""
+    def setUp(self):
+        self.url = self.reverse("problem_api")
+        self.favorite_url = self.reverse("problem_favorite_api")
+        admin = self.create_admin(login=False)
+        ProblemTag.objects.create(name="test")
+        self.problem = self.add_problem(DEFAULT_PROBLEM_DATA, admin)
+        other = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        other["title"] = "다른 문제"
+        self.other = self.add_problem(other, admin)
+        self.user = self.create_user("test", "test123")
+
+    def _add(self, problem_id=None):
+        return self.client.post(self.favorite_url,
+                                data={"problem_id": problem_id or self.problem.id})
+
+    def _list(self, favorite=False):
+        query = "&favorite=1" if favorite else ""
+        resp = self.client.get(f"{self.url}?limit=10{query}")
+        self.assertSuccess(resp)
+        return resp.data["data"]["results"]
+
+    def test_add_and_remove(self):
+        self.assertSuccess(self._add())
+        self.assertTrue(ProblemFavorite.objects.filter(user=self.user,
+                                                       problem=self.problem).exists())
+        self.assertSuccess(self.client.delete(
+            f"{self.favorite_url}?problem_id={self.problem.id}"))
+        self.assertEqual(ProblemFavorite.objects.count(), 0)
+
+    def test_add_twice_is_fine(self):
+        """하트를 두 번 눌러도(느린 응답에 두 번 클릭) 오류가 아니다"""
+        self.assertSuccess(self._add())
+        self.assertSuccess(self._add())
+        self.assertEqual(ProblemFavorite.objects.count(), 1)
+
+    def test_list_marks_my_favorite(self):
+        self._add()
+        by_id = {p["id"]: p["my_favorite"] for p in self._list()}
+        self.assertTrue(by_id[self.problem.id])
+        self.assertFalse(by_id[self.other.id])
+
+    def test_detail_marks_my_favorite(self):
+        self._add()
+        resp = self.client.get(f"{self.url}?problem_id={self.problem.id}")
+        self.assertSuccess(resp)
+        self.assertTrue(resp.data["data"]["my_favorite"])
+
+    def test_filter_shows_only_favorites(self):
+        self._add()
+        self.assertEqual([p["id"] for p in self._list(favorite=True)], [self.problem.id])
+
+    def test_anonymous_cannot_favorite(self):
+        self.client.logout()
+        self.assertFailed(self._add())
+        self.assertEqual(ProblemFavorite.objects.count(), 0)
+
+    def test_anonymous_favorite_filter_is_empty(self):
+        """로그인하지 않으면 담아둔 것이 없다. 필터가 무시되면 전체가 나온다."""
+        self.client.logout()
+        self.assertEqual(self._list(favorite=True), [])
+        self.assertEqual(len(self._list()), 2)
+
+    def test_unknown_problem_rejected(self):
+        self.assertFailed(self._add(self.problem.id + 1000), "문제가 존재하지 않습니다")
+        self.assertFailed(self._add("abc"), "문제가 존재하지 않습니다")
+
+    def test_filter_ignores_other_users_favorites(self):
+        """남이 담아둔 것이 내 목록에 섞이면 안 된다"""
+        self._add()
+        self.client.logout()
+        other = self.create_user("test2", "test123")
+        ProblemFavorite.objects.create(user=other, problem=self.other)
+        self.assertEqual([p["id"] for p in self._list(favorite=True)], [self.other.id])
+
+    def test_deleting_problem_removes_favorite(self):
+        self._add()
+        self.problem.delete()
+        self.assertEqual(ProblemFavorite.objects.count(), 0)
 
 
 class PublicProblemLookupTest(ProblemCreateTestBase):

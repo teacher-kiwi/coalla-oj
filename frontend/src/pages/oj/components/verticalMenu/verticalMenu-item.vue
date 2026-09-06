@@ -36,8 +36,10 @@ function handleClick () {
   li {
     border-bottom: 1px dashed #e9eaec;
     color: #495060;
-    display: block;
-    text-align: left;
+    // 아이콘과 글자를 가운데끼리 맞춘다(기준선 정렬이면 아이콘만 뜬다)
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 15px 20px;
     cursor: pointer;
     &:hover {

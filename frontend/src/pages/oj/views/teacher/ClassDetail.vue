@@ -219,7 +219,6 @@ onMounted(load)
 }
 .nickname .edit-hint {
   color: #c0c4cc;
-  vertical-align: -2px;
 }
 .nickname:hover .edit-hint {
   color: #409eff;
