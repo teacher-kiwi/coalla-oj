@@ -20,7 +20,9 @@
       </el-table-column>
       <el-table-column label="상태" width="100">
         <template #default="{ row }">
-          <el-tag :type="STATUS_TAG[row.status]" size="small">{{ STATUS_LABEL[row.status] }}</el-tag>
+          <el-tag :type="CONTEST_STATUS_REVERSE[row.status]?.tag" size="small">
+            {{ CONTEST_STATUS_REVERSE[row.status]?.label }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="기간" width="300">
@@ -39,11 +41,10 @@
                      @click="remove(row)">삭제</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 연 대회가 없습니다. "대회 열기"로 만든 뒤 문제를 넣고 학급에 배포하세요.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !contests.length" class="empty">
-      아직 연 대회가 없습니다. "대회 열기"로 만든 뒤 문제를 넣고 학급에 배포하세요.
-    </p>
 
     <el-dialog v-model="dialogVisible" title="대회 열기"
                width="520px" :close-on-click-modal="false">
@@ -79,18 +80,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { CONTEST_STATUS } from '@/utils/constants'
-
-const STATUS_LABEL = {
-  [CONTEST_STATUS.NOT_START]: '시작 전',
-  [CONTEST_STATUS.UNDERWAY]: '진행 중',
-  [CONTEST_STATUS.ENDED]: '종료'
-}
-const STATUS_TAG = {
-  [CONTEST_STATUS.NOT_START]: 'info',
-  [CONTEST_STATUS.UNDERWAY]: 'success',
-  [CONTEST_STATUS.ENDED]: ''
-}
+import { CONTEST_STATUS, CONTEST_STATUS_REVERSE } from '@/utils/constants'
 
 const router = useRouter()
 const loading = ref(false)
@@ -180,9 +170,4 @@ onMounted(load)
   margin-top: 4px;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

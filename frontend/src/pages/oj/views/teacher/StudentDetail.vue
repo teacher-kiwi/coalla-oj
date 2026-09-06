@@ -23,9 +23,10 @@
           <el-button link type="primary" @click="router.push('/status/' + row.id)">보기</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 제출한 기록이 없습니다.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !submissions.length" class="empty">아직 제출한 기록이 없습니다.</p>
 
     <Pagination :total="total" :page-size="limit" :current="page" @on-change="onPageChange" />
   </Panel>
@@ -86,9 +87,4 @@ onMounted(load)
   width: 100%;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

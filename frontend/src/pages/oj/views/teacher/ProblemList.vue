@@ -7,7 +7,7 @@
 
     <el-alert v-if="problems.length" type="info" show-icon :closable="false"
               class="panel-guide">
-      비공개 문제는 나와 내가 배포한 학급 학생만 볼 수 있습니다.
+      학급 문제는 나와 내가 배포한 학급 학생만 볼 수 있습니다.
       다른 선생님도 쓸 수 있게 하려면 공개를 신청하세요. 관리자 승인 후 공개됩니다.
     </el-alert>
 
@@ -26,12 +26,8 @@
           <el-tag v-for="tag in row.tags" :key="tag" size="small" class="tag-item">{{ tag }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="공개" width="110" align="center">
-        <template #default="{ row }">
-          <el-tag :type="STATE[row.visibility].type" size="small">
-            {{ STATE[row.visibility].label }}
-          </el-tag>
-        </template>
+      <el-table-column label="범위" width="110" align="center">
+        <template #default="{ row }"><ScopeTag :value="row.visibility" /></template>
       </el-table-column>
       <el-table-column label="제출" width="80" align="center" prop="submission_number" />
       <el-table-column label="관리" width="300">
@@ -46,12 +42,13 @@
                      @click="remove(row)">삭제</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">
+          아직 만든 문제가 없습니다. "문제 만들기"로 시작하세요.<br />
+          만든 문제는 학급 문제로 저장되고, 문제집에 담아 학급에 배포하면 학생이 풀 수 있습니다.
+        </span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !problems.length" class="empty">
-      아직 만든 문제가 없습니다. "문제 만들기"로 시작하세요.<br />
-      만든 문제는 비공개로 저장되고, 문제집에 담아 학급에 배포하면 학생이 풀 수 있습니다.
-    </p>
   </Panel>
 </template>
 
@@ -62,16 +59,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import DifficultyTag from '@oj/components/DifficultyTag.vue'
+import ScopeTag from '@oj/components/ScopeTag.vue'
 
 const router = useRouter()
 const loading = ref(false)
 const problems = ref([])
 
-const STATE = {
-  private: { label: '비공개', type: 'info' },
-  pending: { label: '승인 대기', type: 'warning' },
-  public: { label: '공개', type: 'success' }
-}
 
 function load () {
   loading.value = true
@@ -138,10 +131,4 @@ onMounted(load)
   margin-right: 4px;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-  line-height: 1.8;
-}
 </style>

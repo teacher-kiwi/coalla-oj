@@ -18,11 +18,10 @@
           <el-button size="small" @click="archive(row)">학년 종료</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 만든 학급이 없습니다. "학급 만들기"로 시작하세요.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !classes.length" class="empty">
-      아직 만든 학급이 없습니다. "학급 만들기"로 시작하세요.
-    </p>
 
     <el-dialog v-model="dialogVisible" title="학급 만들기" width="460px" :close-on-click-modal="false">
       <el-form label-width="110px">
@@ -251,9 +250,4 @@ onBeforeUnmount(() => {
   margin-top: 4px;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

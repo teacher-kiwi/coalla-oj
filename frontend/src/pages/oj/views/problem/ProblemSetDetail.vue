@@ -8,9 +8,6 @@
     <Markdown v-if="info.description" class="description panel-inset" :source="info.description" />
     <p class="meta panel-inset">
       <span v-if="info.class_name">{{ info.class_name }}</span>
-      <span v-if="info.due_at" :class="{ overdue: isOverdue }">
-        마감 {{ localtime(info.due_at) }}
-      </span>
       <span>{{ solvedCount }} / {{ info.problems.length }} 문제 해결</span>
     </p>
 
@@ -37,11 +34,10 @@
       <el-table-column label="난이도" width="100">
         <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 문제가 담기지 않은 문제집입니다.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !info.problems.length" class="empty">
-      아직 문제가 담기지 않은 문제집입니다.
-    </p>
 
     <p v-if="hasUnavailable" class="notice panel-inset">
       "지금 풀 수 없습니다" 로 표시된 문제는 선생님께 문의해주세요.
@@ -55,7 +51,6 @@ import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import api from '@oj/api'
-import time from '@/utils/time'
 import DifficultyTag from '@oj/components/DifficultyTag.vue'
 
 const route = useRoute()
@@ -66,12 +61,7 @@ const loading = ref(false)
 const info = ref({ problems: [] })
 
 const solvedCount = computed(() => info.value.problems.filter(p => p.my_status === 0).length)
-const isOverdue = computed(() => !!info.value.due_at && new Date(info.value.due_at) < new Date())
 const hasUnavailable = computed(() => info.value.problems.some(p => p.available === false))
-
-function localtime (val) {
-  return time.utcToLocal(val)
-}
 
 function goList () {
   router.push({ name: 'problem-set-list' })
@@ -125,13 +115,4 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-.overdue {
-  color: #f56c6c;
-}
-
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

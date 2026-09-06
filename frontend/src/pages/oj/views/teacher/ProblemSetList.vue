@@ -24,11 +24,10 @@
           <el-button size="small" type="danger" @click="remove(row)">삭제</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 만든 문제집이 없습니다. "문제집 만들기"로 시작한 뒤 문제를 담고 학급에 배포하세요.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !problemSets.length" class="empty">
-      아직 만든 문제집이 없습니다. "문제집 만들기"로 시작한 뒤 문제를 담고 학급에 배포하세요.
-    </p>
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '문제집 수정' : '문제집 만들기'"
                width="460px" :close-on-click-modal="false">
@@ -137,9 +136,4 @@ onMounted(load)
   line-height: 1.6;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

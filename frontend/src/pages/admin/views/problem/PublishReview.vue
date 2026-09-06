@@ -8,7 +8,7 @@
       <p class="guide">
         교사가 만든 문제의 공개 신청입니다. 승인하면 모든 사용자의 문제 목록에 나타나고,
         그 뒤에는 교사가 수정·삭제할 수 없습니다.
-        반려하면 비공개로 돌아가 교사가 고쳐서 다시 신청할 수 있습니다.
+        반려하면 학급 문제로 돌아가 교사가 고쳐서 다시 신청할 수 있습니다.
       </p>
 
       <el-table v-loading="loading" :data="problems" class="full-width">
@@ -72,9 +72,10 @@
             <el-button type="danger" size="small" @click="review(row, false)">반려</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <span v-if="!loading">공개 신청된 문제가 없습니다.</span>
+        </template>
       </el-table>
-
-      <p v-if="!loading && !problems.length" class="empty">공개 신청된 문제가 없습니다.</p>
     </Panel>
   </div>
 </template>
@@ -140,11 +141,6 @@ onMounted(load)
     margin-right: 4px;
   }
 
-  .empty {
-    text-align: center;
-    color: #909399;
-    padding: 30px 0;
-  }
 
   .detail {
     padding: 8px 20px 16px;

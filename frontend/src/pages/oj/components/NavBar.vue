@@ -34,7 +34,6 @@
         <el-menu-item index="/teacher/problem">내가 만든 문제</el-menu-item>
         <el-menu-item index="/teacher/problem-set">문제집</el-menu-item>
         <el-menu-item index="/teacher/contest">대회</el-menu-item>
-        <el-menu-item index="/teacher/progress">학습 현황</el-menu-item>
       </el-sub-menu>
       <!-- 수업용 학생만 보인다. 개인 학생(구글 가입)은 배포받을 학급이 없다. -->
       <el-menu-item v-if="isStudent" index="/problem-set">

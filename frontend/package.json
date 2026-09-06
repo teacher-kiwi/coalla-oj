@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "check": "node check-globals.mjs && node check-template-refs.mjs",
+    "check": "node check-globals.mjs && node check-template-refs.mjs && node check-single-root.mjs",
     "test": "vitest run"
   },
   "dependencies": {

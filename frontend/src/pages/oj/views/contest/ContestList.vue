@@ -68,8 +68,7 @@
               <el-col :span="18" class="contest-main">
                 <p class="title">
                   <a class="link-text" @click.stop="goContest(contest)">{{ contest.title }}</a>
-                  <el-tag v-if="contest.is_class_contest" type="success" size="small"
-                          effect="plain" class="kind">학급</el-tag>
+                  <ScopeTag v-if="contest.is_class_contest" value="class" class="kind" />
                   <template v-if="contest.contest_type !== 'Public'">
                     <el-icon :size="20"><Lock /></el-icon>
                   </template>
@@ -91,7 +90,7 @@
                 </ul>
               </el-col>
               <el-col :span="4" class="contest-status-col">
-                <el-tag :type="getContestStatusType(contest.status)">
+                <el-tag :type="CONTEST_STATUS_REVERSE[contest.status].tag">
                   {{ CONTEST_STATUS_REVERSE[contest.status].label }}
                 </el-tag>
               </el-col>
@@ -115,6 +114,7 @@ import api from '@oj/api'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
 import Pagination from '@oj/components/Pagination.vue'
+import ScopeTag from '@oj/components/ScopeTag.vue'
 // 학급 대회는 수업의 연장이라 트로피 대신 수업 아이콘을 쓴다
 import cupIcon from '@/assets/Cup.png'
 import lectureIcon from '@/assets/Lecture.png'
@@ -142,13 +142,6 @@ function localtime (val) {
 
 function getDuration (startTime, endTime) {
   return time.duration(startTime, endTime)
-}
-
-function getContestStatusType (status) {
-  const color = CONTEST_STATUS_REVERSE[status]?.color
-  if (color === 'green') return 'success'
-  if (color === 'red') return 'danger'
-  return 'warning'
 }
 
 function init () {

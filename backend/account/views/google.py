@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 NICKNAME_RE = re.compile(r"^[\w가-힣][\w가-힣 ._-]{1,19}$")
 
+# 구글 ID 토큰의 iat/exp 를 볼 때 허용하는 시계 오차. 구글 예제와 같은 값이다.
+GOOGLE_CLOCK_SKEW_SECONDS = 10
+
 
 def validate_nickname(nickname):
     """닉네임은 곧 계정 식별자이자 공개 표시 이름이다. 실패 시 사유를 돌려준다."""
@@ -56,7 +59,11 @@ def verify_google_token(credential, client_id):
         return None
     try:
         return google_id_token.verify_oauth2_token(
-            credential, google_requests.Request(), client_id)
+            credential, google_requests.Request(), client_id,
+            # 서버 시계가 구글보다 몇 초 뒤처지면 iat 검사("Token used too early")에
+            # 걸려 로그인이 막힌다. 도커 VM 은 호스트가 절전에서 깨면 곧잘 밀린다.
+            # exp 검사도 같이 늘어나지만 토큰 수명이 1시간이라 영향이 없다.
+            clock_skew_in_seconds=GOOGLE_CLOCK_SKEW_SECONDS)
     except ValueError as e:
         logger.warning(f"구글 ID 토큰 검증 실패: {e}")
         return None

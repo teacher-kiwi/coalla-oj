@@ -10,24 +10,16 @@
         </template>
       </el-table-column>
       <el-table-column label="학급" prop="class_name" width="260" />
-      <el-table-column label="마감일" width="180">
-        <template #default="{ row }">
-          <span :class="{ overdue: isOverdue(row.due_at) }">
-            {{ row.due_at ? localtime(row.due_at) : '없음' }}
-          </span>
-        </template>
-      </el-table-column>
       <el-table-column label="진행" width="200">
         <template #default="{ row }">
           <el-progress :percentage="percentage(row)" :stroke-width="14"
                        :format="() => `${row.solved_count} / ${row.problem_count}`" />
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">선생님이 배포한 문제집이 없습니다.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !problemSets.length" class="empty">
-      선생님이 배포한 문제집이 없습니다.
-    </p>
   </Panel>
 </template>
 
@@ -35,19 +27,10 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@oj/api'
-import time from '@/utils/time'
 
 const router = useRouter()
 const loading = ref(false)
 const problemSets = ref([])
-
-function localtime (val) {
-  return time.utcToLocal(val)
-}
-
-function isOverdue (dueAt) {
-  return !!dueAt && new Date(dueAt) < new Date()
-}
 
 function percentage (row) {
   if (!row.problem_count) return 0
@@ -80,13 +63,4 @@ onMounted(() => {
   line-height: 1.6;
 }
 
-.overdue {
-  color: #f56c6c;
-}
-
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

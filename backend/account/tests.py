@@ -8,6 +8,7 @@ from options.options import SysOptions
 
 from .models import (AdminType, ProblemPermission, TeacherApplication,
                      TeacherApplicationStatus, User, UserProfile)
+from .views.google import verify_google_token
 from utils.constants import ContestRuleType
 
 
@@ -368,6 +369,25 @@ class GenerateUserAPITest(APITestCase):
         resp = self.client.post(self.url, data=self.data)
         self.assertSuccess(resp)
         mock_workbook.assert_called()
+
+
+class VerifyGoogleTokenTest(APITestCase):
+    """토큰 검증 자체. 다른 테스트는 이 함수를 통째로 갈아끼우므로 여기서만 본다."""
+
+    @mock.patch("google.oauth2.id_token.verify_oauth2_token")
+    def test_allows_clock_skew(self, verify):
+        """서버 시계가 몇 초 뒤처져도 로그인이 막히지 않아야 한다.
+
+        허용 오차가 0 이면 구글이 방금 발급한 토큰이 "Token used too early" 로
+        거절된다. 도커 VM 처럼 시계가 잘 밀리는 곳에서 실제로 겪은 문제다.
+        """
+        verify.return_value = {"sub": "s"}
+        self.assertEqual(verify_google_token("credential", "client-id"), {"sub": "s"})
+        self.assertGreaterEqual(verify.call_args.kwargs.get("clock_skew_in_seconds", 0), 5)
+
+    @mock.patch("google.oauth2.id_token.verify_oauth2_token", side_effect=ValueError("bad"))
+    def test_invalid_token_returns_none(self, verify):
+        self.assertIsNone(verify_google_token("credential", "client-id"))
 
 
 @mock.patch("account.views.google.verify_google_token")

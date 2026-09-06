@@ -394,7 +394,7 @@ class ProblemSetAssignmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProblemSetAssignment
-        fields = ("id", "school_class", "class_name", "assigned_at", "due_at", "is_open")
+        fields = ("id", "school_class", "class_name", "assigned_at")
 
     def get_class_name(self, obj):
         return f"{obj.school_class.school.name} {obj.school_class.display_name}"
@@ -452,11 +452,3 @@ class ProblemSetItemOrderSerializer(serializers.Serializer):
 class CreateProblemSetAssignmentSerializer(serializers.Serializer):
     problem_set = serializers.IntegerField()
     school_class = serializers.IntegerField()
-    due_at = serializers.DateTimeField(allow_null=True, required=False, default=None)
-    is_open = serializers.BooleanField(required=False, default=True)
-
-
-class EditProblemSetAssignmentSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    due_at = serializers.DateTimeField(allow_null=True, required=False)
-    is_open = serializers.BooleanField(required=False)

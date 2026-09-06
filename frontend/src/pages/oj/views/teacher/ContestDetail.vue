@@ -13,8 +13,8 @@
 
       <el-descriptions :column="3" border size="small">
         <el-descriptions-item label="상태">
-          <el-tag :type="STATUS_TAG[contest.status]" size="small">
-            {{ STATUS_LABEL[contest.status] }}
+          <el-tag :type="CONTEST_STATUS_REVERSE[contest.status]?.tag" size="small">
+            {{ CONTEST_STATUS_REVERSE[contest.status]?.label }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="시작">{{ localtime(contest.start_time) }}</el-descriptions-item>
@@ -45,31 +45,30 @@
                        @click="removeProblem(row)">빼기</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <span v-if="!loading.problems">아직 넣은 문제가 없습니다. 내가 만든 문제나 공개 문제를 넣을 수 있습니다.</span>
+        </template>
       </el-table>
-      <p v-if="!loading.problems && !problems.length" class="empty">
-        아직 넣은 문제가 없습니다. 내가 만든 문제나 공개 문제를 넣을 수 있습니다.
-      </p>
     </Panel>
 
     <Panel shadow class="section">
       <template #title>배포 학급</template>
-      <template #extra>
-        <el-button type="primary" :icon="Plus" @click="openClassDialog">학급에 배포</el-button>
-      </template>
 
-      <el-table v-loading="loading.classes" :data="assignments" class="full-width">
+      <!-- 내 학급을 모두 보여주고 스위치로 배포를 켜고 끈다.
+           따로 고르는 대화상자를 열지 않아도 지금 어디에 나갔는지 한눈에 보인다. -->
+      <el-table v-loading="loading.classes" :data="classRows" class="full-width">
         <el-table-column label="학교" prop="school_name" />
         <el-table-column label="학급" prop="display_name" width="200" />
         <el-table-column label="학생 수" prop="student_count" width="100" />
-        <el-table-column label="관리" width="100">
+        <el-table-column label="배포" width="100">
           <template #default="{ row }">
-            <el-button size="small" type="danger" @click="removeClass(row)">배포 취소</el-button>
+            <el-switch :model-value="row.assigned" @change="toggleClass(row, $event)" />
           </template>
         </el-table-column>
+        <template #empty>
+          <span v-if="!loading.classes">만든 학급이 없습니다. "내 학급" 에서 학급을 만든 뒤 여기서 배포하세요.</span>
+        </template>
       </el-table>
-      <p v-if="!loading.classes && !assignments.length" class="empty">
-        배포한 학급이 없습니다. 배포해야 학생이 대회에 들어올 수 있습니다.
-      </p>
     </Panel>
 
     <Panel shadow class="section">
@@ -89,11 +88,11 @@
             <el-button size="small" type="danger" @click="removeAnnouncement(row)">삭제</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <span v-if="!loading.announcements">공지가 없습니다. 대회 중에 알릴 것이 생기면 여기에 씁니다.</span>
+        </template>
       </el-table>
-      <p v-if="!loading.announcements && !announcements.length" class="empty">
-        공지가 없습니다. 대회 중에 알릴 것이 생기면 여기에 씁니다.
-      </p>
-      <p v-if="notStarted && announcements.length" class="empty">
+      <p v-if="notStarted && announcements.length" class="guide panel-inset">
         공지는 대회가 시작한 뒤부터 학생에게 보입니다.
       </p>
     </Panel>
@@ -127,8 +126,8 @@
       <el-table :data="candidates" height="360" @row-click="addProblem" class="pick-table">
         <el-table-column label="번호" prop="display_id" width="90" />
         <el-table-column label="제목" prop="title" />
-        <el-table-column label="구분" width="100">
-          <template #default="{ row }">{{ row.visibility === 'public' ? '공개' : '내 문제' }}</template>
+        <el-table-column label="범위" width="100">
+          <template #default="{ row }"><ScopeTag :value="row.visibility" /></template>
         </el-table-column>
       </el-table>
       <p class="guide">줄을 누르면 대회에 들어갑니다. 원본은 그대로 남습니다.</p>
@@ -152,37 +151,19 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="classDialog" title="학급에 배포" width="520px">
-      <el-table :data="myClasses" @row-click="addClass" class="pick-table">
-        <el-table-column label="학교" prop="school_name" />
-        <el-table-column label="학급" prop="display_name" />
-        <el-table-column label="학생 수" prop="student_count" width="100" />
-      </el-table>
-      <p class="guide">줄을 누르면 배포됩니다.</p>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import Markdown from '@oj/components/Markdown.vue'
+import ScopeTag from '@oj/components/ScopeTag.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { CONTEST_STATUS, DIFFICULTY_LABEL } from '@/utils/constants'
-
-const STATUS_LABEL = {
-  [CONTEST_STATUS.NOT_START]: '시작 전',
-  [CONTEST_STATUS.UNDERWAY]: '진행 중',
-  [CONTEST_STATUS.ENDED]: '종료'
-}
-const STATUS_TAG = {
-  [CONTEST_STATUS.NOT_START]: 'info',
-  [CONTEST_STATUS.UNDERWAY]: 'success',
-  [CONTEST_STATUS.ENDED]: ''
-}
+import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, DIFFICULTY_LABEL } from '@/utils/constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -195,7 +176,6 @@ const myClasses = ref([])
 const candidates = ref([])
 const announcements = ref([])
 const problemDialog = ref(false)
-const classDialog = ref(false)
 const editDialog = ref(false)
 const announcementDialog = ref(false)
 const saving = ref(false)
@@ -204,6 +184,12 @@ const announcementForm = reactive({ id: null, title: '', content: '' })
 const loading = reactive({ problems: false, classes: false, announcements: false })
 
 const notStarted = computed(() => contest.value.status === CONTEST_STATUS.NOT_START)
+
+// 내 학급 전부에 배포 여부를 붙인다
+const classRows = computed(() => {
+  const assigned = new Set(assignments.value.map(a => a.school_class))
+  return myClasses.value.map(c => ({ ...c, assigned: assigned.has(c.id) }))
+})
 
 function localtime (val) {
   return val ? time.utcToLocal(val, 'YYYY-M-D HH:mm') : ''
@@ -269,16 +255,18 @@ function loadProblems () {
 
 function loadAssignments () {
   loading.classes = true
-  api.getMyContestClasses(contestId).then(res => {
-    assignments.value = res.data.data
+  // 내 학급 전부와 배포 현황을 함께 읽는다. 목록에는 둘을 합쳐 보여준다.
+  Promise.all([api.getMyClasses(), api.getMyContestClasses(contestId)]).then(([classes, assigned]) => {
+    myClasses.value = classes.data.data
+    assignments.value = assigned.data.data
     loading.classes = false
-  }, () => {
+  }).catch(() => {
     loading.classes = false
   })
 }
 
 function openProblemDialog () {
-  // 내가 만든 문제와 공개 문제를 함께 고르게 한다
+  // 내가 만든 학급 문제와 공개 문제를 함께 고르게 한다
   Promise.all([
     api.getMyProblems(),
     api.getProblemList(0, 250, {})
@@ -309,28 +297,18 @@ function removeProblem (row) {
   }, () => {})
 }
 
-function openClassDialog () {
-  api.getMyClasses().then(res => {
-    const assigned = new Set(assignments.value.map(a => a.school_class))
-    myClasses.value = res.data.data.filter(c => !assigned.has(c.id))
-    classDialog.value = true
-  }, () => {})
-}
-
-function addClass (row) {
-  api.assignMyContest(contestId, row.id).then(() => {
-    classDialog.value = false
-    ElMessage.success('학급에 배포했습니다')
+function toggleClass (row, assign) {
+  const request = assign
+    ? api.assignMyContest(contestId, row.id)
+    : api.unassignMyContest(contestId, row.id)
+  request.then(() => {
+    ElMessage.success(assign ? '학급에 배포했습니다' : '배포를 취소했습니다')
     loadAssignments()
     loadContest()
-  }, () => {})
-}
-
-function removeClass (row) {
-  api.unassignMyContest(contestId, row.school_class).then(() => {
+  }, () => {
+    // 실패하면 스위치가 눌린 채로 남지 않도록 서버 상태를 다시 읽는다
     loadAssignments()
-    loadContest()
-  }, () => {})
+  })
 }
 
 function loadAnnouncements () {
@@ -408,12 +386,6 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   margin-top: 10px;
-}
-
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 26px 0;
 }
 
 .pick-table :deep(tbody tr) {

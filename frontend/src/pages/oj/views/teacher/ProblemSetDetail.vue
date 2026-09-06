@@ -27,22 +27,20 @@
         <el-table-column label="난이도" width="100">
           <template #default="{ row }"><DifficultyTag :value="row.problem.difficulty" /></template>
         </el-table-column>
-        <el-table-column label="상태" width="150" align="center">
+        <el-table-column label="범위" width="150" align="center">
           <template #default="{ row }">
-            <!-- 담아둔 뒤에 관리자가 감췄거나, 아직 비공개인 문제를 교사가 알아야 한다 -->
+            <!-- 담아둔 뒤에 관리자가 감춘 문제를 교사가 알아야 한다.
+                 감춘 것은 학급/공개와 다른 축이라 이때만 따로 표시한다. -->
             <el-tooltip v-if="!row.problem_visible"
                         content="관리자가 감춘 문제입니다. 학생은 풀 수 없습니다." placement="top">
-              <el-tag size="small" type="danger">풀 수 없음</el-tag>
+              <el-tag size="small" type="danger" effect="plain">풀 수 없음</el-tag>
             </el-tooltip>
             <el-tooltip v-else-if="row.problem_visibility === 'private'"
-                        content="비공개 문제입니다. 이 문제집을 배포한 학급만 볼 수 있습니다."
+                        content="학급 문제입니다. 이 문제집을 배포한 학급만 볼 수 있습니다."
                         placement="top">
-              <el-tag size="small" type="info">비공개</el-tag>
+              <ScopeTag value="private" />
             </el-tooltip>
-            <el-tag v-else-if="row.problem_visibility === 'pending'" size="small" type="warning">
-              승인 대기
-            </el-tag>
-            <span v-else class="state-ok">공개</span>
+            <ScopeTag v-else :value="row.problem_visibility" />
           </template>
         </el-table-column>
         <el-table-column label="관리" width="240">
@@ -53,11 +51,10 @@
             <el-button size="small" type="danger" @click="removeItem(row)">빼기</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <span v-if="!loading">담긴 문제가 없습니다. "문제 추가"로 문제를 골라 담으세요.</span>
+        </template>
       </el-table>
-
-      <p v-if="!loading && !info.items.length" class="empty">
-        담긴 문제가 없습니다. "문제 추가"로 문제를 골라 담으세요.
-      </p>
 
       <p v-if="hasBlocked" class="notice panel-inset">
         <b>풀 수 없음</b> 으로 표시된 문제는 관리자가 감춘 것입니다. 학생 화면에도
@@ -67,32 +64,32 @@
     </Panel>
 
     <Panel shadow class="assignment-panel">
-      <template #title>배포한 학급</template>
-      <template #extra>
-        <el-button type="primary" :icon="Plus" @click="openAssignDialog">학급에 배포</el-button>
-      </template>
+      <template #title>배포 학급</template>
 
-      <el-table :data="info.assignments" class="full-width">
-        <el-table-column label="학급" prop="class_name" />
-        <el-table-column label="마감일" width="200">
+      <!-- 내 학급을 모두 보여주고 스위치로 배포를 켜고 끈다. 배포한 학급의
+           학생에게만 보인다. (대회 상세의 배포 학급 표와 같은 모양이다) -->
+      <el-table :data="classRows" class="full-width">
+        <el-table-column label="학교" prop="school_name" />
+        <el-table-column label="학급" width="200">
           <template #default="{ row }">
-            {{ row.due_at ? localtime(row.due_at) : '없음' }}
+            <!-- 학급을 누르면 이 문제집의 학습 현황으로 간다.
+                 배포를 내린 학급도 그동안의 기록이 남아 있어 막지 않는다. -->
+            <el-button link type="primary" @click="goProgress(row)">{{ row.display_name }}</el-button>
           </template>
         </el-table-column>
-        <el-table-column label="공개" width="100">
+        <el-table-column label="학생 수" prop="student_count" width="100" />
+        <el-table-column label="배포" width="100">
           <template #default="{ row }">
-            <el-switch :model-value="row.is_open" @change="toggleOpen(row, $event)" />
+            <el-switch :model-value="!!row.assignment" @change="toggleAssign(row, $event)" />
           </template>
         </el-table-column>
-        <el-table-column label="관리" width="120">
-          <template #default="{ row }">
-            <el-button size="small" type="danger" @click="removeAssignment(row)">배포 취소</el-button>
-          </template>
-        </el-table-column>
+        <template #empty>
+          <span v-if="!loading">만든 학급이 없습니다. "내 학급" 에서 학급을 만든 뒤 여기서 배포하세요.</span>
+        </template>
       </el-table>
-
-      <p v-if="!loading && !info.assignments.length" class="empty">
-        아직 배포한 학급이 없습니다. 배포해야 학생 화면에 나타납니다.
+      <p class="field-help panel-inset">
+        학급 이름을 누르면 그 학급의 학습 현황을 볼 수 있습니다.
+        배포를 끄면 학생 화면에서 사라집니다.
       </p>
     </Panel>
 
@@ -125,17 +122,12 @@
         <el-table-column label="난이도" width="90">
           <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
         </el-table-column>
-        <el-table-column label="공개" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.visibility !== 'public'" size="small" type="info">
-              {{ row.visibility === 'pending' ? '승인 대기' : '비공개' }}
-            </el-tag>
-            <span v-else class="public-mark">공개</span>
-          </template>
+        <el-table-column label="범위" width="90" align="center">
+          <template #default="{ row }"><ScopeTag :value="row.visibility" /></template>
         </el-table-column>
       </el-table>
       <p class="picker-guide">
-        내가 만든 비공개 문제도 담을 수 있습니다. 배포한 학급 학생만 볼 수 있습니다.
+        내가 만든 학급 문제도 담을 수 있습니다. 배포한 학급 학생만 볼 수 있습니다.
       </p>
       <Pagination :total="candidateTotal" :page-size="10" :current="candidatePage"
                   @on-change="searchProblems" />
@@ -147,28 +139,6 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="assignDialogVisible" title="학급에 배포" width="460px"
-               :close-on-click-modal="false">
-      <el-form label-width="90px">
-        <el-form-item label="학급" required>
-          <el-select v-model="assignForm.school_class" placeholder="학급을 선택하세요" class="full-width">
-            <el-option v-for="item in myClasses" :key="item.id" :value="item.id"
-                       :label="`${item.school_name} ${item.grade}학년 ${item.class_no}반`" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="마감일">
-          <el-date-picker v-model="assignForm.due_at" type="datetime" placeholder="정하지 않음"
-                          class="full-width" />
-        </el-form-item>
-      </el-form>
-      <p class="field-help">
-        마감일은 안내용입니다. 지나도 문제는 계속 풀 수 있습니다.
-      </p>
-      <template #footer>
-        <el-button @click="assignDialogVisible = false">취소</el-button>
-        <el-button type="primary" :loading="saving" @click="assign">배포</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -179,8 +149,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
-import time from '@/utils/time'
 import DifficultyTag from '@oj/components/DifficultyTag.vue'
+import ScopeTag from '@oj/components/ScopeTag.vue'
 import Pagination from '@oj/components/Pagination.vue'
 
 const route = useRoute()
@@ -203,13 +173,8 @@ const candidateTotal = ref(0)
 const candidatePage = ref(1)
 const selected = ref([])
 
-const assignDialogVisible = ref(false)
 const myClasses = ref([])
-const assignForm = reactive({ school_class: null, due_at: null })
 
-function localtime (val) {
-  return time.utcToLocal(val)
-}
 
 // 목록 화면의 "수정" 과 같은 칸을 쓴다(제목과 설명).
 function openEditDialog () {
@@ -237,6 +202,16 @@ function submitEdit () {
   })
 }
 
+// 내 학급 전부에 배포 정보를 붙인다
+const classRows = computed(() => {
+  const byClass = new Map(info.value.assignments.map(a => [a.school_class, a]))
+  return myClasses.value.map(c => ({ ...c, assignment: byClass.get(c.id) || null }))
+})
+
+function loadMyClasses () {
+  api.getMyClasses().then(res => { myClasses.value = res.data.data }, () => {})
+}
+
 function load () {
   loading.value = true
   api.getProblemSetForTeacher(setId).then(res => {
@@ -249,6 +224,11 @@ function load () {
 
 function goList () {
   router.push({ name: 'teacher-problem-set-list' })
+}
+
+function goProgress (row) {
+  router.push({ name: 'teacher-problem-set-progress',
+                params: { setId, classId: row.id } })
 }
 
 function goProblem (problemID) {
@@ -267,7 +247,7 @@ function openProblemDialog () {
 function searchProblems (page) {
   candidatePage.value = page
   searching.value = true
-  // 공개 문제와 내가 만든 비공개 문제를 함께 고를 수 있어야 한다
+  // 공개 문제와 내가 만든 학급 문제를 함께 고를 수 있어야 한다
   api.getProblemList((page - 1) * 10, 10, { keyword: keyword.value, mine: 1 }).then(res => {
     searching.value = false
     candidates.value = res.data.data.results
@@ -315,49 +295,21 @@ function removeItem (row) {
 
 // ---- 배포 ----
 
-function openAssignDialog () {
-  assignForm.school_class = null
-  assignForm.due_at = null
-  assignDialogVisible.value = true
-  api.getMyClasses().then(res => {
-    myClasses.value = res.data.data
-  }, () => {})
-}
-
-function assign () {
-  if (!assignForm.school_class) {
-    ElMessage.error('학급을 선택하세요')
-    return
-  }
-  saving.value = true
-  api.assignProblemSet({
-    problem_set: setId,
-    school_class: assignForm.school_class,
-    due_at: assignForm.due_at || null
-  }).then(() => {
-    saving.value = false
-    assignDialogVisible.value = false
-    ElMessage.success('배포했습니다')
+function toggleAssign (row, assign) {
+  const request = assign
+    ? api.assignProblemSet({ problem_set: setId, school_class: row.id })
+    : api.deleteProblemSetAssignment(row.assignment.id)
+  request.then(() => {
+    ElMessage.success(assign ? '배포했습니다' : '배포를 취소했습니다')
     load()
-  }, () => {
-    saving.value = false
-  })
+  }, load)   // 실패하면 스위치가 눌린 채 남지 않도록 서버 상태를 다시 읽는다
 }
 
-function toggleOpen (row, value) {
-  api.editProblemSetAssignment({ id: row.id, is_open: value }).then(load).catch(load)
-}
 
-function removeAssignment (row) {
-  ElMessageBox.confirm(
-    `${row.class_name}에서 이 문제집을 내립니다. 학생 화면에서 사라집니다.`,
-    '배포 취소', { confirmButtonText: '취소하기', cancelButtonText: '닫기', type: 'warning' }
-  ).then(() => {
-    api.deleteProblemSetAssignment(row.id).then(load).catch(() => {})
-  }).catch(() => {})
-}
-
-onMounted(load)
+onMounted(() => {
+  load()
+  loadMyClasses()
+})
 </script>
 
 <style scoped>
@@ -367,11 +319,6 @@ onMounted(load)
 
 .assignment-panel {
   margin-top: 20px;
-}
-
-.state-ok {
-  font-size: 12px;
-  color: #909399;
 }
 
 .notice {
@@ -394,11 +341,6 @@ onMounted(load)
   margin-top: 8px;
 }
 
-.public-mark {
-  font-size: 12px;
-  color: #909399;
-}
-
 .candidate-table {
   margin-top: 12px;
 }
@@ -409,9 +351,4 @@ onMounted(load)
   line-height: 1.6;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

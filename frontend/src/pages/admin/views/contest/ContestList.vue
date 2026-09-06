@@ -68,7 +68,7 @@ import { Search as SearchIcon } from '@element-plus/icons-vue'
 import api from '../../api.js'
 import utils from '@/utils/utils'
 import time from '@/utils/time'
-import { CONTEST_STATUS_REVERSE, CONTEST_TYPE, CONTEST_TYPE_LABEL } from '@/utils/constants'
+import { CONTEST_STATUS_REVERSE, CONTEST_TYPE, CONTEST_TYPE_LABEL, SCOPE_TAG } from '@/utils/constants'
 
 const router = useRouter()
 
@@ -89,7 +89,7 @@ function contestStatus (value) { return CONTEST_STATUS_REVERSE[value].label }
 // 비밀번호가 없어 contest_type 은 늘 Public 으로 나오므로 먼저 걸러야 한다.
 // 관리자 목록에서는 셋을 한 칸에 모아 보여준다.
 function contestKind (row) {
-  if (row.is_class_contest) return { label: '학급', tag: 'warning' }
+  if (row.is_class_contest) return { label: SCOPE_TAG.class.label, tag: SCOPE_TAG.class.type }
   return {
     label: CONTEST_TYPE_LABEL[row.contest_type],
     tag: row.contest_type === CONTEST_TYPE.PUBLIC ? 'success' : 'primary'

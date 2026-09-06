@@ -24,6 +24,9 @@ class ProblemVisibility(Choices):
 
     admin 의 `visible` 과는 다른 축이다. `visible` 은 "목록에서 감추기"(운영용)이고,
     이 값은 "누구의 문제인지"를 뜻한다.
+
+    화면에서는 private 을 "학급", public 을 "공개" 로 부른다. 대회의 학급/공개와
+    같은 축이라 말을 맞췄다(frontend 의 SCOPE_TAG). 값은 그대로 두고 라벨만 다르다.
     """
     # 만든 교사와 그 교사가 문제집으로 배포한 학급만 볼 수 있다
     private = "private"
@@ -194,7 +197,7 @@ class ProblemSet(models.Model):
     """교사가 공개 문제를 묶어 학급에 배포하는 단위.
 
     대회(Contest)와 달리 순위·시간 제한이 없다. 수업에서 "이번 주에 풀 문제"를
-    지정하는 용도이므로 배포(assignment)와 마감일만 갖는다.
+    지정하는 용도이므로 배포(assignment)만 갖는다.
     """
     title = models.TextField()
     description = models.TextField(blank=True, default="")
@@ -222,16 +225,14 @@ class ProblemSetItem(models.Model):
 class ProblemSetAssignment(models.Model):
     """문제집을 학급에 배포한 기록.
 
-    같은 문제집을 여러 학급에 배포할 수 있고 학급마다 마감일이 다를 수 있어
-    문제집이 아니라 이 관계에 마감일을 둔다.
+    이 기록이 있는지가 곧 학생에게 보이는지다. 배포를 내리려면 지운다.
+    (예전에는 기록을 두고 공개만 끄는 is_open 이 따로 있었는데, 학생 화면에서
+     "배포 안 함" 과 구분되지 않아 배포 하나로 합쳤다. 마감일도 있었지만
+     지나도 아무것도 막지 않는 표시용이라 없앴다 - 역할을 정하면 그때 다시 넣는다)
     """
     problem_set = models.ForeignKey(ProblemSet, on_delete=models.CASCADE, related_name="assignments")
     school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name="assignments")
     assigned_at = models.DateTimeField(auto_now_add=True)
-    due_at = models.DateTimeField(null=True, blank=True)
-    # 배포를 잠시 내릴 때 쓴다. 삭제하면 학생 화면에서 사라지지만 다시 배포하려면
-    # 마감일을 다시 입력해야 하므로 켜고 끄는 수단을 따로 둔다.
-    is_open = models.BooleanField(default=True)
 
     class Meta:
         db_table = "problem_set_assignment"
@@ -264,6 +265,5 @@ def can_access_problem(problem, user):
     if not problem.visible:
         return False
     return ProblemSetAssignment.objects.filter(
-        is_open=True,
         problem_set__items__problem_id=problem.id,
         school_class__memberships__student_id=user.id).exists()

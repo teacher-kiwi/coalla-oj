@@ -89,21 +89,23 @@ export const CONTEST_STATUS = {
   'ENDED': '-1'
 }
 
+// tag 는 el-tag 의 type 이다. 화면마다 따로 정하다 값이 갈렸고(교사 목록은 종료를
+// 빈 문자열로 두어 el-tag 가 막았다) 여기로 모았다.
 export const CONTEST_STATUS_REVERSE = {
   '1': {
     name: 'Not Started',
     label: '시작 전',
-    color: 'yellow'
+    tag: 'warning'
   },
   '0': {
     name: 'Underway',
     label: '진행 중',
-    color: 'green'
+    tag: 'success'
   },
   '-1': {
     name: 'Ended',
     label: '종료',
-    color: 'red'
+    tag: 'info'
   }
 }
 
@@ -143,6 +145,17 @@ export const RULE_TYPE_LABEL = {
 export const CONTEST_TYPE_LABEL = {
   'Public': '공개',
   'Password Protected': '비밀번호 보호'
+}
+
+// 학급 안에서만 쓰이는지, 밖에 공개되는지. 문제와 대회가 같은 축이라
+// 이름과 색을 여기서 한 번만 정한다. 화면에서는 ScopeTag 로 그린다.
+// 키가 둘인 이유: 문제 API 는 visibility 로 'private' 을 주고,
+// 대회는 is_class_contest 라 부르는 쪽에서 'class' 로 넘긴다.
+export const SCOPE_TAG = {
+  private: { label: '학급', type: 'info' },
+  class: { label: '학급', type: 'info' },
+  pending: { label: '승인 대기', type: 'warning' },
+  public: { label: '공개', type: 'success' }
 }
 
 export const RULE_TYPE = {

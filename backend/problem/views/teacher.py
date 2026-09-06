@@ -22,7 +22,7 @@ from utils.shortcuts import int_or_none
 from ..models import (Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment,
                       ProblemSetItem, ProblemVisibility)
 from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSetSerializer,
-                           EditProblemSetAssignmentSerializer, EditProblemSetSerializer,
+                           EditProblemSetSerializer,
                            EditTeacherProblemSerializer, ProblemAdminSerializer,
                            ProblemSetDetailSerializer, ProblemSetItemOrderSerializer,
                            ProblemSetProblemSerializer, ProblemSetSerializer,
@@ -161,8 +161,7 @@ class ProblemSetAssignmentAPI(APIView):
     @validate_serializer(CreateProblemSetAssignmentSerializer)
     @teacher_required
     def post(self, request):
-        # 마감일을 datetime 그대로 쓰기 위해 직렬화 결과 대신 validated_data 를 본다
-        data = request.serializer.validated_data
+        data = request.data
         problem_set = owned_problem_set(request.user, data["problem_set"])
         if not problem_set:
             return self.error("문제집이 존재하지 않습니다")
@@ -171,26 +170,10 @@ class ProblemSetAssignmentAPI(APIView):
 
         try:
             assignment = ProblemSetAssignment.objects.create(
-                problem_set=problem_set, school_class_id=data["school_class"],
-                due_at=data["due_at"], is_open=data["is_open"])
+                problem_set=problem_set, school_class_id=data["school_class"])
         except IntegrityError:
             return self.error("이미 이 학급에 배포한 문제집입니다")
         return self.success({"id": assignment.id})
-
-    @validate_serializer(EditProblemSetAssignmentSerializer)
-    @teacher_required
-    def put(self, request):
-        # request.data 는 직렬화 결과라 보내지 않은 due_at 도 None 으로 들어온다.
-        # 공개 여부만 바꿀 때 마감일이 지워지지 않도록 validated_data 를 본다.
-        data = request.serializer.validated_data
-        assignment = self._owned_assignment(request.user, data["id"])
-        if not assignment:
-            return self.error("배포 기록이 존재하지 않습니다")
-        for field in ("due_at", "is_open"):
-            if field in data:
-                setattr(assignment, field, data[field])
-        assignment.save(update_fields=["due_at", "is_open"])
-        return self.success()
 
     @teacher_required
     def delete(self, request):

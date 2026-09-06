@@ -1,6 +1,9 @@
 <template>
-  <!-- 폼 화면이라 여백을 준다. 안의 테스트케이스 표도 입력칸이라 폼과 같이 들여쓴다. -->
   <Panel shadow :padding="20">
+    <!-- 폼 화면이라 여백을 준다. 안의 테스트케이스 표도 입력칸이라 폼과 같이 들여쓴다.
+         (이 주석은 루트 밖으로 내면 안 된다. 루트가 요소 하나가 아니라 프래그먼트가
+          되어 App.vue 의 transition mode="out-in" 이 이 화면을 끝내 못 떠나고,
+          다음 화면이 mount 되지 않아 빈 화면이 된다. check-single-root.mjs 가 막는다) -->
     <template #title>{{ isEdit ? '문제 수정' : '문제 만들기' }}</template>
     <template #extra>
       <el-button @click="goList">목록</el-button>

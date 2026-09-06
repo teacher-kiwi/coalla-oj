@@ -46,11 +46,10 @@
           <el-button size="small" type="danger" @click="removeStudent(row)">삭제</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">아직 학생 계정이 없습니다. "학생 계정 만들기"로 번호 범위를 지정해 한 번에 만드세요.</span>
+      </template>
     </el-table>
-
-    <p v-if="!loading && !students.length" class="empty">
-      아직 학생 계정이 없습니다. "학생 계정 만들기"로 번호 범위를 지정해 한 번에 만드세요.
-    </p>
 
     <el-dialog v-model="dialogVisible" title="학생 계정 만들기" width="420px" :close-on-click-modal="false">
       <el-form label-width="100px">
@@ -214,11 +213,6 @@ onMounted(load)
   line-height: 1.6;
 }
 
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 
 .nickname {
   cursor: pointer;

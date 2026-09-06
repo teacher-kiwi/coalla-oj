@@ -186,9 +186,6 @@ export default {
   assignProblemSet (data) {
     return ajax('teacher/problem_set/assignment', 'post', { data })
   },
-  editProblemSetAssignment (data) {
-    return ajax('teacher/problem_set/assignment', 'put', { data })
-  },
   deleteProblemSetAssignment (id) {
     return ajax('teacher/problem_set/assignment', 'delete', { params: { id } })
   },

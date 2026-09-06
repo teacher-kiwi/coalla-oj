@@ -122,7 +122,7 @@
           <li>학생 계정 {{ cleanup.student_count }}개</li>
           <li>학생 제출 기록 {{ cleanup.student_submission_count }}건</li>
           <li>문제집 {{ cleanup.problem_set_count }}개</li>
-          <li>비공개 문제 {{ cleanup.private_problem_count }}개</li>
+          <li>학급 문제 {{ cleanup.private_problem_count }}개</li>
         </ul>
         <p>공개 문제와 선생님 본인의 제출 기록은 남습니다.</p>
       </el-alert>

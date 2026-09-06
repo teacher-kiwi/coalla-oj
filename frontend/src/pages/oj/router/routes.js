@@ -240,8 +240,10 @@ export default [
     component: TeacherProblemSetDetail
   },
   {
-    path: '/teacher/progress',
-    name: 'teacher-progress',
+    // 학습 현황은 "이 문제집을 이 학급이 얼마나 풀었나" 라서 둘이 정해져야 뜻이 있다.
+    // 메뉴에서 둘을 고르게 하는 대신 문제집 상세의 배포 학급에서 들어온다.
+    path: '/teacher/problem-set/:setId/class/:classId',
+    name: 'teacher-problem-set-progress',
     meta: { requiresAuth: true, title: '학습 현황' },
     component: TeacherProgressBoard
   },

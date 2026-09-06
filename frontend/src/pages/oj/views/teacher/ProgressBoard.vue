@@ -1,19 +1,10 @@
 <template>
   <Panel shadow>
-    <template #title>학습 현황</template>
+    <template #title>{{ title }}</template>
     <template #extra>
-      <el-button :disabled="!canQuery" @click="download">엑셀로 내려받기</el-button>
+      <el-button @click="goSet">문제집</el-button>
+      <el-button :disabled="!board" @click="download">엑셀로 내려받기</el-button>
     </template>
-
-    <div class="selectors panel-inset">
-      <el-select v-model="classId" placeholder="학급 선택" class="selector" @change="load">
-        <el-option v-for="item in classes" :key="item.id" :value="item.id"
-                   :label="`${item.school_name} ${item.grade}학년 ${item.class_no}반`" />
-      </el-select>
-      <el-select v-model="problemSetId" placeholder="문제집 선택" class="selector" @change="load">
-        <el-option v-for="item in problemSets" :key="item.id" :value="item.id" :label="item.title" />
-      </el-select>
-    </div>
 
     <div v-if="board" class="legend panel-inset">
       <span><b>O</b> 해결</span>
@@ -21,7 +12,8 @@
       <span>빈칸 손대지 않음</span>
     </div>
 
-    <el-table v-if="board" v-loading="loading" :data="board.students" class="full-width" size="small">
+    <el-table v-if="board" v-loading="loading" :data="board.students" class="full-width" size="small"
+              :show-summary="!!board.students.length" :summary-method="summary">
       <el-table-column label="번호" width="70" fixed>
         <template #default="{ row }">{{ row.number }}</template>
       </el-table-column>
@@ -44,35 +36,42 @@
       <el-table-column label="해결" align="center" width="90" fixed="right">
         <template #default="{ row }">{{ row.solved_count }} / {{ board.problems.length }}</template>
       </el-table-column>
+      <template #empty>
+        <span v-if="!loading">이 학급에 학생 계정이 없습니다.</span>
+      </template>
     </el-table>
-
-    <p v-if="board && !board.students.length" class="empty">이 학급에 학생 계정이 없습니다.</p>
-
-    <div v-if="board && board.students.length" class="totals panel-inset">
-      <span v-for="(total, index) in board.totals" :key="index" class="total-item">
-        <b>{{ board.problems[index].display_id }}</b>
-        해결 {{ total.solved }}명 · 시도 {{ total.tried }}명
-      </span>
-    </div>
-
-    <p v-if="!board && !loading" class="empty">학급과 문제집을 고르면 진도표가 나옵니다.</p>
   </Panel>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@oj/api'
 
+const route = useRoute()
 const router = useRouter()
+// 어느 문제집을 어느 학급이 얼마나 풀었는지. 둘 다 주소로 정해져 온다.
+const setId = parseInt(route.params.setId)
+const classId = parseInt(route.params.classId)
+
 const loading = ref(false)
-const classes = ref([])
-const problemSets = ref([])
-const classId = ref(null)
-const problemSetId = ref(null)
 const board = ref(null)
 
-const canQuery = computed(() => !!classId.value && !!problemSetId.value)
+// 응답이 문제집 제목과 학급 이름을 함께 준다. 따로 부르지 않는다.
+const title = computed(() => board.value
+  ? `${board.value.problem_set.title} · ${board.value.school_class.name}`
+  : '학습 현황')
+
+// 반 전체 집계는 표 아래 따로 두지 않고 마지막 행으로 넣는다.
+// 열 순서는 번호, 이름, 문제들..., 해결 이라 문제는 2 번째부터다.
+// (범위 밖 인덱스는 undefined 라 번호·해결 칸은 저절로 빈칸이 된다)
+function summary ({ columns }) {
+  return columns.map((column, index) => {
+    if (index === 1) return '해결/시도'
+    const total = board.value.totals[index - 2]
+    return total ? `${total.solved}/${total.tried}` : ''
+  })
+}
 
 function cellText (cell) {
   if (cell.solved) return 'O'
@@ -86,9 +85,8 @@ function cellClass (cell) {
 }
 
 function load () {
-  if (!canQuery.value) return
   loading.value = true
-  api.getProblemSetProgress(problemSetId.value, classId.value).then(res => {
+  api.getProblemSetProgress(setId, classId).then(res => {
     loading.value = false
     board.value = res.data.data
   }, () => {
@@ -98,7 +96,11 @@ function load () {
 
 function download () {
   window.open('/api/teacher/problem_set/progress?download=1' +
-    `&problem_set=${problemSetId.value}&class_id=${classId.value}`)
+    `&problem_set=${setId}&class_id=${classId}`)
+}
+
+function goSet () {
+  router.push({ name: 'teacher-problem-set-detail', params: { setId } })
 }
 
 function goStudent (row) {
@@ -106,25 +108,12 @@ function goStudent (row) {
                 query: { number: row.number, nickname: row.nickname } })
 }
 
-onMounted(() => {
-  api.getMyClasses().then(res => { classes.value = res.data.data }, () => {})
-  api.getMyProblemSets().then(res => { problemSets.value = res.data.data }, () => {})
-})
+onMounted(load)
 </script>
 
 <style scoped>
 .full-width {
   width: 100%;
-}
-
-.selectors {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.selector {
-  width: 260px;
 }
 
 .legend {
@@ -144,22 +133,4 @@ onMounted(() => {
   color: #e6a23c;
 }
 
-.totals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 14px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.total-item {
-  white-space: nowrap;
-}
-
-.empty {
-  text-align: center;
-  color: #909399;
-  padding: 30px 0;
-}
 </style>

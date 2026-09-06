@@ -51,11 +51,9 @@ class ProblemSetTestBase(APITestCase):
         return self.client.post(self.item_url, data={"problem_set": set_id,
                                                      "problems": problems})
 
-    def _assign(self, set_id, class_id, due_at=None):
-        data = {"problem_set": set_id, "school_class": class_id}
-        if due_at:
-            data["due_at"] = due_at
-        return self.client.post(self.assign_url, data=data)
+    def _assign(self, set_id, class_id):
+        return self.client.post(self.assign_url,
+                                data={"problem_set": set_id, "school_class": class_id})
 
 
 class TeacherProblemSetAPITest(ProblemSetTestBase):
@@ -146,7 +144,7 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
     def test_assign_to_class(self):
         set_id = self._create_set()
         class_id = self._create_class()
-        resp = self._assign(set_id, class_id, due_at="2026-09-01T00:00:00Z")
+        resp = self._assign(set_id, class_id)
         self.assertSuccess(resp)
 
         detail = self.client.get(self.set_url + f"?id={set_id}").data["data"]
@@ -157,13 +155,10 @@ class TeacherProblemSetAPITest(ProblemSetTestBase):
         # 같은 학급에 두 번 배포할 수 없다
         self.assertFailed(self._assign(set_id, class_id))
 
-    def test_edit_and_delete_assignment(self):
+    def test_delete_assignment(self):
         set_id = self._create_set()
         class_id = self._create_class()
         assignment_id = self._assign(set_id, class_id).data["data"]["id"]
-        self.assertSuccess(self.client.put(self.assign_url,
-                                           data={"id": assignment_id, "is_open": False}))
-        self.assertFalse(ProblemSetAssignment.objects.get(id=assignment_id).is_open)
         self.assertSuccess(self.client.delete(self.assign_url + f"?id={assignment_id}"))
         self.assertEqual(ProblemSetAssignment.objects.count(), 0)
 
@@ -204,10 +199,8 @@ class ProblemSetCrossAccessTest(ProblemSetTestBase):
         self.assertEqual(ProblemSetAssignment.objects.count(), 1)
 
     def test_cannot_touch_other_assignment(self):
-        self.assertFailed(self.client.put(self.assign_url,
-                                          data={"id": self.assignment_id, "is_open": False}))
         self.assertFailed(self.client.delete(self.assign_url + f"?id={self.assignment_id}"))
-        self.assertTrue(ProblemSetAssignment.objects.get(id=self.assignment_id).is_open)
+        self.assertTrue(ProblemSetAssignment.objects.filter(id=self.assignment_id).exists())
 
 
 class StudentProblemSetAPITest(ProblemSetTestBase):
@@ -217,8 +210,7 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         self._add_problems(self.set_id, [self.problem.id, self.problem2.id])
         self.class_id = self._create_class()
         self._create_students(self.class_id, 1, 1)
-        self.assignment_id = self._assign(self.set_id, self.class_id,
-                                          due_at="2026-09-01T00:00:00Z").data["data"]["id"]
+        self.assignment_id = self._assign(self.set_id, self.class_id).data["data"]["id"]
         self.student = ClassMembership.objects.get(school_class_id=self.class_id,
                                                    number=1).student
         self.list_url = self.reverse("problem_set_list_api")
@@ -248,7 +240,6 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         self.assertEqual(data[0]["class_name"], "코알라초등학교 2026학년도 3학년 2반")
         self.assertEqual(data[0]["problem_count"], 2)
         self.assertEqual(data[0]["solved_count"], 0)
-        self.assertTrue(data[0]["due_at"].startswith("2026-09-01"))
 
     def test_solved_count(self):
         profile = self.student.userprofile
@@ -263,8 +254,9 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         self.assertSuccess(resp)
         self.assertEqual([p["title"] for p in resp.data["data"]["problems"]], ["문제 P1", "문제 P2"])
 
-    def test_closed_assignment_is_hidden(self):
-        ProblemSetAssignment.objects.filter(id=self.assignment_id).update(is_open=False)
+    def test_unassigned_set_is_hidden(self):
+        """배포를 내리면(기록을 지우면) 학생 화면에서 사라진다"""
+        ProblemSetAssignment.objects.filter(id=self.assignment_id).delete()
         self._login_student()
         self.assertEqual(self.client.get(self.list_url).data["data"], [])
         self.assertFailed(self.client.get(self.detail_url + f"?id={self.set_id}"))
@@ -289,7 +281,7 @@ class StudentProblemSetAPITest(ProblemSetTestBase):
         """배포 전에도 만든 교사는 내용을 확인할 수 있어야 한다"""
         resp = self.client.get(self.detail_url + f"?id={self.set_id}")
         self.assertSuccess(resp)
-        self.assertIsNone(resp.data["data"]["due_at"])
+        self.assertIsNone(resp.data["data"]["class_name"])
 
 
 class ProblemSetProgressTest(ProblemSetTestBase):

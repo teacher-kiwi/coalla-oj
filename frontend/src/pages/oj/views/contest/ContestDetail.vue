@@ -127,13 +127,8 @@ const isContestAdmin = computed(() => contestStore.isContestAdmin)
 const OIContestRealTimePermission = computed(() => contestStore.OIContestRealTimePermission)
 const passwordFormVisible = computed(() => contestStore.passwordFormVisible)
 
-const countdownType = computed(() => {
-  if (!contestStatusVal.value) return 'warning'
-  const color = CONTEST_STATUS_REVERSE[contestStatusVal.value]?.color
-  if (color === 'green') return 'success'
-  if (color === 'red') return 'danger'
-  return 'warning'
-})
+const countdownType = computed(() =>
+  CONTEST_STATUS_REVERSE[contestStatusVal.value]?.tag || 'warning')
 
 // 관리자 도우미는 /api/admin/* 이라 관리자만 쓸 수 있다. 학급 대회를 연 교사는
 // isContestAdmin 이지만 관리자 권한이 없어, 메뉴가 보이면 눌렀을 때 실패한다.

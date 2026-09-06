@@ -163,7 +163,7 @@ class ProblemSetListAPI(APIView):
     @login_required
     def get(self, request):
         assignments = (ProblemSetAssignment.objects
-                       .filter(school_class__memberships__student=request.user, is_open=True)
+                       .filter(school_class__memberships__student=request.user)
                        .select_related("problem_set", "school_class__school")
                        .prefetch_related("problem_set__items"))
         status_map = _solved_status_map(request.user)
@@ -177,8 +177,6 @@ class ProblemSetListAPI(APIView):
                 "description": assignment.problem_set.description,
                 "class_name": f"{assignment.school_class.school.name} "
                               f"{assignment.school_class.display_name}",
-                # 응답은 json.dumps 를 그대로 타므로(직렬화기 미사용) 문자열로 바꿔서 넘긴다
-                "due_at": assignment.due_at.isoformat() if assignment.due_at else None,
                 "problem_count": len(problem_ids),
                 "solved_count": sum(1 for pid in problem_ids if _is_solved(status_map, pid)),
             })
@@ -186,12 +184,7 @@ class ProblemSetListAPI(APIView):
 
 
 class ProblemSetDetailAPI(APIView):
-    """문제집 상세. 내 학급에 배포된 것만 열람할 수 있다.
-
-    마감일이 지나도 잠그지 않는다. 문제집에 담기는 것은 어차피 공개 문제라
-    제출을 막아도 문제 목록에서 그대로 풀 수 있고, 늦게라도 푸는 것을 막을 이유가 없다.
-    마감일은 화면 표시와 교사의 진도 확인용이다.
-    """
+    """문제집 상세. 내 학급에 배포된 것만 열람할 수 있다."""
     @login_required
     def get(self, request):
         problem_set_id = request.GET.get("id")
@@ -202,10 +195,10 @@ class ProblemSetDetailAPI(APIView):
             return self.error("문제집이 존재하지 않습니다")
 
         assignment = (ProblemSetAssignment.objects
-                      .filter(problem_set=problem_set, is_open=True,
+                      .filter(problem_set=problem_set,
                               school_class__memberships__student=request.user)
                       .select_related("school_class__school")
-                      .order_by("due_at").first())
+                      .order_by("assigned_at").first())
         # 교사 본인(과 최고관리자)은 배포 전에 내용을 확인할 수 있어야 한다
         if assignment is None and not (problem_set.created_by_id == request.user.id or
                                        request.user.is_super_admin()):
@@ -227,6 +220,5 @@ class ProblemSetDetailAPI(APIView):
             "description": problem_set.description,
             "class_name": (f"{assignment.school_class.school.name} "
                            f"{assignment.school_class.display_name}") if assignment else None,
-            "due_at": assignment.due_at.isoformat() if assignment and assignment.due_at else None,
             "problems": problems,
         })
