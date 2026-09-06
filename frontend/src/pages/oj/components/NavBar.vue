@@ -7,11 +7,12 @@
       :ellipsis="false"
       @select="handleRoute"
     >
-      <div class="logo"><span>{{ appStore.website.website_name }}</span></div>
-      <el-menu-item index="/">
-        <el-icon><HomeFilled /></el-icon>
-        홈
-      </el-menu-item>
+      <!-- 로고가 홈 버튼을 겸한다. 흔한 관례이고, 내비가 빠듯한 좁은 화면에서
+           메뉴 한 칸을 아낀다. el-menu 의 항목이 아니라 select 를 타지 않는다. -->
+      <div class="logo" role="link" tabindex="0"
+           @click="goHome" @keyup.enter="goHome">
+        <span>{{ appStore.website.website_name }}</span>
+      </div>
       <el-menu-item index="/problem">
         <el-icon><Grid /></el-icon>
         문제
@@ -125,6 +126,10 @@ function handleRoute (target) {
   }
 }
 
+function goHome () {
+  if (route.path !== '/') router.push('/')
+}
+
 function openLogin () {
   appStore.changeModalStatus({ visible: true })
 }
@@ -153,6 +158,27 @@ function openLogin () {
       margin-right: 2%;
       font-size: 20px;
       line-height: 60px;
+      // 메뉴 항목(.el-menu-item)은 nowrap 이라 줄이 바뀌지 않는데 로고는 그냥 div 라
+      // 그것이 없었다. 한글은 글자 사이에서 줄을 바꿀 수 있어, flex 가 로고의 최소 폭을
+      // "한 글자" 로 잡고 좁은 화면에서 이름을 세로로 세워버렸다.
+      white-space: nowrap;
+      cursor: pointer;
+      // 좁아지면 내비에서 로고가 먼저 양보한다. 로고를 고정하면 대신 오른쪽 끝의
+      // 로그인·사용자 메뉴가 화면 밖으로 밀려 눌러볼 수 없게 된다.
+      // (min-width 를 0 으로 풀어야 flex 항목이 글자 폭 아래로 줄어든다)
+      min-width: 0;
+      max-width: 30%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+      // 키보드로 이동할 때 어디에 있는지 보이게 한다
+      &:focus-visible {
+        outline: 2px solid #2d8cf0;
+        outline-offset: -2px;
+      }
     }
 
     .flex-spacer {

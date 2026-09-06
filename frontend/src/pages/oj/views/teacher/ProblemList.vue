@@ -5,6 +5,12 @@
       <el-button type="primary" :icon="Plus" @click="goCreate">문제 만들기</el-button>
     </template>
 
+    <el-alert v-if="problems.length" type="info" show-icon :closable="false"
+              class="panel-guide">
+      비공개 문제는 나와 내가 배포한 학급 학생만 볼 수 있습니다.
+      다른 선생님도 쓸 수 있게 하려면 공개를 신청하세요. 관리자 승인 후 공개됩니다.
+    </el-alert>
+
     <el-table v-loading="loading" :data="problems" class="full-width">
       <el-table-column label="번호" prop="display_id" width="90" />
       <el-table-column label="제목">
@@ -45,11 +51,6 @@
     <p v-if="!loading && !problems.length" class="empty">
       아직 만든 문제가 없습니다. "문제 만들기"로 시작하세요.<br />
       만든 문제는 비공개로 저장되고, 문제집에 담아 학급에 배포하면 학생이 풀 수 있습니다.
-    </p>
-
-    <p v-if="problems.length" class="guide">
-      비공개 문제는 나와 내가 배포한 학급 학생만 볼 수 있습니다.
-      다른 선생님도 쓸 수 있게 하려면 공개를 신청하세요. 관리자 승인 후 공개됩니다.
     </p>
   </Panel>
 </template>
@@ -142,12 +143,5 @@ onMounted(load)
   color: #909399;
   padding: 30px 0;
   line-height: 1.8;
-}
-
-.guide {
-  margin-top: 14px;
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.7;
 }
 </style>

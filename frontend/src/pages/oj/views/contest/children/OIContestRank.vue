@@ -47,7 +47,7 @@
       </el-table-column>
       <el-table-column v-for="prob in contestProblems" :key="prob.id" align="center">
         <template #header>
-          <a class="emphasis link-text"
+          <a class="link-text"
              @click="router.push({ name: 'contest-problem-details', params: { contestID, problemID: prob.display_id } })">
             {{ prob.display_id }}
           </a>
@@ -185,11 +185,6 @@ onMounted(() => {
   }
 
   .setting-icon {
-    cursor: pointer;
-  }
-
-  .link-text {
-    color: #57a3f3;
     cursor: pointer;
   }
 

@@ -15,7 +15,7 @@
           <li v-for="a in announcements" :key="a.title">
             <div class="flex-container">
               <div class="title">
-                <a class="entry" @click="goAnnouncement(a)">{{ a.title }}</a>
+                <a class="link-text" @click="goAnnouncement(a)">{{ a.title }}</a>
               </div>
               <div class="date">{{ localtime(a.create_time) }}</div>
               <div class="creator"> 작성자 {{ a.created_by.username }}</div>
@@ -108,6 +108,9 @@ onMounted(init)
   .announcements-container {
     margin-top: -10px;
     margin-bottom: 10px;
+    // 목록 기본값인 왼쪽 40px 을 지운다. li 에 list-style: none 을 주어 기호를
+    // 없앴으므로 그 자리는 빈 들여쓰기로만 남는다(들여쓰기는 li 가 정한다).
+    padding: 0;
     li {
       padding-top: 15px;
       list-style: none;
@@ -124,14 +127,6 @@ onMounted(init)
           flex: 1 1;
           text-align: left;
           padding-left: 10px;
-          a.entry {
-            color: #495060;
-            cursor: pointer;
-            &:hover {
-              color: #2d8cf0;
-              border-bottom: 1px solid #2d8cf0;
-            }
-          }
         }
         .creator {
           flex: none;

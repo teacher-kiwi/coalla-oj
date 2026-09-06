@@ -7,7 +7,7 @@ dayjs.extend(duration)
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 
-function utcToLocal (utcDt, format = 'YYYY-M-D  HH:mm:ss') {
+function utcToLocal (utcDt, format = 'YYYY-M-D HH:mm:ss') {
   return dayjs.utc(utcDt).local().format(format)
 }
 

@@ -3,9 +3,9 @@
     <template #title>ACM 도우미</template>
     <template #extra>
       <ul class="filter">
-        <li>
-          자동 새로고침 (10s)
-          <el-switch class="auto-refresh-switch" @change="handleAutoRefreshToggle" />
+        <li class="switch-filter">
+          <span class="switch-label">자동 새로고침 (10s)</span>
+          <el-switch @change="handleAutoRefreshToggle" />
         </li>
         <li>
           <el-button type="primary" @click="getACInfo">새로고침</el-button>
@@ -163,13 +163,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="less">
-  .auto-refresh-switch {
-    margin-left: 5px;
+  // 글자와 스위치는 높이가 달라 밑선으로 맞추면 어긋난다. 가운데로 맞춘다.
+  // (문제 목록·제출 목록의 걸러내기 줄과 같은 모양이다)
+  .switch-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  .link-text {
-    color: #57a3f3;
-    cursor: pointer;
+  .switch-label {
+    white-space: nowrap;
   }
 
   .truncate {

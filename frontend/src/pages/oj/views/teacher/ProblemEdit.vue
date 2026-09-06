@@ -1,5 +1,6 @@
 <template>
-  <Panel shadow>
+  <!-- 폼 화면이라 여백을 준다. 안의 테스트케이스 표도 입력칸이라 폼과 같이 들여쓴다. -->
+  <Panel shadow :padding="20">
     <template #title>{{ isEdit ? '문제 수정' : '문제 만들기' }}</template>
     <template #extra>
       <el-button @click="goList">목록</el-button>

@@ -5,7 +5,7 @@
       <el-button :disabled="!canQuery" @click="download">엑셀로 내려받기</el-button>
     </template>
 
-    <div class="selectors">
+    <div class="selectors panel-inset">
       <el-select v-model="classId" placeholder="학급 선택" class="selector" @change="load">
         <el-option v-for="item in classes" :key="item.id" :value="item.id"
                    :label="`${item.school_name} ${item.grade}학년 ${item.class_no}반`" />
@@ -15,7 +15,7 @@
       </el-select>
     </div>
 
-    <div v-if="board" class="legend">
+    <div v-if="board" class="legend panel-inset">
       <span><b>O</b> 해결</span>
       <span><b>△</b> 시도했지만 아직 못 풂 (괄호는 제출 횟수)</span>
       <span>빈칸 손대지 않음</span>
@@ -48,7 +48,7 @@
 
     <p v-if="board && !board.students.length" class="empty">이 학급에 학생 계정이 없습니다.</p>
 
-    <div v-if="board && board.students.length" class="totals">
+    <div v-if="board && board.students.length" class="totals panel-inset">
       <span v-for="(total, index) in board.totals" :key="index" class="total-item">
         <b>{{ board.problems[index].display_id }}</b>
         해결 {{ total.solved }}명 · 시도 {{ total.tried }}명

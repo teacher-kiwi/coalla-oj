@@ -14,13 +14,13 @@
       </el-table-column>
       <el-table-column label="문제 수" prop="problem_count" width="100" />
       <el-table-column label="배포 학급" prop="assignment_count" width="100" />
-      <el-table-column label="수정" width="180">
+      <el-table-column label="수정 일시" width="180">
         <template #default="{ row }">{{ localtime(row.last_update_time) }}</template>
       </el-table-column>
-      <el-table-column label="관리" width="260">
+      <el-table-column label="관리" width="220">
         <template #default="{ row }">
-          <el-button size="small" type="primary" @click="goDetail(row.id)">문제·배포 관리</el-button>
-          <el-button size="small" @click="openDialog(row)">이름 변경</el-button>
+          <el-button size="small" type="primary" @click="goDetail(row.id)">관리</el-button>
+          <el-button size="small" @click="openDialog(row)">수정</el-button>
           <el-button size="small" type="danger" @click="remove(row)">삭제</el-button>
         </template>
       </el-table-column>
@@ -30,7 +30,7 @@
       아직 만든 문제집이 없습니다. "문제집 만들기"로 시작한 뒤 문제를 담고 학급에 배포하세요.
     </p>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '문제집 이름 변경' : '문제집 만들기'"
+    <el-dialog v-model="dialogVisible" :title="form.id ? '문제집 수정' : '문제집 만들기'"
                width="460px" :close-on-click-modal="false">
       <el-form label-width="80px">
         <el-form-item label="제목" required>

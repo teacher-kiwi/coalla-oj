@@ -1,6 +1,6 @@
 <template>
   <el-row :gutter="18">
-    <el-col :span="19">
+    <el-col :span="19" class="list-column">
       <Panel shadow>
         <template #title>문제 목록</template>
         <template #extra>
@@ -21,11 +21,9 @@
                 </template>
               </el-dropdown>
             </li>
-            <li>
-              <el-switch v-model="tagsVisible">
-                <template #active-action><span class="switch-label">태그</span></template>
-                <template #inactive-action><span class="switch-label">태그</span></template>
-              </el-switch>
+            <li class="switch-filter">
+              <span class="switch-label">태그</span>
+              <el-switch v-model="tagsVisible" />
             </li>
             <li>
               <el-input v-model="query.keyword" placeholder="검색어" @keyup.enter="filterByKeyword">
@@ -88,7 +86,7 @@
 
     <el-col :span="5">
       <Panel :padding="10">
-        <template #title><div class="taglist-title">태그</div></template>
+        <template #title>태그</template>
         <div v-loading="loadings.tag">
           <el-button v-for="tag in tagList" :key="tag.name" @click="filterByTag(tag.name)"
                      :disabled="query.tag === tag.name" round class="tag-btn">
@@ -96,7 +94,7 @@
           </el-button>
           <el-button id="pick-one" @click="pickone">
             <el-icon><Switch /></el-icon>
-            선택
+            랜덤 문제
           </el-button>
         </div>
       </Panel>
@@ -227,9 +225,12 @@ watch(() => [userStore.profileReady, userStore.user.id], ([ready]) => {
 </script>
 
 <style scoped lang="less">
-  .taglist-title {
-    margin-left: -10px;
-    margin-bottom: -10px;
+  // 표의 최소 폭(고정 컬럼 530px + 나머지)이 이 칸보다 넓어지면, min-width 가 auto 인
+  // 탓에 칸이 표에 맞춰 벌어지고 옆의 태그 칸이 아래로 밀려난다. 0 으로 풀면 칸은
+  // 제 몫만 쓰고 표가 자기 안에서 가로 스크롤을 만든다.
+  // (submission/SubmissionList.vue 에 같은 설명이 있다)
+  .list-column {
+    min-width: 0;
   }
 
   .tag-btn {
@@ -243,8 +244,18 @@ watch(() => [userStore.profileReady, userStore.user.id], ([ready]) => {
     width: 100%;
   }
 
+  // 스위치 옆에 두는 이름. 예전에는 el-switch 의 action 슬롯에 넣었는데,
+  // 그 자리는 지름 16px 짜리 동그란 손잡이 안이라 한글이 줄바꿈되며 튀어나왔다.
+  .switch-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .switch-label {
-    font-size: 11px;
+    font-size: 13px;
+    color: #606266;
+    white-space: nowrap;
   }
 
   .problem-table {

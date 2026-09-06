@@ -143,10 +143,6 @@ onMounted(() => {
     width: 95%;
     height: 400px;
   }
-  .link-text {
-    color: #57a3f3;
-    cursor: pointer;
-  }
   .truncate {
     display: inline-block;
     max-width: 200px;

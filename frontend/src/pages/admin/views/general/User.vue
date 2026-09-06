@@ -320,7 +320,10 @@ watch(uploadUsersCurrentPage, (page) => {
   .help-icon { margin-left: 4px; }
 
 .cleanup-list {
-  margin: 8px 0 8px 18px;
+  // 들여쓰기는 padding 으로 적는다. margin 으로만 주면 목록 기본값인
+  // 왼쪽 padding 40px 이 그 아래 그대로 깔려 실제로는 58px 이 된다.
+  margin: 8px 0;
+  padding-left: 18px;
   line-height: 1.7;
 }
 </style>

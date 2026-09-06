@@ -4,10 +4,11 @@
       <template #title>{{ info.title || '문제집' }}</template>
       <template #extra>
         <el-button @click="goList">목록</el-button>
+        <el-button @click="openEditDialog">수정</el-button>
         <el-button type="primary" :icon="Plus" @click="openProblemDialog">문제 추가</el-button>
       </template>
 
-      <p v-if="info.description" class="description">{{ info.description }}</p>
+      <Markdown v-if="info.description" class="description panel-inset" :source="info.description" />
 
       <el-table v-loading="loading" :data="info.items" class="full-width">
         <el-table-column label="순서" width="70">
@@ -58,7 +59,7 @@
         담긴 문제가 없습니다. "문제 추가"로 문제를 골라 담으세요.
       </p>
 
-      <p v-if="hasBlocked" class="notice">
+      <p v-if="hasBlocked" class="notice panel-inset">
         <b>풀 수 없음</b> 으로 표시된 문제는 관리자가 감춘 것입니다. 학생 화면에도
         "지금 풀 수 없습니다" 로 나옵니다. 문제집에서 빼거나, 내가 만든 문제라면
         고쳐서 다시 공개를 신청하세요.
@@ -94,6 +95,23 @@
         아직 배포한 학급이 없습니다. 배포해야 학생 화면에 나타납니다.
       </p>
     </Panel>
+
+    <el-dialog v-model="editDialogVisible" title="문제집 수정" width="460px"
+               :close-on-click-modal="false">
+      <el-form label-width="80px">
+        <el-form-item label="제목" required>
+          <el-input v-model="editForm.title" maxlength="128" placeholder="예: 3주차 반복문" />
+        </el-form-item>
+        <el-form-item label="설명">
+          <el-input v-model="editForm.description" type="textarea" :rows="3" maxlength="1024"
+                    placeholder="학생에게 보이는 안내입니다" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">취소</el-button>
+        <el-button type="primary" :loading="saving" @click="submitEdit">저장</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="problemDialogVisible" title="문제 추가" width="720px"
                :close-on-click-modal="false">
@@ -156,6 +174,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -173,6 +192,9 @@ const saving = ref(false)
 const info = ref({ items: [], assignments: [] })
 const hasBlocked = computed(() => info.value.items.some(i => !i.problem_visible))
 
+const editDialogVisible = ref(false)
+const editForm = reactive({ title: '', description: '' })
+
 const problemDialogVisible = ref(false)
 const searching = ref(false)
 const keyword = ref('')
@@ -187,6 +209,32 @@ const assignForm = reactive({ school_class: null, due_at: null })
 
 function localtime (val) {
   return time.utcToLocal(val)
+}
+
+// 목록 화면의 "수정" 과 같은 칸을 쓴다(제목과 설명).
+function openEditDialog () {
+  editForm.title = info.value.title || ''
+  editForm.description = info.value.description || ''
+  editDialogVisible.value = true
+}
+
+function submitEdit () {
+  if (!editForm.title.trim()) {
+    ElMessage.error('제목을 입력하세요')
+    return
+  }
+  saving.value = true
+  api.editProblemSet({
+    id: setId,
+    title: editForm.title.trim(),
+    description: editForm.description
+  }).then(() => {
+    saving.value = false
+    editDialogVisible.value = false
+    load()
+  }, () => {
+    saving.value = false
+  })
 }
 
 function load () {
@@ -333,11 +381,10 @@ onMounted(load)
   line-height: 1.7;
 }
 
+/* 교사가 적은 안내. 마크다운으로 그린다(학생 화면과 같은 렌더러).
+   색·줄간격·줄바꿈은 마크다운 쪽이 정하므로 여기서는 간격만 잡는다. */
 .description {
-  color: #606266;
-  line-height: 1.7;
   margin-bottom: 12px;
-  white-space: pre-wrap;
 }
 
 .picker-guide {

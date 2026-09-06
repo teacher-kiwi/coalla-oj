@@ -67,7 +67,7 @@
                    :alt="contest.is_class_contest ? '학급 대회' : '공개 대회'" />
               <el-col :span="18" class="contest-main">
                 <p class="title">
-                  <a class="entry" @click.stop="goContest(contest)">{{ contest.title }}</a>
+                  <a class="link-text" @click.stop="goContest(contest)">{{ contest.title }}</a>
                   <el-tag v-if="contest.is_class_contest" type="success" size="small"
                           effect="plain" class="kind">학급</el-tag>
                   <template v-if="contest.contest_type !== 'Public'">
@@ -234,6 +234,10 @@ watch(() => route.fullPath, (newVal, oldVal) => {
       padding: 20px;
     }
     #contest-list {
+      // 목록 기본값(번호 자리 40px, 위아래 1em)을 지운다. li 에 list-style: none 을
+      // 주어 번호를 없앴으므로 그 자리는 빈 들여쓰기로만 남는다.
+      margin: 0;
+      padding: 0;
       > li {
         padding: 20px;
         border-bottom: 1px solid rgba(187, 187, 187, 0.5);
@@ -245,15 +249,13 @@ watch(() => route.fullPath, (newVal, oldVal) => {
           margin-right: -20px;
         }
         .contest-main {
+          // 안쪽 목록도 마찬가지다. li 가 inline-block 이라 기호가 그려지지 않는다.
+          .detail {
+            margin: 0;
+            padding: 0;
+          }
           .title {
             font-size: 18px;
-            a.entry {
-              color: #495060;
-              &:hover {
-                color: #2d8cf0;
-                border-bottom: 1px solid #2d8cf0;
-              }
-            }
           }
           li {
             display: inline-block;

@@ -35,8 +35,12 @@
       <VChart ref="chart" :option="options" :loading="chartLoading" autoresize />
     </div>
 
-    <el-table :key="contestProblems.length"
-              :data="dataRank" height="600" stripe :cell-class-name="cellClassName">
+    <!-- 전자칠판이나 대형 모니터에 띄우는 화면이다. 높이를 고정하면 큰 화면에서
+         아래가 비고 작은 화면에서는 표가 잘린다. 남는 만큼 쓰게 한다.
+         max-height 라 참가자가 적으면 그만큼만 차지하고, 많으면 머리글을 고정한 채 스크롤한다.
+         (CSS 가 아니라 prop 으로 줘야 머리글 고정이 동작한다) -->
+    <el-table :key="contestProblems.length" :max-height="tableMaxHeight"
+              :data="dataRank" stripe :cell-class-name="cellClassName">
       <el-table-column align="center" width="50">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
@@ -60,7 +64,7 @@
                        :column-key="String(prob.id)"
                        :width="contestProblems.length > 15 ? 80 : undefined">
         <template #header>
-          <a class="emphasis link-text"
+          <a class="link-text"
              @click="router.push({ name: 'contest-problem-details', params: { contestID, problemID: prob.display_id } })">
             {{ prob.display_id }}
           </a>
@@ -81,7 +85,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import UserLabel from '@oj/components/UserLabel.vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -102,6 +106,11 @@ const {
   showChart, showMenu, forceUpdate, limit, refreshDisabled,
   chartLoading, getContestRankData, handleAutoRefresh, getContestProblems
 } = useContestRank()
+
+// 순위표 위에 놓이는 것들(내비·제목·차트)을 뺀 나머지를 표가 쓴다.
+// max() 로 바닥을 두는 이유: 화면이 낮은데 차트까지 켜면 표가 몇 줄도 안 남는다.
+const tableMaxHeight = computed(() =>
+  showChart.value ? 'max(240px, calc(100vh - 700px))' : 'max(320px, calc(100vh - 260px))')
 
 const total = ref(0)
 const page = ref(1)
@@ -231,11 +240,6 @@ onMounted(() => {
   }
 
   .setting-icon {
-    cursor: pointer;
-  }
-
-  .link-text {
-    color: #57a3f3;
     cursor: pointer;
   }
 

@@ -206,9 +206,16 @@ onBeforeUnmount(() => {
   .flex-container {
     #contest-main {
       flex: 1 1;
-      width: 0;
+      // flex 항목의 기본 min-width 는 auto 라 "내용의 최소 폭" 아래로 줄지 않는다.
+      // 안에 표(대회 정보·순위)와 마크다운이 들어와 그 최소 폭이 커지면, 창을 줄여도
+      // 이 칸이 버티며 카드까지 함께 화면을 넘긴다.
+      // width: 0 은 이것을 막지 못한다. flex-basis 는 이미 0 이고 min-width 가 따로
+      // 걸리기 때문이다. 풀어야 하는 것은 min-width 다.
+      // (submission/SubmissionList.vue 에 같은 설명이 있다)
+      min-width: 0;
       #contest-desc {
         flex: auto;
+        min-width: 0;
       }
     }
     #contest-menu {

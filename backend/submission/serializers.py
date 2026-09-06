@@ -46,7 +46,10 @@ class SubmissionSafeModelSerializer(_AuthorMixin, serializers.ModelSerializer):
 
 
 class SubmissionListSerializer(_AuthorMixin, serializers.ModelSerializer):
+    # problem 은 화면에 보이는 번호(대회 안에서는 A, B, C)다. 주소를 만드는 데 쓴다.
+    # 목록에는 번호 대신 제목을 보여주므로 제목도 함께 싣는다.
     problem = serializers.SlugRelatedField(read_only=True, slug_field="display_id")
+    problem_title = serializers.CharField(source="problem.title", read_only=True)
     show_link = serializers.SerializerMethodField()
     username = serializers.SerializerMethodField()
     nickname = serializers.SerializerMethodField()
@@ -64,7 +67,7 @@ class SubmissionListSerializer(_AuthorMixin, serializers.ModelSerializer):
     class Meta:
         model = Submission
         # 필요한 것만 싣는다. exclude 로 두면 모델에 필드가 늘 때마다 따라 나간다.
-        fields = ("id", "problem", "create_time", "result", "language",
+        fields = ("id", "problem", "problem_title", "create_time", "result", "language",
                   "statistic_info", "username", "nickname", "show_link")
 
     def get_show_link(self, obj):

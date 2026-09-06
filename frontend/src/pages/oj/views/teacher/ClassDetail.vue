@@ -9,7 +9,7 @@
       <el-button type="primary" :icon="Plus" @click="dialogVisible = true">학생 계정 만들기</el-button>
     </template>
 
-    <el-alert v-if="issued.length" type="success" show-icon :closable="false" class="issued">
+    <el-alert v-if="issued.length" type="success" show-icon :closable="false" class="issued panel-inset">
       <p>학생 계정 {{ issued.length }}개를 만들었습니다. <b>비밀번호는 지금만 확인할 수 있습니다.</b></p>
       <el-button type="primary" size="small" @click="downloadSheet">엑셀로 내려받기</el-button>
       <el-table :data="issued" size="small" class="issued-table">

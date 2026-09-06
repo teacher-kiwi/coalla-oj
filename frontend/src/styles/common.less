@@ -44,10 +44,45 @@ body {
   position: relative;
 }
 
-a.emphasis{
-  color: #495060;
+// href 가 없는 a 는 브라우저가 링크로 보지 않아(a:any-link 에 걸리지 않는다)
+// 손가락 커서가 붙지 않고 글자 선택 커서(I)가 나온다. 이 앱에서는 라우터로
+// 이동시키려고 href 없이 클릭만 붙인 a 가 여럿이라 커서를 직접 준다.
+a:not([href]) {
+  cursor: pointer;
+}
+
+// 화면이 어떻게 굴러가는지 알려주는 안내. el-alert(type="info") 로 띄워
+// "읽을 것" 임을 눈에 보이게 한다. 작은 회색 글씨는 지나치기 쉽다.
+// 표는 카드 끝까지 차므로 안내 상자만 좌우를 띄워 제목과 줄을 맞춘다.
+// (입력칸이나 대화상자에 딸린 짧은 힌트는 이것이 아니라 작은 글씨 그대로 둔다.
+//  바로 위 요소에 붙는 설명이라 상자로 만들면 화면이 시끄러워진다)
+.panel-guide {
+  // el-alert 에는 width: 100% 가 박혀 있어, margin 만 주면 그만큼 부모를 넘어간다
+  // (box-sizing 은 padding 만 안으로 넣지 margin 은 넣지 않는다). auto 로 풀면
+  // 블록 요소가 남는 폭을 쓰므로 좌우 여백이 제대로 먹는다.
+  width: auto;
+  margin: 0 20px 14px;
+}
+
+// 표와 다른 것이 한 판에 같이 있을 때 쓴다.
+// 표는 카드 끝까지 차는 것이 자연스럽고(행 구분선이 좌우에 닿는다), 설명·안내·
+// 선택 상자는 안으로 들어와야 제목과 줄이 맞는다. Panel 의 padding 을 올리면
+// 표까지 함께 들어가므로, 표가 아닌 것에만 이 클래스를 준다.
+// 값은 el-card 의 기본 여백(20px)과 같다.
+.panel-inset {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+// 눌러서 어딘가로 가는 글자. 화면마다 따로 칠하지 말고 이것만 쓴다.
+// 색은 Element Plus 의 링크 버튼(el-button link type="primary")과 같은 변수를
+// 써서, 표 안의 링크 버튼과 글자 링크가 같은 파랑·같은 hover 로 보이게 한다.
+// (span 에도 붙이므로 cursor 를 여기서 준다)
+.link-text {
+  color: var(--el-color-primary);
+  cursor: pointer;
   &:hover {
-    color: #2d8cf0;
+    color: var(--el-color-primary-light-5);
   }
 }
 

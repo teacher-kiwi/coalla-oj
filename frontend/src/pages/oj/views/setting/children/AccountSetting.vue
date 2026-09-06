@@ -190,7 +190,9 @@ async function confirmDelete (credential) {
   }
 
   .delete-list {
-    margin: 8px 0 0 16px;
+    // 들여쓰기는 padding 으로 적는다(admin User.vue 의 .cleanup-list 와 같은 이유)
+    margin: 8px 0 0;
+    padding-left: 16px;
     line-height: 1.8;
   }
 

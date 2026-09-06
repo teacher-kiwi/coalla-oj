@@ -507,6 +507,10 @@ watch(() => route.fullPath, () => {
   #problem-main {
     flex: auto;
     margin-right: 18px;
+    // 긴 코드 블록이나 넓은 표가 본문에 들어오면 이 칸의 최소 폭이 그만큼 커진다.
+    // 풀어두지 않으면 창을 줄여도 칸이 버티고 화면 전체에 가로 스크롤이 생긴다.
+    // (submission/SubmissionList.vue 에 같은 설명이 있다)
+    min-width: 0;
   }
   #right-column {
     flex: none;

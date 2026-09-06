@@ -1,12 +1,15 @@
 <template>
   <div>
-    <Panel shadow>
+    <!-- 이 판은 표가 아니라 대회 정보와 안내만 담는다. 아래 판들은 표라 여백이 없다. -->
+    <Panel shadow :padding="20">
       <template #title>{{ contest.title || '대회' }}</template>
       <template #extra>
         <el-button @click="goList">목록</el-button>
         <el-button :icon="Edit" @click="openEdit">수정</el-button>
         <el-button type="primary" @click="goRank">순위 보기</el-button>
       </template>
+
+      <Markdown v-if="contest.description" class="description" :source="contest.description" />
 
       <el-descriptions :column="3" border size="small">
         <el-descriptions-item label="상태">
@@ -77,7 +80,7 @@
 
       <el-table v-loading="loading.announcements" :data="announcements" class="full-width">
         <el-table-column label="제목" prop="title" />
-        <el-table-column label="올린 때" width="180">
+        <el-table-column label="작성 일시" width="180">
           <template #default="{ row }">{{ localtime(row.create_time) }}</template>
         </el-table-column>
         <el-table-column label="관리" width="160">
@@ -162,6 +165,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Plus } from '@element-plus/icons-vue'
@@ -390,6 +394,14 @@ onMounted(() => {
 
 .locked {
   margin-top: 14px;
+}
+
+/* 교사가 대회를 만들 때 적은 안내. 학생도 같은 글을 본다.
+   (teacher/ProblemSetDetail.vue 의 문제집 안내와 같은 모양이다) */
+/* 교사가 적은 안내. 마크다운으로 그린다(학생 화면과 같은 렌더러).
+   색·줄간격·줄바꿈은 마크다운 쪽이 정하므로 여기서는 간격만 잡는다. */
+.description {
+  margin-bottom: 12px;
 }
 
 .guide {

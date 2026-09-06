@@ -66,18 +66,13 @@ watch(() => route.fullPath, updateTitle)
     }
   }
 
-  @media screen and (max-width: 1200px) {
-    .content-app {
-      margin-top: 160px;
-      padding: 0 2%;
-    }
-  }
-
-  @media screen and (min-width: 1200px) {
-    .content-app {
-      margin-top: 80px;
-      padding: 0 2%;
-    }
+  // 내비게이션은 화면에 고정되어 있고 높이가 60px 로 일정하다
+  // (el-menu 의 가로 모드는 줄바꿈하지 않는다). 그만큼 본문을 내린다.
+  // 예전에는 좁은 화면에서 내비가 두 줄이 된다고 보고 160px 를 줬는데,
+  // 두 줄이 되지 않아 1200px 아래에서 100px 가 그냥 비어 있었다.
+  .content-app {
+    margin-top: 80px;
+    padding: 0 2%;
   }
 
   .footer {

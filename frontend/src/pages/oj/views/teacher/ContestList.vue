@@ -5,15 +5,16 @@
       <el-button type="primary" :icon="Plus" @click="openDialog()">대회 열기</el-button>
     </template>
 
-    <p class="guide">
+    <el-alert type="info" show-icon :closable="false" class="panel-guide">
       배포한 학급의 학생만 대회에 들어갈 수 있습니다. 진행 중에는 순위가 실시간으로
       바뀌며, 순위 화면을 전체화면으로 띄우면 칠판에 그대로 쓸 수 있습니다.
-    </p>
+    </el-alert>
 
     <el-table v-loading="loading" :data="contests" class="full-width">
       <el-table-column label="제목">
         <template #default="{ row }">
-          <el-button link type="primary" @click="goDetail(row.id)">{{ row.title }}</el-button>
+          <!-- 제목은 학생이 보는 대회 화면으로 간다. 관리 화면은 오른쪽 "관리" 로 간다. -->
+          <el-button link type="primary" @click="goContest(row.id)">{{ row.title }}</el-button>
           <div v-if="row.description" class="description">{{ row.description }}</div>
         </template>
       </el-table-column>
@@ -106,6 +107,11 @@ function goDetail (id) {
   router.push({ name: 'teacher-contest-detail', params: { contestId: id } })
 }
 
+// 학생이 보는 것과 같은 대회 화면
+function goContest (id) {
+  router.push({ name: 'contest-details', params: { contestID: id } })
+}
+
 function goRank (id) {
   router.push({ name: 'contest-rank', params: { contestID: id } })
 }
@@ -168,13 +174,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.guide {
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.7;
-  margin-bottom: 14px;
-}
-
 .description {
   font-size: 12px;
   color: #909399;

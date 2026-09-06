@@ -5,8 +5,8 @@
       <el-button @click="goList">목록</el-button>
     </template>
 
-    <p v-if="info.description" class="description">{{ info.description }}</p>
-    <p class="meta">
+    <Markdown v-if="info.description" class="description panel-inset" :source="info.description" />
+    <p class="meta panel-inset">
       <span v-if="info.class_name">{{ info.class_name }}</span>
       <span v-if="info.due_at" :class="{ overdue: isOverdue }">
         마감 {{ localtime(info.due_at) }}
@@ -43,7 +43,7 @@
       아직 문제가 담기지 않은 문제집입니다.
     </p>
 
-    <p v-if="hasUnavailable" class="notice">
+    <p v-if="hasUnavailable" class="notice panel-inset">
       "지금 풀 수 없습니다" 로 표시된 문제는 선생님께 문의해주세요.
     </p>
   </Panel>
@@ -51,6 +51,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import Markdown from '@oj/components/Markdown.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import api from '@oj/api'
@@ -110,10 +111,10 @@ onMounted(() => {
   width: 100%;
 }
 
+/* 교사가 적은 안내. 마크다운으로 그린다(학생 화면과 같은 렌더러).
+   색·줄간격·줄바꿈은 마크다운 쪽이 정하므로 여기서는 간격만 잡는다. */
 .description {
-  color: #606266;
-  line-height: 1.7;
-  white-space: pre-wrap;
+  margin-bottom: 12px;
 }
 
 .meta {

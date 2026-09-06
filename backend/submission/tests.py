@@ -58,6 +58,14 @@ class SubmissionListTest(SubmissionPrepare):
         resp = self.client.get(self.url, data={"limit": "10"})
         self.assertSuccess(resp)
 
+    def test_list_carries_both_the_number_and_the_title(self):
+        """목록에는 제목을 보여주고, 번호는 문제로 이동할 때 쓴다."""
+        resp = self.client.get(self.url, data={"limit": "10"})
+        self.assertSuccess(resp)
+        row = resp.data["data"]["results"][0]
+        self.assertEqual(row["problem"], self.problem.display_id)
+        self.assertEqual(row["problem_title"], self.problem.title)
+
     def test_filter_by_problem_number(self):
         """주소에 들어오는 문제 번호는 pk 다."""
         resp = self.client.get(self.url, data={"limit": "10", "problem_id": self.problem.id})
