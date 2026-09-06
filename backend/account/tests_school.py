@@ -121,12 +121,13 @@ class SchoolClassOrderAPITest(SchoolClassTestBase):
                                           data={"classes": [mine, self.first]}))
         self.assertEqual(SchoolClass.objects.get(id=self.first).order, 1)
 
-    def test_archived_class_is_not_counted(self):
-        """종료한 학급은 목록에 없으므로 함께 보내지 않는다"""
+    def test_archived_class_is_reordered_too(self):
+        """비활성 학급도 목록에 함께 보이므로 순서 대상에 들어간다"""
         self.client.put(self.class_url, data={"id": self.second, "is_archived": True})
-        self.assertSuccess(self.client.put(self.class_order_url,
-                                           data={"classes": [self.third, self.first]}))
-        self.assertEqual(self._ids(), [self.third, self.first])
+        wanted = [self.third, self.second, self.first]
+        self.assertSuccess(self.client.put(self.class_order_url, data={"classes": wanted}))
+        got = [c["id"] for c in self.client.get(self.class_url + "?archived=true").data["data"]]
+        self.assertEqual(got, wanted)
 
 
 class StudentAccountAPITest(SchoolClassTestBase):
@@ -294,6 +295,32 @@ class StudentLoginAPITest(SchoolClassTestBase):
             "school_class": self.class_id, "number": 1, "password": self.pin})
         self.assertSuccess(resp)
         self.assertTrue(auth.get_user(self.client).is_authenticated)
+
+    def test_archived_class_cannot_log_in(self):
+        """학급 고르기에서 감추는 것만으로는 부족하다. 학급 id 를 알면 바로 부를 수 있다."""
+        self.client.login(username=self.teacher.username, password="teacher")
+        self.client.put(self.class_url, data={"id": self.class_id, "is_archived": True})
+        self.client.logout()
+
+        resp = self.client.post(self.login_url, data={
+            "school_class": self.class_id, "number": 1, "password": self.pin})
+        self.assertFailed(resp, "지금은 로그인할 수 없는 학급입니다. 선생님께 문의하세요")
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+
+    def test_archived_class_login_does_not_count_as_failure(self):
+        """비밀번호 오류로 흘려보내면 잠기고, 되살린 뒤에도 못 들어간다"""
+        self.client.login(username=self.teacher.username, password="teacher")
+        self.client.put(self.class_url, data={"id": self.class_id, "is_archived": True})
+        self.client.logout()
+        for _ in range(MAX_FAILURES + 1):
+            self.client.post(self.login_url, data={
+                "school_class": self.class_id, "number": 1, "password": self.pin})
+
+        self.client.login(username=self.teacher.username, password="teacher")
+        self.client.put(self.class_url, data={"id": self.class_id, "is_archived": False})
+        self.client.logout()
+        self.assertSuccess(self.client.post(self.login_url, data={
+            "school_class": self.class_id, "number": 1, "password": self.pin}))
 
     def test_wrong_password(self):
         wrong = "0000" if self.pin != "0000" else "1111"

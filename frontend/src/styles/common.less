@@ -55,6 +55,14 @@ body {
   vertical-align: -0.125em;
 }
 
+// 확인 대화상자(ElMessageBox)의 본문. 메시지는 글자로 그려지므로 문자열의 \n 이
+// HTML 규칙대로 접혀 한 덩어리가 된다. dangerouslyUseHTMLString 으로 <br> 을 쓰면
+// 되지만, 이 앱의 메시지에는 학급 이름·문제 제목·학생 닉네임이 그대로 끼어들어
+// 삽입 통로가 된다. 글자로 두고 개행만 살린다.
+.el-message-box__message p {
+  white-space: pre-line;
+}
+
 // 아이콘과 글자를 한 줄에 나란히 둘 때. 기준선과 글꼴 치수에 기대지 않고
 // 상자 가운데끼리 맞춰서, 아이콘 크기가 달라져도 흔들리지 않는다.
 .icon-label {

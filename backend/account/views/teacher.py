@@ -121,9 +121,16 @@ class SchoolClassAPI(APIView):
 
     @teacher_required
     def delete(self, request):
-        """학급과 소속 학생 계정을 함께 삭제한다(학년 종료 처리).
+        """학급과 소속 학생 계정을 함께 삭제한다.
 
-        제출 기록도 CASCADE 로 사라진다. 문제 통계는 누적값이므로 재계산하지 않는다.
+        한 해가 끝나 학생의 기록을 남기지 않으려 할 때 쓴다. 잠시 막아두려는
+        것이면 is_archived 로 끄면 된다(기록이 남고 다시 켤 수 있다).
+
+        제출 기록, 즐겨찾기, 대회 순위가 CASCADE 로 함께 사라진다.
+        문제의 정답률(submission_number/accepted_number)은 일부러 다시 세지 않는다.
+        "지금까지 몇 명이 도전해 몇 번 맞혔나" 는 학생이 떠난 뒤에도 남아야 하는
+        값이라서다. 다만 그 문제에 재채점이 일어나면 살아 있는 제출만으로 다시
+        세므로 지워진 몫이 그때 사라진다(judge/recompute.py). 아직 못 맞춘 부분이다.
         """
         class_id = request.GET.get("id")
         if not class_id:
@@ -152,9 +159,9 @@ class SchoolClassOrderAPI(APIView):
     @validate_serializer(SchoolClassOrderSerializer)
     @teacher_required
     def put(self, request):
-        # 화면이 보여주는 것과 같은 범위(내 학급, 종료하지 않은 것)를 견준다.
-        owned = SchoolClass.objects.filter(teacher=request.user, is_archived=False)
-        classes = {c.id: c for c in owned}
+        # 화면이 보여주는 것과 같은 범위(내 학급 전부)를 견준다.
+        # 학급 목록은 비활성 학급도 함께 보여주고 거기서 순서를 바꾼다.
+        classes = {c.id: c for c in SchoolClass.objects.filter(teacher=request.user)}
         if set(request.data["classes"]) != set(classes.keys()):
             return self.error("학급 목록이 바뀌었습니다. 새로고침 후 다시 시도하세요")
 

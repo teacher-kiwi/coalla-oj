@@ -58,6 +58,13 @@ class StudentLoginAPI(APIView):
             return self.error(f"로그인 시도가 많아 잠겼습니다. {minutes}분 후 다시 시도하거나 "
                               f"선생님께 초기화를 요청하세요")
 
+        # 비활성으로 돌린 학급은 학급 고르기에도 나오지 않지만, 학급 id 만 알면
+        # 이 API 를 바로 부를 수 있어 여기서 한 번 더 막는다.
+        # 비밀번호 오류로 흘려보내면 실패 횟수가 쌓여 잠기고, 학생은 이유도 모른다.
+        school_class = SchoolClass.objects.filter(id=class_id).first()
+        if school_class is None or school_class.is_archived:
+            return self.error("지금은 로그인할 수 없는 학급입니다. 선생님께 문의하세요")
+
         membership = ClassMembership.objects.select_related("student", "school_class") \
             .filter(school_class_id=class_id, number=number).first()
 

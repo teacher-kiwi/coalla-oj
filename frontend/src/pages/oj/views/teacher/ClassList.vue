@@ -5,21 +5,33 @@
       <el-button type="primary" :icon="Plus" @click="openDialog">학급 만들기</el-button>
     </template>
 
-    <el-table v-loading="loading" :data="classes" class="full-width">
+    <el-alert type="info" show-icon :closable="false" class="panel-guide">
+      비활성으로 두면 학생이 로그인할 수 없지만
+      기록은 그대로 남아 다시 켜면 되돌아옵니다. 학급을 삭제하면 학생 계정과 제출 기록이
+      모두 사라지며 되돌릴 수 없습니다.
+    </el-alert>
+
+    <el-table v-loading="loading" :data="classes" class="full-width"
+              :row-class-name="({ row }) => (row.is_archived ? 'archived-row' : '')">
       <el-table-column label="학교" prop="school_name" />
       <el-table-column label="학급">
         <template #default="{ row }">{{ row.grade }}학년 {{ row.class_no }}반</template>
       </el-table-column>
       <el-table-column label="학년도" prop="year" width="100" />
       <el-table-column label="학생 수" prop="student_count" width="100" />
-      <el-table-column label="관리" width="360">
+      <el-table-column label="활성" width="80">
+        <template #default="{ row }">
+          <el-switch :model-value="!row.is_archived" @change="setActive(row, $event)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="관리" width="330">
         <template #default="{ row, $index }">
           <!-- 여기서 정한 차례가 대회·문제집의 배포 학급 표에도 그대로 쓰인다 -->
           <el-button size="small" :disabled="$index === 0" @click="move($index, -1)">위로</el-button>
           <el-button size="small" :disabled="$index === classes.length - 1"
                      @click="move($index, 1)">아래로</el-button>
           <el-button size="small" type="primary" @click="goDetail(row.id)">학생 관리</el-button>
-          <el-button size="small" @click="archive(row)">학년 종료</el-button>
+          <el-button size="small" type="danger" @click="remove(row)">삭제</el-button>
         </template>
       </el-table-column>
       <template #empty>
@@ -103,7 +115,8 @@ function move (index, delta) {
 
 function load () {
   loading.value = true
-  api.getMyClasses().then(res => {
+  // 비활성 학급도 함께 받는다. 이 화면에서 다시 켤 수 있어야 한다.
+  api.getMyClasses(true).then(res => {
     loading.value = false
     classes.value = res.data.data
   }, () => {
@@ -197,14 +210,23 @@ function goDetail (id) {
   router.push({ name: 'teacher-class-detail', params: { classId: id } })
 }
 
-function archive (row) {
+// 켜고 끄는 것뿐이라 따로 묻지 않는다. 언제든 되돌릴 수 있다.
+function setActive (row, active) {
+  api.editClass({ id: row.id, is_archived: !active }).then(() => {
+    ElMessage.success(active ? '학급을 활성화했습니다.' : '학급을 비활성화했습니다.')
+    load()
+  }, load)   // 실패하면 스위치가 눌린 채 남지 않도록 서버 상태를 다시 읽는다
+}
+
+function remove (row) {
   ElMessageBox.confirm(
-    `${row.school_name} ${row.grade}학년 ${row.class_no}반을 학년 종료 처리합니다.\n` +
-    '목록에서 숨겨지며 학생은 로그인할 수 없게 됩니다. 계정과 기록은 남습니다.',
-    '학년 종료', { confirmButtonText: '종료', cancelButtonText: '취소', type: 'warning' }
+    `${row.school_name} ${row.grade}학년 ${row.class_no}반을 삭제합니다.\n` +
+    `학생 계정 ${row.student_count}개와 모든 기록이 삭제됩니다. 되돌릴 수 없습니다.\n` +
+    '데이터는 남기고 잠시 막아두려면 "활성"을 끄세요.',
+    '학급 삭제', { confirmButtonText: '삭제', cancelButtonText: '취소', type: 'warning' }
   ).then(() => {
-    api.editClass({ id: row.id, is_archived: true }).then(() => {
-      ElMessage.success('학년 종료 처리했습니다')
+    api.deleteClass(row.id).then(res => {
+      ElMessage.success(`학급을 삭제했습니다 (학생 계정 ${res.data.data.deleted_students}개)`)
       load()
     }).catch(() => {})
   }).catch(() => {})
@@ -218,6 +240,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 꺼 둔 학급. 지운 것이 아니라 잠시 막아둔 것이라 흐리게만 보인다. */
+:deep(.archived-row) {
+  color: #a8abb2;
+}
+
 .full-width {
   width: 100%;
 }
