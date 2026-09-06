@@ -57,6 +57,9 @@ export default {
   searchSchool (keyword) {
     return ajax('teacher/school', 'get', { params: { keyword, paging: true, offset: 0, limit: 20 } })
   },
+  reorderMyClasses (classes) {
+    return ajax('teacher/class/order', 'put', { data: { classes } })
+  },
   getMyClasses (archived = false) {
     return ajax('teacher/class', 'get', { params: archived ? { archived: 'true' } : {} })
   },

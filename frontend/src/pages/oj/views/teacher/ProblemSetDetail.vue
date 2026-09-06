@@ -66,11 +66,16 @@
     <Panel shadow class="assignment-panel">
       <template #title>배포 학급</template>
 
-      <!-- 내 학급을 모두 보여주고 스위치로 배포를 켜고 끈다. 배포한 학급의
-           학생에게만 보인다. (대회 상세의 배포 학급 표와 같은 모양이다) -->
+      <el-alert type="info" show-icon :closable="false" class="panel-guide">
+        배포한 학급의 학생에게만 보입니다. 배포를 끄면 학생 화면에서 사라집니다.
+        학급 이름을 누르면 그 학급의 학습 현황을 볼 수 있습니다.
+      </el-alert>
+
+      <!-- 내 학급을 모두 보여주고 스위치로 배포를 켜고 끈다.
+           (대회 상세의 배포 학급 표와 같은 모양이다) -->
       <el-table :data="classRows" class="full-width">
         <el-table-column label="학교" prop="school_name" />
-        <el-table-column label="학급" width="200">
+        <el-table-column label="학급">
           <template #default="{ row }">
             <!-- 학급을 누르면 이 문제집의 학습 현황으로 간다.
                  배포를 내린 학급도 그동안의 기록이 남아 있어 막지 않는다. -->
@@ -87,10 +92,6 @@
           <span v-if="!loading">만든 학급이 없습니다. "내 학급" 에서 학급을 만든 뒤 여기서 배포하세요.</span>
         </template>
       </el-table>
-      <p class="field-help panel-inset">
-        학급 이름을 누르면 그 학급의 학습 현황을 볼 수 있습니다.
-        배포를 끄면 학생 화면에서 사라집니다.
-      </p>
     </Panel>
 
     <el-dialog v-model="editDialogVisible" title="문제집 수정" width="460px"
@@ -343,12 +344,6 @@ onMounted(() => {
 
 .candidate-table {
   margin-top: 12px;
-}
-
-.field-help {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.6;
 }
 
 </style>

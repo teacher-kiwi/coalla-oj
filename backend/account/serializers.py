@@ -211,10 +211,14 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         model = SchoolClass
         fields = ["id", "school", "school_name", "teacher_name", "year", "grade",
                   "class_no", "display_name", "student_count",
-                  "is_archived", "created_at"]
+                  "is_archived", "order", "created_at"]
 
     def get_student_count(self, obj):
         return obj.memberships.count()
+
+
+class SchoolClassOrderSerializer(serializers.Serializer):
+    classes = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
 
 
 class CreateSchoolClassSerializer(serializers.Serializer):

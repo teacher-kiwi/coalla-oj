@@ -11,6 +11,7 @@ import xlsxwriter
 from django.http import HttpResponse
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
+from django.db.models import Max
 
 from options.options import SysOptions
 from submission.models import Submission
@@ -24,8 +25,8 @@ from ..models import (AdminType, ClassMembership, School, SchoolClass, User,
 from ..serializers import (ClassMembershipSerializer, CreateSchoolClassSerializer,
                            CreateStudentsSerializer, EditSchoolClassSerializer,
                            EditStudentNicknameSerializer,
-                           ResetStudentPasswordSerializer, SchoolClassSerializer,
-                           SchoolSerializer)
+                           ResetStudentPasswordSerializer, SchoolClassOrderSerializer,
+                           SchoolClassSerializer, SchoolSerializer)
 
 # 학생 비밀번호는 숫자 4자리로 고정한다(초등학생이 외울 수 있는 수준).
 # 무차별 대입에 취약하므로 로그인 실패 잠금이 반드시 함께 동작해야 한다.
@@ -76,7 +77,11 @@ class SchoolClassAPI(APIView):
             classes = classes.filter(teacher=request.user)
         if request.GET.get("archived") != "true":
             classes = classes.filter(is_archived=False)
-        return self.success(SchoolClassSerializer(classes, many=True).data)
+        # 교사가 정한 차례로 준다. 이 응답이 대회·문제집의 배포 학급 표에도 그대로 쓰여,
+        # 한 곳에서 순서를 바꾸면 모든 화면이 같이 따라온다.
+        # 아직 순서를 손대지 않은 학급(order=0)은 뒤의 기준으로 갈린다.
+        return self.success(SchoolClassSerializer(
+            classes.order_by("order", "-year", "grade", "class_no"), many=True).data)
 
     @validate_serializer(CreateSchoolClassSerializer)
     @teacher_required
@@ -87,10 +92,13 @@ class SchoolClassAPI(APIView):
         except School.DoesNotExist:
             return self.error("학교가 존재하지 않습니다")
 
+        # 새 학급은 맨 뒤에 붙인다. 0 으로 두면 이미 순서를 정해 둔 학급들 앞으로 끼어든다.
+        next_order = (SchoolClass.objects.filter(teacher=request.user)
+                      .aggregate(m=Max("order"))["m"] or 0) + 1
         try:
             school_class = SchoolClass.objects.create(
                 school=school, teacher=request.user, year=data["year"],
-                grade=data["grade"], class_no=data["class_no"])
+                grade=data["grade"], class_no=data["class_no"], order=next_order)
         except IntegrityError:
             return self.error("같은 학급이 이미 등록되어 있습니다")
         return self.success(SchoolClassSerializer(school_class).data)
@@ -133,6 +141,27 @@ class SchoolClassAPI(APIView):
             deleted_students = orphans.count()
             orphans.delete()
         return self.success({"deleted_students": deleted_students})
+
+
+class SchoolClassOrderAPI(APIView):
+    """학급 순서 변경. 받은 id 순서대로 order 를 다시 매긴다.
+
+    문제집의 문제 순서(ProblemSetProblemAPI.put)와 같은 방식이다. 화면이 바꾼
+    자리 하나가 아니라 목록 전체를 보내므로, 서버가 받은 차례를 그대로 확정한다.
+    """
+    @validate_serializer(SchoolClassOrderSerializer)
+    @teacher_required
+    def put(self, request):
+        # 화면이 보여주는 것과 같은 범위(내 학급, 종료하지 않은 것)를 견준다.
+        owned = SchoolClass.objects.filter(teacher=request.user, is_archived=False)
+        classes = {c.id: c for c in owned}
+        if set(request.data["classes"]) != set(classes.keys()):
+            return self.error("학급 목록이 바뀌었습니다. 새로고침 후 다시 시도하세요")
+
+        for order, class_id in enumerate(request.data["classes"], start=1):
+            classes[class_id].order = order
+        SchoolClass.objects.bulk_update(classes.values(), ["order"])
+        return self.success()
 
 
 class StudentSheetAPI(APIView):

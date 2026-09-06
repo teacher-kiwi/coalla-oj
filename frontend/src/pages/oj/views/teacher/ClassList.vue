@@ -12,8 +12,12 @@
       </el-table-column>
       <el-table-column label="학년도" prop="year" width="100" />
       <el-table-column label="학생 수" prop="student_count" width="100" />
-      <el-table-column label="관리" width="220">
-        <template #default="{ row }">
+      <el-table-column label="관리" width="360">
+        <template #default="{ row, $index }">
+          <!-- 여기서 정한 차례가 대회·문제집의 배포 학급 표에도 그대로 쓰인다 -->
+          <el-button size="small" :disabled="$index === 0" @click="move($index, -1)">위로</el-button>
+          <el-button size="small" :disabled="$index === classes.length - 1"
+                     @click="move($index, 1)">아래로</el-button>
           <el-button size="small" type="primary" @click="goDetail(row.id)">학생 관리</el-button>
           <el-button size="small" @click="archive(row)">학년 종료</el-button>
         </template>
@@ -87,6 +91,14 @@ function defaultForm () {
     grade: 3,
     class_no: 1
   }
+}
+
+function move (index, delta) {
+  const rows = classes.value.slice()
+  const target = index + delta
+  ;[rows[index], rows[target]] = [rows[target], rows[index]]
+  // 서버가 차례를 확정하므로 화면은 응답을 받은 뒤 다시 그린다
+  api.reorderMyClasses(rows.map(c => c.id)).then(load).catch(() => {})
 }
 
 function load () {

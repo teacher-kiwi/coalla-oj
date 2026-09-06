@@ -58,7 +58,7 @@
            따로 고르는 대화상자를 열지 않아도 지금 어디에 나갔는지 한눈에 보인다. -->
       <el-table v-loading="loading.classes" :data="classRows" class="full-width">
         <el-table-column label="학교" prop="school_name" />
-        <el-table-column label="학급" prop="display_name" width="200" />
+        <el-table-column label="학급" prop="display_name" />
         <el-table-column label="학생 수" prop="student_count" width="100" />
         <el-table-column label="배포" width="100">
           <template #default="{ row }">

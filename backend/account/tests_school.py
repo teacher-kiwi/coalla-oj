@@ -22,6 +22,7 @@ class SchoolClassTestBase(APITestCase):
                                             kind="초등학교", office="전라남도교육청")
         self.teacher = self.create_teacher(username="김선생")
         self.class_url = self.reverse("teacher_class_api")
+        self.class_order_url = self.reverse("teacher_class_order_api")
         self.student_url = self.reverse("teacher_student_api")
         self.sheet_url = self.reverse("teacher_student_sheet_api")
 
@@ -77,6 +78,55 @@ class SchoolClassAPITest(SchoolClassTestBase):
         self.assertSuccess(self.client.put(self.class_url,
                                            data={"id": class_id, "is_archived": True}))
         self.assertEqual(self.client.get(self.class_url).data["data"], [])
+
+
+class SchoolClassOrderAPITest(SchoolClassTestBase):
+    """학급 차례. 여기서 정한 순서를 대회·문제집의 배포 학급 표가 그대로 쓴다."""
+    def setUp(self):
+        super().setUp()
+        # 만든 차례대로 뒤에 붙는다
+        self.first = self._create_class(grade=3, class_no=1).data["data"]["id"]
+        self.second = self._create_class(grade=3, class_no=2).data["data"]["id"]
+        self.third = self._create_class(grade=4, class_no=1).data["data"]["id"]
+
+    def _ids(self):
+        return [c["id"] for c in self.client.get(self.class_url).data["data"]]
+
+    def test_new_class_goes_last(self):
+        self.assertEqual(self._ids(), [self.first, self.second, self.third])
+
+    def test_reorder(self):
+        wanted = [self.third, self.first, self.second]
+        self.assertSuccess(self.client.put(self.class_order_url, data={"classes": wanted}))
+        self.assertEqual(self._ids(), wanted)
+
+    def test_class_added_after_reorder_still_goes_last(self):
+        """순서를 한 번 정한 뒤에 만든 학급이 앞으로 끼어들면 안 된다"""
+        self.client.put(self.class_order_url,
+                        data={"classes": [self.third, self.second, self.first]})
+        fourth = self._create_class(grade=5, class_no=1).data["data"]["id"]
+        self.assertEqual(self._ids(), [self.third, self.second, self.first, fourth])
+
+    def test_partial_list_rejected(self):
+        """목록이 그사이 바뀌었을 수 있어 전부 받았을 때만 확정한다"""
+        self.assertFailed(self.client.put(self.class_order_url,
+                                          data={"classes": [self.second, self.first]}))
+        self.assertEqual(self._ids(), [self.first, self.second, self.third])
+
+    def test_other_teacher_class_rejected(self):
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        mine = self._create_class(grade=6, class_no=1).data["data"]["id"]
+        self.assertFailed(self.client.put(self.class_order_url,
+                                          data={"classes": [mine, self.first]}))
+        self.assertEqual(SchoolClass.objects.get(id=self.first).order, 1)
+
+    def test_archived_class_is_not_counted(self):
+        """종료한 학급은 목록에 없으므로 함께 보내지 않는다"""
+        self.client.put(self.class_url, data={"id": self.second, "is_archived": True})
+        self.assertSuccess(self.client.put(self.class_order_url,
+                                           data={"classes": [self.third, self.first]}))
+        self.assertEqual(self._ids(), [self.third, self.first])
 
 
 class StudentAccountAPITest(SchoolClassTestBase):

@@ -212,10 +212,15 @@ class SchoolClass(models.Model):
     class_no = models.IntegerField()    # 반
     created_at = models.DateTimeField(auto_now_add=True)
     is_archived = models.BooleanField(default=False)
+    # 교사가 정한 자기 학급의 차례. 대회·문제집의 배포 학급 표가 모두 이 차례를 따른다.
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = "school_class"
         unique_together = (("school", "teacher", "year", "grade", "class_no"),)
+        # order 는 교사마다 매기는 값이라 기본 정렬에 넣지 않는다. 학생의 학급 고르기는
+        # 한 학교의 여러 교사 학급을 함께 보여주므로 섞이면 안 된다.
+        # 교사 자기 목록(SchoolClassAPI.get)에서만 order 로 정렬한다.
         ordering = ["-year", "grade", "class_no"]
 
     @property
