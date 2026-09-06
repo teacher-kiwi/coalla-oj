@@ -117,9 +117,9 @@ export default {
   getMyContestProblems (contestId) {
     return ajax('teacher/contest/problem', 'get', { params: { contest_id: contestId } })
   },
-  addMyContestProblem (contestId, problemId) {
+  addMyContestProblems (contestId, problems) {
     return ajax('teacher/contest/problem', 'post',
-      { data: { contest_id: contestId, problem_id: problemId } })
+      { data: { contest_id: contestId, problems } })
   },
   removeMyContestProblem (contestId, problemId) {
     return ajax('teacher/contest/problem', 'delete',

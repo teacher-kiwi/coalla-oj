@@ -3,7 +3,8 @@ from datetime import timedelta
 from django.utils.timezone import now
 
 from account.models import ClassMembership, School
-from problem.models import ContestProblem, Problem, ProblemVisibility
+from problem.models import (ContestProblem, MAX_CONTEST_PROBLEMS, Problem,
+                            ProblemVisibility)
 from utils.api.tests import APITestCase
 from .models import ClassContestAssignment, Contest, ContestAnnouncement
 
@@ -184,19 +185,20 @@ class ClassContestProblemTest(ClassContestTestBase):
     def test_problem_is_linked_not_copied(self):
         mine = make_problem("1000", self.teacher)
         resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                        "problem_id": mine.id})
+                                                        "problems": [mine.id]})
         self.assertSuccess(resp)
-        self.assertEqual(resp.data["data"]["display_id"], "A")
+        self.assertEqual(resp.data["data"]["added"], 1)
         # 복사본이 생기지 않는다. 대회는 문제를 가리키기만 한다.
         self.assertEqual(Problem.objects.count(), 1)
         entry = ContestProblem.objects.get(contest_id=self.contest_id)
         self.assertEqual(entry.problem_id, mine.id)
+        self.assertEqual(entry.label, "A")
 
     def test_letters_go_in_order(self):
         for i in range(3):
             problem = make_problem(f"200{i}", self.teacher)
             self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                     "problem_id": problem.id})
+                                                     "problems": [problem.id]})
         entries = ContestProblem.objects.filter(contest_id=self.contest_id).order_by("order")
         self.assertEqual([e.order for e in entries], [1, 2, 3])
         self.assertEqual([e.label for e in entries], ["A", "B", "C"])
@@ -208,7 +210,7 @@ class ClassContestProblemTest(ClassContestTestBase):
             problem = make_problem(f"210{i}", self.teacher)
             added.append(problem)
             self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                     "problem_id": problem.id})
+                                                     "problems": [problem.id]})
         self.assertSuccess(self.client.delete(
             self.problem_url + f"?contest_id={self.contest_id}&problem_id={added[1].id}"))
 
@@ -218,9 +220,42 @@ class ClassContestProblemTest(ClassContestTestBase):
 
         # 새로 넣으면 맨 뒤에 붙는다
         fresh = make_problem("2200", self.teacher)
-        resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                        "problem_id": fresh.id})
-        self.assertEqual(resp.data["data"]["display_id"], "C")
+        self.assertSuccess(self.client.post(self.problem_url, data={
+            "contest_id": self.contest_id, "problems": [fresh.id]}))
+        self.assertEqual(ContestProblem.objects.get(contest_id=self.contest_id,
+                                                    problem=fresh).label, "C")
+
+    def test_add_many_at_once(self):
+        """화면이 여러 개를 골라 한 번에 보낸다. 고른 차례대로 뒤에 붙는다."""
+        picked = [make_problem(f"230{i}", self.teacher) for i in range(3)]
+        resp = self.client.post(self.problem_url, data={
+            "contest_id": self.contest_id, "problems": [p.id for p in picked]})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["added"], 3)
+        entries = ContestProblem.objects.filter(contest_id=self.contest_id).order_by("order")
+        self.assertEqual([e.label for e in entries], ["A", "B", "C"])
+
+    def test_already_added_is_skipped(self):
+        """이미 담긴 문제가 섞여 있어도 오류가 아니다. 나머지만 들어간다."""
+        first = make_problem("2400", self.teacher)
+        second = make_problem("2401", self.teacher)
+        self.client.post(self.problem_url, data={"contest_id": self.contest_id,
+                                                 "problems": [first.id]})
+        resp = self.client.post(self.problem_url, data={
+            "contest_id": self.contest_id, "problems": [first.id, second.id]})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["added"], 1)
+        entries = ContestProblem.objects.filter(contest_id=self.contest_id).order_by("order")
+        self.assertEqual([e.problem_id for e in entries], [first.id, second.id])
+
+    def test_over_the_limit_adds_nothing(self):
+        """한 개라도 넘치면 아무것도 넣지 않는다. 일부만 들어가면 무엇이 빠졌는지 모른다."""
+        picked = [make_problem(f"25{i:02d}", self.teacher)
+                  for i in range(MAX_CONTEST_PROBLEMS + 1)]
+        resp = self.client.post(self.problem_url, data={
+            "contest_id": self.contest_id, "problems": [p.id for p in picked]})
+        self.assertFailed(resp)
+        self.assertEqual(ContestProblem.objects.filter(contest_id=self.contest_id).count(), 0)
 
     def test_cannot_add_another_teachers_private_problem(self):
         self.client.logout()
@@ -229,7 +264,7 @@ class ClassContestProblemTest(ClassContestTestBase):
         self.client.logout()
         self.client.login(username=self.teacher.username, password="teacher")
         resp = self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                        "problem_id": theirs.id})
+                                                        "problems": [theirs.id]})
         self.assertFailed(resp, "문제가 존재하지 않습니다")
 
     def test_public_problem_can_be_added(self):
@@ -237,19 +272,19 @@ class ClassContestProblemTest(ClassContestTestBase):
         public = make_problem("4000", admin, visibility=ProblemVisibility.public)
         self.client.login(username=self.teacher.username, password="teacher")
         self.assertSuccess(self.client.post(self.problem_url, data={
-            "contest_id": self.contest_id, "problem_id": public.id}))
+            "contest_id": self.contest_id, "problems": [public.id]}))
 
     def test_cannot_change_problems_after_start(self):
         started = self._create_contest(hours_from_now=-1).data["data"]["id"]
         mine = make_problem("5000", self.teacher)
         self.assertFailed(self.client.post(self.problem_url, data={
-            "contest_id": started, "problem_id": mine.id}),
+            "contest_id": started, "problems": [mine.id]}),
             "시작한 대회에는 문제를 넣을 수 없습니다")
 
     def test_removing_from_the_contest_keeps_the_problem(self):
         mine = make_problem("6000", self.teacher)
         self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                 "problem_id": mine.id})
+                                                 "problems": [mine.id]})
         self.assertSuccess(self.client.delete(
             self.problem_url + f"?contest_id={self.contest_id}&problem_id={mine.id}"))
         self.assertFalse(ContestProblem.objects.filter(contest_id=self.contest_id).exists())
@@ -259,7 +294,7 @@ class ClassContestProblemTest(ClassContestTestBase):
         """지우면 대회 제출이 함께 사라지고 순위표에 없는 문제 칸이 남는다."""
         mine = make_problem("6100", self.teacher)
         self.client.post(self.problem_url, data={"contest_id": self.contest_id,
-                                                 "problem_id": mine.id})
+                                                 "problems": [mine.id]})
         resp = self.client.delete(self.reverse("teacher_problem_api") + f"?id={mine.id}")
         self.assertFailed(resp)
         self.assertIn("대회에서 먼저 빼주세요", resp.data["data"])

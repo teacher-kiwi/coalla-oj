@@ -122,15 +122,44 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="problemDialog" title="문제 넣기" width="620px">
-      <el-table :data="candidates" height="360" @row-click="addProblem" class="pick-table">
-        <el-table-column label="번호" prop="display_id" width="90" />
+    <el-dialog v-model="problemDialog" title="문제 넣기" width="720px"
+               :close-on-click-modal="false">
+      <!-- 문제집의 문제 추가와 같은 방식이다(같은 기준으로 고르고 여러 개를 한 번에) -->
+      <div class="picker-filter">
+        <el-input v-model="keyword" placeholder="문제 제목이나 번호로 검색 (Enter)"
+                  clearable @keyup.enter="searchProblems(1)" />
+        <el-select v-model="difficulty" placeholder="난이도" clearable class="picker-difficulty"
+                   @change="searchProblems(1)">
+          <el-option v-for="d in DIFFICULTY" :key="d.value" :value="d.value" :label="d.label" />
+        </el-select>
+        <span class="picker-switch">
+          <span class="picker-switch-label">즐겨찾기</span>
+          <el-switch v-model="favoriteOnly" @change="searchProblems(1)" />
+        </span>
+      </div>
+      <el-table v-loading="searching" :data="candidates"
+                class="full-width candidate-table" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="45" />
+        <el-table-column label="#" prop="display_id" width="100" />
         <el-table-column label="제목" prop="title" />
-        <el-table-column label="범위" width="100">
+        <el-table-column label="난이도" width="90">
+          <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
+        </el-table-column>
+        <el-table-column label="범위" width="90" align="center">
           <template #default="{ row }"><ScopeTag :value="row.visibility" /></template>
         </el-table-column>
       </el-table>
-      <p class="guide">줄을 누르면 대회에 들어갑니다. 원본은 그대로 남습니다.</p>
+      <p class="picker-guide">
+        내가 만든 학급 문제도 넣을 수 있습니다. 배포한 학급 학생만 볼 수 있습니다.
+      </p>
+      <Pagination :total="candidateTotal" :page-size="10" :current="candidatePage"
+                  @on-change="searchProblems" />
+      <template #footer>
+        <el-button @click="problemDialog = false">취소</el-button>
+        <el-button type="primary" :loading="saving" @click="addProblems">
+          {{ selected.length ? `${selected.length}개 넣기` : '넣기' }}
+        </el-button>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="announcementDialog"
@@ -158,12 +187,14 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import Markdown from '@oj/components/Markdown.vue'
 import ScopeTag from '@oj/components/ScopeTag.vue'
+import DifficultyTag from '@oj/components/DifficultyTag.vue'
+import Pagination from '@oj/components/Pagination.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Plus } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
-import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, DIFFICULTY_LABEL } from '@/utils/constants'
+import { CONTEST_STATUS, CONTEST_STATUS_REVERSE, DIFFICULTY, DIFFICULTY_LABEL } from '@/utils/constants'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,6 +205,13 @@ const problems = ref([])
 const assignments = ref([])
 const myClasses = ref([])
 const candidates = ref([])
+const candidateTotal = ref(0)
+const candidatePage = ref(1)
+const searching = ref(false)
+const selected = ref([])
+const keyword = ref('')
+const difficulty = ref('')
+const favoriteOnly = ref(false)
 const announcements = ref([])
 const problemDialog = ref(false)
 const editDialog = ref(false)
@@ -266,28 +304,53 @@ function loadAssignments () {
 }
 
 function openProblemDialog () {
-  // 내가 만든 학급 문제와 공개 문제를 함께 고르게 한다
-  Promise.all([
-    api.getMyProblems(),
-    api.getProblemList(0, 250, {})
-  ]).then(([mine, publics]) => {
-    const already = new Set(problems.value.map(p => p.title))
-    const rows = [
-      ...mine.data.data.map(p => ({ ...p, visibility: p.visibility })),
-      ...publics.data.data.results.map(p => ({ ...p, visibility: 'public' }))
-    ].filter(p => !already.has(p.title))
-    candidates.value = rows
-    problemDialog.value = true
-  }).catch(() => {})
+  keyword.value = ''
+  difficulty.value = ''
+  favoriteOnly.value = false
+  selected.value = []
+  problemDialog.value = true
+  searchProblems(1)
 }
 
-function addProblem (row) {
-  api.addMyContestProblem(contestId, row.id).then(() => {
+function searchProblems (page) {
+  candidatePage.value = page
+  searching.value = true
+  // 공개 문제와 내가 만든 학급 문제를 함께 고를 수 있어야 한다.
+  // 빈 값은 getProblemList 가 알아서 뺀다.
+  const params = {
+    keyword: keyword.value,
+    difficulty: difficulty.value,
+    favorite: favoriteOnly.value ? '1' : '',
+    mine: 1
+  }
+  api.getProblemList((page - 1) * 10, 10, params).then(res => {
+    searching.value = false
+    candidates.value = res.data.data.results
+    candidateTotal.value = res.data.data.total
+  }, () => {
+    searching.value = false
+  })
+}
+
+function onSelectionChange (rows) {
+  selected.value = rows
+}
+
+function addProblems () {
+  if (!selected.value.length) {
+    ElMessage.error('넣을 문제를 선택하세요')
+    return
+  }
+  saving.value = true
+  api.addMyContestProblems(contestId, selected.value.map(p => p.id)).then(res => {
+    saving.value = false
     problemDialog.value = false
-    ElMessage.success('문제를 넣었습니다')
+    ElMessage.success(`${res.data.data.added}개를 넣었습니다`)
     loadProblems()
     loadContest()
-  }, () => {})
+  }, () => {
+    saving.value = false
+  })
 }
 
 function removeProblem (row) {
@@ -388,7 +451,39 @@ onMounted(() => {
   margin-top: 10px;
 }
 
-.pick-table :deep(tbody tr) {
-  cursor: pointer;
+/* 문제집의 문제 추가 대화상자와 같은 모양이다 */
+.picker-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.picker-difficulty {
+  width: 130px;
+  flex: none;
+}
+
+.picker-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.picker-switch-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.picker-guide {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.candidate-table {
+  margin-top: 12px;
 }
 </style>

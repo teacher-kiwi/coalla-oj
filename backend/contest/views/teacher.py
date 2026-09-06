@@ -7,6 +7,7 @@
 순위 화면은 관리자 대회와 같은 것을 그대로 쓴다.
 """
 from django.db import IntegrityError
+from django.db.models import Q
 
 from account.decorators import teacher_required
 from account.views.teacher import owned_class
@@ -130,9 +131,8 @@ class TeacherContestAssignmentAPI(APIView):
 class TeacherContestProblemAPI(APIView):
     """대회에 문제를 넣고 뺀다.
 
-    대회 문제는 원본을 복사해서 넣는다(Problem.contest 가 FK 라 한 문제가 여러
-    대회에 속할 수 없다). 관리자 대회의 AddContestProblemAPI 와 같은 방식이다.
-    복사본이라 대회 중 제출과 통계가 원본 문제에 섞이지 않는다.
+    복사하지 않고 ContestProblem 으로 가리키기만 한다. 한 문제가 여러 대회에
+    담길 수 있고, 문제를 고치면 대회에도 그대로 반영된다.
     """
     @teacher_required
     def get(self, request):
@@ -148,36 +148,45 @@ class TeacherContestProblemAPI(APIView):
     @validate_serializer(AddClassContestProblemSerializer)
     @teacher_required
     def post(self, request):
+        """고른 문제를 대회 끝에 넣는다. 이미 담긴 문제는 조용히 건너뛴다.
+
+        문제집(ProblemSetProblemAPI.post)과 같은 방식이다. 화면이 여러 개를
+        한 번에 고르므로 하나씩 오류를 내면 어디까지 들어갔는지 알 수 없다.
+        """
         contest = owned_contest(request.user, request.data["contest_id"])
         if not contest:
             return self.error("대회가 존재하지 않습니다")
         if contest.status != ContestStatus.CONTEST_NOT_START:
             return self.error("시작한 대회에는 문제를 넣을 수 없습니다")
 
-        # 내가 만든 문제와 공개 문제만 넣을 수 있다
-        problem = Problem.objects.filter(id=request.data["problem_id"],
-                                         ).first()
-        if not problem or not (problem.created_by_id == request.user.id
-                               or problem.visibility == ProblemVisibility.public):
+        # 내가 만든 문제와 공개 문제만, 그리고 대회와 규칙이 같은 것만 넣을 수 있다
+        problems = Problem.objects.filter(
+            Q(created_by=request.user) | Q(visibility=ProblemVisibility.public),
+            id__in=request.data["problems"], rule_type=contest.rule_type)
+        if not problems:
             return self.error("문제가 존재하지 않습니다")
 
-        if ContestProblem.objects.filter(contest=contest, problem=problem).exists():
-            return self.error("이미 이 대회에 담긴 문제입니다")
-        if problem.rule_type != contest.rule_type:
-            return self.error("대회와 규칙 유형이 다른 문제입니다")
-
+        existing = set(ContestProblem.objects.filter(contest=contest)
+                       .values_list("problem_id", flat=True))
         order = ContestProblem.next_order(contest)
-        if order > MAX_CONTEST_PROBLEMS:
+        entries = []
+        for problem in problems:
+            if problem.id in existing:
+                continue
+            entries.append(ContestProblem(contest=contest, problem=problem, order=order))
+            order += 1
+
+        # 한 개라도 넘치면 아무것도 넣지 않는다. 일부만 들어가면 무엇이 빠졌는지 모른다.
+        if order - 1 > MAX_CONTEST_PROBLEMS:
             return self.error(f"대회에는 문제를 {MAX_CONTEST_PROBLEMS}개까지 넣을 수 있습니다")
 
         try:
-            entry = ContestProblem.objects.create(contest=contest, problem=problem, order=order)
+            ContestProblem.objects.bulk_create(entries)
         except IntegrityError:
             # 자리를 읽는 것과 저장하는 것 사이에 다른 요청이 같은 자리를 먼저 썼다
             # (버튼 두 번 누르기)
             return self.error("문제를 넣지 못했습니다. 다시 시도해주세요")
-        return self.success({"id": problem.id, "display_id": entry.label,
-                             "title": problem.title})
+        return self.success({"added": len(entries)})
 
     @teacher_required
     def delete(self, request):

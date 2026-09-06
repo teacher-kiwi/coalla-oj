@@ -170,7 +170,8 @@ class AssignClassContestSerializer(serializers.Serializer):
 
 class AddClassContestProblemSerializer(serializers.Serializer):
     contest_id = serializers.IntegerField()
-    problem_id = serializers.IntegerField()
+    # 화면이 여러 개를 한 번에 고른다(문제집의 ProblemSetProblemSerializer 와 같다)
+    problems = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
 
 
 class CreateClassContestAnnouncementSerializer(serializers.Serializer):
