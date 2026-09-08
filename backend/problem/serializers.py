@@ -17,9 +17,25 @@ class TestCaseUploadForm(forms.Form):
     file = forms.FileField()
 
 
+# 예제는 문제를 여는 모든 학생에게 매번 전송되므로 크기와 개수를 제한한다.
+MAX_SAMPLES = 3
+MAX_SAMPLE_BYTES = 2 * 1024
+# 손으로 넣는 테스트케이스. 많거나 크면 zip 으로 올리는 게 맞다.
+MAX_CASES = 20
+MAX_CASE_BYTES = 64 * 1024
+
+
 class CreateSampleSerializer(serializers.Serializer):
     input = serializers.CharField(trim_whitespace=False)
     output = serializers.CharField(trim_whitespace=False)
+
+
+class TeacherTestCaseSerializer(serializers.Serializer):
+    """손으로 넣는 테스트케이스 한 줄. 교사·관리자 화면이 함께 쓴다."""
+    input = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
+                                  trim_whitespace=False)
+    output = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
+                                   trim_whitespace=False)
 
 
 class CreateTestCaseScoreSerializer(serializers.Serializer):
@@ -51,8 +67,12 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     input_description = serializers.CharField(allow_blank=True)
     output_description = serializers.CharField(allow_blank=True)
     samples = serializers.ListField(child=CreateSampleSerializer(), allow_empty=False)
-    test_case_id = serializers.CharField(max_length=32)
-    test_case_score = serializers.ListField(child=CreateTestCaseScoreSerializer(), allow_empty=True)
+    # 테스트케이스를 넣는 두 가지 길. 파일로 올렸으면 업로드가 돌려준
+    # test_case_id 와 배점이 오고, 직접 입력이면 cases 가 온다.
+    test_case_id = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    test_case_score = serializers.ListField(child=CreateTestCaseScoreSerializer(),
+                                            allow_empty=True, required=False)
+    cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
     time_limit = serializers.IntegerField(min_value=1, max_value=1000 * 60)
     memory_limit = serializers.IntegerField(min_value=1, max_value=1024)
     languages = LanguageNameMultiChoiceField()
@@ -68,6 +88,14 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
     hint = serializers.CharField(allow_blank=True, allow_null=True)
     source = serializers.CharField(max_length=256, allow_blank=True, allow_null=True)
+
+    def validate(self, data):
+        if data.get("cases") and data.get("test_case_id"):
+            raise serializers.ValidationError(
+                "테스트 케이스는 직접 입력과 파일 중 하나로만 넣을 수 있습니다")
+        if not data.get("cases") and not data.get("test_case_id"):
+            raise serializers.ValidationError("테스트 케이스를 넣어주세요")
+        return data
 
 
 class CreateProblemSerializer(CreateOrEditProblemSerializer):
@@ -295,20 +323,6 @@ class ImportProblemSerializer(serializers.Serializer):
 
 # ---- 교사 출제 ----
 
-# 예제는 문제를 여는 모든 학생에게 매번 전송되므로 크기와 개수를 제한한다.
-MAX_SAMPLES = 3
-MAX_SAMPLE_BYTES = 2 * 1024
-# 손으로 넣는 테스트케이스. 많거나 크면 zip 으로 올리는 게 맞다.
-MAX_CASES = 20
-MAX_CASE_BYTES = 64 * 1024
-
-
-class TeacherTestCaseSerializer(serializers.Serializer):
-    input = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
-                                  trim_whitespace=False)
-    output = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
-                                   trim_whitespace=False)
-
 
 class TeacherSampleSerializer(serializers.Serializer):
     """학생에게 보여줄 예제.
@@ -341,6 +355,11 @@ class TeacherProblemSerializer(serializers.Serializer):
     # 업로드가 돌려준 test_case_id 가 온다. 만들 때는 둘 중 하나가 있어야 한다.
     cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
     test_case_id = serializers.CharField(max_length=32, required=False)
+    # 채점 방식. 특수 채점은 정답 파일 대신 judge 코드가 판정한다
+    # ("4보다 작은 수를 모두 출력" 처럼 답이 여럿인 문제).
+    spj = serializers.BooleanField(default=False)
+    spj_language = SPJLanguageNameChoiceField(required=False, allow_blank=True, allow_null=True)
+    spj_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_cases(self, cases):
         if not cases:
@@ -360,6 +379,8 @@ class TeacherProblemSerializer(serializers.Serializer):
         if data.get("cases") and data.get("test_case_id"):
             raise serializers.ValidationError(
                 "테스트 케이스는 직접 입력과 파일 중 하나로만 넣을 수 있습니다")
+        if data.get("spj") and not (data.get("spj_language") and data.get("spj_code")):
+            raise serializers.ValidationError("판정 코드와 언어를 넣어주세요")
         return data
 
 

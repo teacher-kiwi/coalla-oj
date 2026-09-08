@@ -105,6 +105,23 @@
                   </el-form-item>
                 </el-col>
               </el-row>
+              <!-- 손으로 치면 실제 채점 데이터와 어긋날 수 있다. 케이스에서
+                   가져오면 그럴 수 없고, 가져온 뒤 고치는 것은 자유다. -->
+              <el-form-item label="테스트 케이스에서 가져오기">
+                <el-select :model-value="null" placeholder="케이스" class="pick-case"
+                           :disabled="!pickableCases.length"
+                           @change="fillSample(sample, $event)">
+                  <el-option v-for="c in pickableCases" :key="c.index" :value="c.index"
+                             :label="`${c.index}번`" :disabled="c.too_large" />
+                </el-select>
+                <el-button v-if="canLoadSaved" size="small" class="pick-hint"
+                           :loading="loadingCases" @click="loadSavedCases">
+                  저장된 케이스 불러오기
+                </el-button>
+                <span v-else-if="!pickableCases.length" class="pick-hint">
+                  케이스를 넣으면 여기서 가져올 수 있습니다
+                </span>
+              </el-form-item>
             </Accordion>
           </el-form-item>
         </div>
@@ -161,9 +178,14 @@
               </el-radio-group>
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="10">
             <el-form-item label="테스트 케이스" :error="error.testCase">
-              <el-upload action="/api/admin/test_case" name="file" :data="{ spj: problem.spj }"
+              <el-radio-group v-model="caseSource" size="small" class="case-source">
+                <el-radio-button value="file">파일 올리기</el-radio-button>
+                <el-radio-button value="manual">직접 입력</el-radio-button>
+              </el-radio-group>
+              <el-upload v-if="caseSource === 'file'"
+                         action="/api/admin/test_case" name="file" :data="{ spj: problem.spj }"
                          :show-file-list="true" :on-success="uploadSucceeded" :on-error="uploadFailed">
                 <el-button size="small" type="primary">파일 선택</el-button>
               </el-upload>
@@ -189,7 +211,39 @@
               <el-input v-model="problem.io_mode.output" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="24" v-if="caseSource === 'manual'">
+            <p class="case-guide">
+              입력과 출력의 짝을 적습니다. 배점은 고르게 나뉩니다 - 케이스마다 다른
+              점수를 주려면 파일로 올린 뒤 아래 표에서 고치세요.
+              <template v-if="problem.spj">
+                스페셜 저지는 판정 코드가 맞고 틀림을 정하므로 출력을 넣지 않습니다.
+              </template>
+            </p>
+            <el-table :data="cases" class="full-width" size="small">
+              <el-table-column label="#" width="50" align="center">
+                <template #default="{ $index }">{{ $index + 1 }}</template>
+              </el-table-column>
+              <el-table-column label="입력">
+                <template #default="{ row }">
+                  <el-input v-model="row.input" type="textarea" :rows="3" placeholder="입력" />
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!problem.spj" label="출력">
+                <template #default="{ row }">
+                  <el-input v-model="row.output" type="textarea" :rows="3" placeholder="출력" />
+                </template>
+              </el-table-column>
+              <el-table-column width="120" align="center">
+                <template #default="{ $index }">
+                  <el-button size="small" type="danger" link :disabled="cases.length === 1"
+                             @click="cases.splice($index, 1)">삭제</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-button size="small" :icon="Plus" class="add-case"
+                       @click="cases.push({ input: '', output: '' })">케이스 추가</el-button>
+          </el-col>
+          <el-col :span="24" v-else>
             <el-table :data="problem.test_case_score" class="full-width">
               <el-table-column prop="input_name" label="입력" />
               <el-table-column prop="output_name" label="출력" />
@@ -213,7 +267,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
@@ -258,6 +312,44 @@ function defaultProblem () {
 }
 
 const problem = ref(defaultProblem())
+// 테스트 케이스를 넣는 두 가지 길. 섞을 수 없어 하나를 고른다.
+const caseSource = ref('file')
+const cases = ref([{ input: '', output: '' }])
+// 업로드가 돌려주는 케이스 내용. 여기서 예제를 가져온다.
+const uploadedCases = ref([])
+const SAMPLE_PICK_LIMIT = 5
+const loadingCases = ref(false)
+
+// 고칠 때 이미 저장된 케이스에서 예제를 다시 고를 수 있게 한다
+const canLoadSaved = computed(() =>
+  caseSource.value === 'file' && !uploadedCases.value.length && !!problem.value.id)
+
+function loadSavedCases () {
+  loadingCases.value = true
+  api.getTestCasePreview(problem.value.id).then(res => {
+    loadingCases.value = false
+    uploadedCases.value = res.data.data.cases
+  }, () => {
+    loadingCases.value = false
+  })
+}
+
+const pickableCases = computed(() => {
+  if (caseSource.value === 'file') return uploadedCases.value
+  return cases.value.slice(0, SAMPLE_PICK_LIMIT).map((c, index) => ({
+    // 스페셜 저지는 출력 칸이 없다. null 이면 예제 출력을 건드리지 않는다.
+    index: index + 1, input: c.input, output: problem.value.spj ? null : c.output,
+    too_large: false
+  }))
+})
+
+// 케이스 내용을 예제 칸에 복사한다. 그 뒤 고치는 것은 사용자 몫이다.
+function fillSample (sample, index) {
+  const picked = pickableCases.value.find(c => c.index === index)
+  if (!picked) return
+  sample.input = picked.input || ''
+  if (picked.output !== null && picked.output !== undefined) sample.output = picked.output
+}
 
 onMounted(() => {
   getTagOptions()
@@ -373,6 +465,7 @@ function uploadSucceeded (response) {
   problem.value.test_case_score = fileList
   testCaseUploaded.value = true
   problem.value.test_case_id = response.data.id
+  uploadedCases.value = response.data.cases || []
 }
 
 function uploadFailed () { ElMessage.error('업로드에 실패했습니다') }
@@ -408,8 +501,13 @@ async function submit () {
     if (error.spj) { ElMessage.error(error.spj); return }
   }
   if (!problem.value.languages.length) { error.languages = 'Please choose at least one language for problem'; ElMessage.error(error.languages); return }
-  if (!testCaseUploaded.value) { error.testCase = 'Test case is not uploaded yet'; ElMessage.error(error.testCase); return }
-  if (problem.value.rule_type === 'OI') {
+  const filledCases = cases.value.filter(c => c.input.trim() || c.output.trim())
+  if (caseSource.value === 'manual') {
+    if (!filledCases.length) { error.testCase = '테스트 케이스를 넣어주세요'; ElMessage.error(error.testCase); return }
+  } else if (!testCaseUploaded.value) {
+    error.testCase = '테스트 케이스 파일을 올려주세요'; ElMessage.error(error.testCase); return
+  } else if (problem.value.rule_type === 'OI') {
+    // 배점 표는 파일로 올렸을 때만 있다. 직접 입력은 서버가 고르게 나눈다.
     for (const item of problem.value.test_case_score) {
       if (parseInt(item.score) <= 0 || isNaN(parseInt(item.score))) {
         ElMessage.error('테스트 케이스 점수가 올바르지 않습니다'); return
@@ -423,8 +521,16 @@ async function submit () {
     if (template.value[k].checked) problem.value.template[k] = template.value[k].code
   }
 
+  // 두 길 중 하나만 보낸다. 서버가 둘 다 오면 거절한다.
+  const payload = { ...problem.value }
+  if (caseSource.value === 'manual') {
+    payload.cases = filledCases.map(c => ({ input: c.input, output: c.output }))
+    payload.test_case_id = ''
+    payload.test_case_score = []
+  }
+
   const funcName = routeName.value === 'create-problem' ? 'createProblem' : 'editProblem'
-  api[funcName](problem.value).then(res => {
+  api[funcName](payload).then(res => {
     // 테스트케이스를 갈아끼우면 서버가 이 문제의 제출을 전부 다시 채점한다.
     // 정답률과 대회 순위가 잠시 뒤 바뀌므로 알려준다.
     if (res.data.data?.rejudging) {
@@ -437,6 +543,31 @@ async function submit () {
 </script>
 
 <style lang="less" scoped>
+.case-source {
+  margin-bottom: 8px;
+}
+
+.case-guide {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.8;
+  margin: 0 0 8px;
+}
+
+.add-case {
+  margin-top: 8px;
+}
+
+.pick-case {
+  width: 160px;
+}
+
+.pick-hint {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
 .problem {
   .difficulty-help {
     margin-left: 6px;

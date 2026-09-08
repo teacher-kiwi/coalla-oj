@@ -3,6 +3,7 @@
 교사는 `is_admin_role()` 에서 제외되어 있어 /api/admin/* 을 쓸 수 없다.
 여기의 모든 조회·수정은 "내가 만든 문제집"과 "내가 담당하는 학급"으로 범위를 좁힌다.
 """
+import hashlib
 import io
 import os
 from urllib.parse import quote
@@ -29,6 +30,7 @@ from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSe
                            ProblemSetDetailSerializer, ProblemSetItemOrderSerializer,
                            ProblemSetProblemSerializer, ProblemSetSerializer,
                            TeacherProblemListSerializer, TestCaseUploadForm)
+from judge.dispatcher import SPJCompiler
 from judge.tasks import rejudge_problem_task
 from .admin import get_existing_problem_tags, TestCaseZipProcessor
 
@@ -366,14 +368,34 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
                     .prefetch_related("tags"))
         return self.success(TeacherProblemListSerializer(problems, many=True).data)
 
-    def _materialize_cases(self, validated):
+    def _spj_fields(self, validated):
+        """특수 채점 설정. 저장할 때 여기서 직접 컴파일해 본다.
+
+        관리자 화면은 컴파일 버튼을 따로 두고 spj_compile_ok 를 클라이언트가
+        올려 보내는데, 그 값은 화면이 정하는 것이라 믿을 것이 못 된다.
+        컴파일은 1 초 안팎이라 저장할 때 한 번 돌리는 편이 확실하다.
+        컴파일되지 않는 판정 코드로 저장하면 그 문제의 모든 제출이
+        시스템 오류가 된다.
+        """
+        if not validated.get("spj"):
+            return {"spj": False, "spj_language": None, "spj_code": None,
+                    "spj_version": None, "spj_compile_ok": False}
+        language, code = validated["spj_language"], validated["spj_code"]
+        version = hashlib.md5(f"{language}:{code}".encode("utf-8")).hexdigest()
+        error = SPJCompiler(code, version, language).compile_spj()
+        if error:
+            raise APIError(f"판정 코드를 컴파일하지 못했습니다\n{error}")
+        return {"spj": True, "spj_language": language, "spj_code": code,
+                "spj_version": version, "spj_compile_ok": True}
+
+    def _materialize_cases(self, validated, spj):
         """직접 입력이든 파일이든 결국 하나의 test_case_id 로 모인다.
 
         :return: (test_case_score, test_case_id) 또는 넣은 것이 없으면 (None, None)
         """
         cases = validated.get("cases")
         if cases:
-            info, test_case_id = self.process_cases(cases)
+            info, test_case_id = self.process_cases(cases, spj=spj)
         elif validated.get("test_case_id"):
             test_case_id = validated["test_case_id"]
             info = self.read_case_info(test_case_id)
@@ -392,14 +414,18 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         if error:
             return self.error(error)
 
-        test_case_score, test_case_id = self._materialize_cases(request.serializer.validated_data)
+        validated = request.serializer.validated_data
+        spj_fields = self._spj_fields(validated)
+        test_case_score, test_case_id = self._materialize_cases(validated, spj_fields["spj"])
         with transaction.atomic():
-            problem = self._build_problem(data, test_case_score, test_case_id, request.user)
+            problem = self._build_problem(data, test_case_score, test_case_id,
+                                          spj_fields, request.user)
             problem.tags.set(tag_objs)
         return self.success(TeacherProblemListSerializer(problem).data)
 
-    def _build_problem(self, data, test_case_score, test_case_id, user):
+    def _build_problem(self, data, test_case_score, test_case_id, spj_fields, user):
         return Problem.objects.create(
+            **spj_fields,
             title=data["title"],
             description=data["description"],
             input_description=data["input_description"],
@@ -432,7 +458,11 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         if error:
             return self.error(error)
 
-        test_case_score, test_case_id = self._materialize_cases(request.serializer.validated_data)
+        validated = request.serializer.validated_data
+        spj_fields = self._spj_fields(validated)
+        for field, value in spj_fields.items():
+            setattr(problem, field, value)
+        test_case_score, test_case_id = self._materialize_cases(validated, spj_fields["spj"])
         cases_changed = test_case_id is not None
         if cases_changed:
             problem.test_case_id = test_case_id

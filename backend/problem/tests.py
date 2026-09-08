@@ -192,6 +192,17 @@ class TestCaseUploadAPITest(APITestCase):
                 with open(os.path.join(test_case_dir, name), "r", encoding="utf-8") as f:
                     self.assertEqual(f.read(), name + "\n" + name + "\n" + "end")
 
+    def test_upload_returns_cases_to_pick_samples_from(self):
+        """올린 직후 예제를 고를 수 있어야 한다. 내용이 없으면 화면이 고를 것이 없다."""
+        with open(self.make_test_case_zip(), "rb") as f:
+            resp = self.client.post(self.url,
+                                    data={"spj": "false", "file": f}, format="multipart")
+        self.assertSuccess(resp)
+        cases = resp.data["data"]["cases"]
+        self.assertEqual([c["index"] for c in cases], [1])
+        self.assertEqual(cases[0]["input"], "1.in\n1.in\nend")
+        self.assertEqual(cases[0]["output"], "1.out\n1.out\nend")
+
     def test_upload_test_case_zip(self):
         with open(self.make_test_case_zip(), "rb") as f:
             resp = self.client.post(self.url,
@@ -350,6 +361,44 @@ class ProblemAPITest(ProblemCreateTestBase):
     def get_one_problem(self):
         resp = self.client.get(self.url + "?id=" + str(self.problem.id))
         self.assertSuccess(resp)
+
+
+class AdminManualCasesTest(ProblemCreateTestBase):
+    """관리자도 케이스를 손으로 넣을 수 있다. 교사 화면과 같은 길이다."""
+    def setUp(self):
+        self.url = self.reverse("problem_admin_api")
+        self.create_super_admin()
+        ProblemTag.objects.create(name="test")
+
+    def _create(self, **overrides):
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data.pop("test_case_id")
+        data.pop("test_case_score")
+        data["cases"] = [{"input": "1 2", "output": "3"}, {"input": "4 5", "output": "9"}]
+        data.update(overrides)
+        return self.client.post(self.url, data=data)
+
+    def test_cases_become_test_case_files(self):
+        resp = self._create()
+        self.assertSuccess(resp)
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
+        self.addCleanup(shutil.rmtree, test_case_dir, ignore_errors=True)
+        with open(os.path.join(test_case_dir, "2.out")) as f:
+            self.assertEqual(f.read(), "9")
+        self.assertEqual(len(problem.test_case_score), 2)
+
+    def test_cannot_use_both_input_methods(self):
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data["cases"] = [{"input": "1", "output": "1"}]
+        self.assertFailed(self.client.post(self.url, data=data),
+                          "테스트 케이스는 직접 입력과 파일 중 하나로만 넣을 수 있습니다")
+
+    def test_one_of_them_is_required(self):
+        data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
+        data.pop("test_case_id")
+        data.pop("test_case_score")
+        self.assertFailed(self.client.post(self.url, data=data), "테스트 케이스를 넣어주세요")
 
 
 class ReadCasesTest(APITestCase):

@@ -6,6 +6,7 @@
 import json
 import os
 import shutil
+from unittest import mock
 from zipfile import ZipFile
 
 from django.conf import settings
@@ -197,6 +198,55 @@ class TeacherProblemCreateTest(TeacherProblemTestBase):
                 "samples": [sample()], "test_case_id": "a" * 32}
         self.assertFailed(self.client.post(self.url, data=data),
                           "올린 테스트 케이스를 찾을 수 없습니다. 다시 올려주세요")
+
+
+@mock.patch("problem.views.teacher.SPJCompiler")
+class TeacherSpjProblemTest(TeacherProblemTestBase):
+    """특수 채점 문제. 정답 파일 대신 판정 코드가 맞고 틀림을 정한다."""
+    def _create_spj(self, compiler, error=None, **overrides):
+        compiler.return_value.compile_spj.return_value = error
+        data = {"spj": True, "spj_language": "C", "spj_code": "int main(){return 0;}",
+                "cases": [case("1 2", ""), case("3 4", "")]}
+        data.update(overrides)
+        return self._create(**data)
+
+    def test_spj_problem_has_no_output_files(self, compiler):
+        """판정은 spj 코드가 한다. 정답 파일이 있으면 안 된다."""
+        resp = self._create_spj(compiler)
+        self.assertSuccess(resp)
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        self.assertTrue(problem.spj)
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
+        self.assertEqual(sorted(os.listdir(test_case_dir)), ["1.in", "2.in", "info"])
+        with open(os.path.join(test_case_dir, "info")) as f:
+            self.assertTrue(json.load(f)["spj"])
+
+    def test_judge_code_is_compiled_on_save(self, compiler):
+        """컴파일되지 않는 판정 코드로 저장하면 모든 제출이 시스템 오류가 된다."""
+        self.assertFailed(self._create_spj(compiler, error="error: expected ';'"))
+        self.assertEqual(Problem.objects.count(), 0)
+
+    def test_judge_code_is_required(self, compiler):
+        self.assertFailed(self._create(spj=True, cases=[case("1", "")]),
+                          "판정 코드와 언어를 넣어주세요")
+
+    def test_sample_output_is_typed_by_hand(self, compiler):
+        """예제 출력은 케이스에서 가져올 수 없다. 여러 정답 중 하나를 교사가 적는다."""
+        resp = self._create_spj(compiler, samples=[sample("1 2", "2 1")])
+        self.assertSuccess(resp)
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        self.assertEqual(problem.samples, [{"input": "1 2", "output": "2 1"}])
+
+    def test_turning_spj_off_clears_the_judge_code(self, compiler):
+        problem_id = self._create_spj(compiler).data["data"]["id"]
+        self.assertSuccess(self.client.put(self.url, data={
+            "id": problem_id, "title": "t", "description": "d",
+            "input_description": "i", "output_description": "o",
+            "difficulty": "L1", "tags": ["반복"], "samples": [sample()],
+            "cases": [case("1", "1")]}))
+        problem = Problem.objects.get(id=problem_id)
+        self.assertFalse(problem.spj)
+        self.assertIsNone(problem.spj_code)
 
 
 class TeacherProblemEditTest(TeacherProblemTestBase):

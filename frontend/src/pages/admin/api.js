@@ -152,6 +152,9 @@ export default {
   deleteProblem (id) {
     return ajax('admin/problem', 'delete', { params: { id } })
   },
+  getTestCasePreview (problemId) {
+    return ajax('test_case', 'get', { params: { problem_id: problemId, preview: 1 } })
+  },
   getProblem (id) {
     return ajax('admin/problem', 'get', { params: { id } })
   },

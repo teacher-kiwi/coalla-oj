@@ -146,6 +146,9 @@ export default {
   getMyProblems () {
     return ajax('teacher/problem', 'get')
   },
+  getTeacherTestCases (problemId) {
+    return ajax('teacher/problem/test_case', 'get', { params: { problem_id: problemId } })
+  },
   getMyProblem (id) {
     return ajax('teacher/problem', 'get', { params: { id } })
   },

@@ -263,11 +263,11 @@ class TestCaseZipProcessor(object):
 
         return info, test_case_id
 
-    def process_cases(self, cases):
-        """손으로 입력한 입출력 쌍을 테스트케이스로 저장한다.
+    def process_cases(self, cases, spj=False):
+        """손으로 입력한 케이스를 테스트케이스로 저장한다.
 
         zip 업로드와 결과물(파일 이름·info)이 같아야 채점 서버가 그대로 읽는다.
-        특수 채점은 정답 파일이 없어야 하므로 이 경로에서는 지원하지 않는다.
+        특수 채점은 정답 파일이 없다. 판정은 spj 코드가 하므로 입력만 쓴다.
         """
         test_case_id = rand_str()
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
@@ -275,19 +275,21 @@ class TestCaseZipProcessor(object):
         os.chmod(test_case_dir, 0o710)
 
         info = []
-        test_case_info = {"spj": False, "test_cases": {}}
+        test_case_info = {"spj": spj, "test_cases": {}}
         for index, case in enumerate(cases, start=1):
-            input_name, output_name = f"{index}.in", f"{index}.out"
+            input_name = f"{index}.in"
             # 채점 서버는 줄바꿈을 LF 로 본다(zip 경로와 같게 맞춘다)
             input_bytes = case["input"].replace("\r\n", "\n").encode("utf-8")
-            output_bytes = case["output"].replace("\r\n", "\n").encode("utf-8")
             with open(os.path.join(test_case_dir, input_name), "wb") as f:
                 f.write(input_bytes)
-            with open(os.path.join(test_case_dir, output_name), "wb") as f:
-                f.write(output_bytes)
-            data = {"input_name": input_name, "input_size": len(input_bytes),
-                    "output_name": output_name, "output_size": len(output_bytes),
-                    "stripped_output_md5": hashlib.md5(output_bytes.rstrip()).hexdigest()}
+            data = {"input_name": input_name, "input_size": len(input_bytes)}
+            if not spj:
+                output_name = f"{index}.out"
+                output_bytes = case["output"].replace("\r\n", "\n").encode("utf-8")
+                with open(os.path.join(test_case_dir, output_name), "wb") as f:
+                    f.write(output_bytes)
+                data.update({"output_name": output_name, "output_size": len(output_bytes),
+                             "stripped_output_md5": hashlib.md5(output_bytes.rstrip()).hexdigest()})
             info.append(data)
             test_case_info["test_cases"][str(index)] = data
 
@@ -336,6 +338,11 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
 
         ensure_created_by(problem, request.user)
 
+        # 예제로 고르라고 케이스 내용만 보여주는 경로. 내려받기와 달리 zip 을 만들지 않는다.
+        if request.GET.get("preview") == "1":
+            return self.success({"id": problem.test_case_id,
+                                 "cases": self.read_cases(problem.test_case_id)})
+
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
         if not os.path.isdir(test_case_dir):
             return self.error("테스트 케이스가 존재하지 않습니다")
@@ -365,7 +372,9 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                 f.write(chunk)
         info, test_case_id = self.process_zip(zip_file, spj=spj)
         os.remove(zip_file)
-        return self.success({"id": test_case_id, "info": info, "spj": spj})
+        # 올린 직후 바로 예제를 고를 수 있게 내용까지 함께 준다(교사 경로와 같다)
+        return self.success({"id": test_case_id, "info": info, "spj": spj,
+                             "cases": self.read_cases(test_case_id)})
 
 
 class CompileSPJAPI(APIView):
@@ -402,9 +411,19 @@ class ProblemPublishReviewAPI(APIView):
         return self.success({"visibility": problem.visibility})
 
 
-class ProblemBase(APIView):
+class ProblemBase(APIView, TestCaseZipProcessor):
     def common_checks(self, request):
         data = request.data
+        # 직접 입력한 케이스는 여기서 파일로 만든다. 그 뒤로는 파일로 올린 것과
+        # 구분되지 않는다(같은 이름·같은 info 를 쓴다).
+        cases = data.pop("cases", None)
+        if cases:
+            info, data["test_case_id"] = self.process_cases(cases, spj=data["spj"])
+            # 손으로 넣을 때는 배점을 고르게 나눈다. 케이스마다 다른 점수를 주려면
+            # 파일로 올린 뒤 표에서 고쳐야 한다.
+            data["test_case_score"] = [
+                {"input_name": c["input_name"], "output_name": c.get("output_name", ""),
+                 "score": 100 // len(info)} for c in info]
         error = check_test_case_score(data["test_case_id"], data["test_case_score"], data["spj"])
         if error:
             return error
