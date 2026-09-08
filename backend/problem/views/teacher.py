@@ -4,6 +4,7 @@
 여기의 모든 조회·수정은 "내가 만든 문제집"과 "내가 담당하는 학급"으로 범위를 좁힌다.
 """
 import io
+import os
 from urllib.parse import quote
 
 import xlsxwriter
@@ -16,17 +17,18 @@ from options.options import SysOptions
 from account.decorators import teacher_required
 from account.views.teacher import owned_class
 from submission.models import JudgeStatus, Submission
-from utils.api import APIView, validate_serializer
-from utils.shortcuts import int_or_none
+from utils.api import APIError, APIView, CSRFExemptAPIView, validate_serializer
+from utils.shortcuts import int_or_none, rand_str
 
 from ..models import (Problem, ProblemRuleType, ProblemSet, ProblemSetAssignment,
                       ProblemSetItem, ProblemVisibility)
 from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSetSerializer,
                            EditProblemSetSerializer,
+                           CreateTeacherProblemSerializer,
                            EditTeacherProblemSerializer, ProblemAdminSerializer,
                            ProblemSetDetailSerializer, ProblemSetItemOrderSerializer,
                            ProblemSetProblemSerializer, ProblemSetSerializer,
-                           TeacherProblemListSerializer, TeacherProblemSerializer)
+                           TeacherProblemListSerializer, TestCaseUploadForm)
 from judge.tasks import rejudge_problem_task
 from .admin import get_existing_problem_tags, TestCaseZipProcessor
 
@@ -299,6 +301,48 @@ def _progress_xlsx(data):
     return response
 
 
+class TeacherTestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
+    """교사용 테스트케이스 업로드와 미리보기.
+
+    /api/admin/test_case 는 미들웨어가 관리자로 막고 있고 교사는 is_admin_role()
+    에서 빠져 있어 쓸 수 없다. 처리 로직(TestCaseZipProcessor)은 그대로 나눠 쓴다.
+    """
+    request_parsers = ()
+
+    @teacher_required
+    def get(self, request):
+        """이미 저장된 문제의 케이스를 예제로 고르라고 보여준다."""
+        problem = self._owned(request.user, int_or_none(request.GET.get("problem_id")))
+        if not problem:
+            return self.error("문제가 존재하지 않습니다")
+        return self.success({"id": problem.test_case_id,
+                             "cases": self.read_cases(problem.test_case_id)})
+
+    @teacher_required
+    def post(self, request):
+        form = TestCaseUploadForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.error("업로드에 실패했습니다")
+        spj = form.cleaned_data["spj"] == "true"
+        zip_path = f"/tmp/{rand_str()}.zip"
+        with open(zip_path, "wb") as f:
+            for chunk in form.cleaned_data["file"]:
+                f.write(chunk)
+        try:
+            info, test_case_id = self.process_zip(zip_path, spj=spj)
+        finally:
+            os.remove(zip_path)
+        # 올린 직후 바로 예제를 고를 수 있게 내용까지 함께 준다
+        return self.success({"id": test_case_id, "info": info, "spj": spj,
+                             "cases": self.read_cases(test_case_id)})
+
+    @staticmethod
+    def _owned(user, problem_id):
+        if problem_id is None:
+            return None
+        return Problem.objects.filter(id=problem_id, created_by=user).first()
+
+
 class TeacherProblemAPI(APIView, TestCaseZipProcessor):
     """교사가 직접 만드는 문제.
 
@@ -322,7 +366,25 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
                     .prefetch_related("tags"))
         return self.success(TeacherProblemListSerializer(problems, many=True).data)
 
-    @validate_serializer(TeacherProblemSerializer)
+    def _materialize_cases(self, validated):
+        """직접 입력이든 파일이든 결국 하나의 test_case_id 로 모인다.
+
+        :return: (test_case_score, test_case_id) 또는 넣은 것이 없으면 (None, None)
+        """
+        cases = validated.get("cases")
+        if cases:
+            info, test_case_id = self.process_cases(cases)
+        elif validated.get("test_case_id"):
+            test_case_id = validated["test_case_id"]
+            info = self.read_case_info(test_case_id)
+            if not info:
+                raise APIError("올린 테스트 케이스를 찾을 수 없습니다. 다시 올려주세요")
+        else:
+            return None, None
+        return [{"input_name": c["input_name"], "output_name": c.get("output_name", ""),
+                 "score": 100 // len(info)} for c in info], test_case_id
+
+    @validate_serializer(CreateTeacherProblemSerializer)
     @teacher_required
     def post(self, request):
         data = request.data
@@ -330,25 +392,22 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         if error:
             return self.error(error)
 
-        cases = request.serializer.validated_data["cases"]
-        info, test_case_id = self.process_cases(cases)
+        test_case_score, test_case_id = self._materialize_cases(request.serializer.validated_data)
         with transaction.atomic():
-            problem = self._build_problem(data, cases, info, test_case_id, request.user)
+            problem = self._build_problem(data, test_case_score, test_case_id, request.user)
             problem.tags.set(tag_objs)
         return self.success(TeacherProblemListSerializer(problem).data)
 
-    def _build_problem(self, data, cases, info, test_case_id, user):
+    def _build_problem(self, data, test_case_score, test_case_id, user):
         return Problem.objects.create(
             title=data["title"],
             description=data["description"],
             input_description=data["input_description"],
             output_description=data["output_description"],
             hint=data.get("hint") or "",
-            samples=[{"input": c["input"], "output": c["output"]}
-                     for c in cases if c["is_sample"]],
+            samples=[{"input": s["input"], "output": s["output"]} for s in data["samples"]],
             test_case_id=test_case_id,
-            test_case_score=[{"input_name": c["input_name"], "output_name": c["output_name"],
-                              "score": 100 // len(info)} for c in info],
+            test_case_score=test_case_score,
             languages=SysOptions.language_names,
             template={},
             time_limit=self.DEFAULT_TIME_LIMIT,
@@ -373,17 +432,14 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         if error:
             return self.error(error)
 
-        cases = request.serializer.validated_data.get("cases")
-        if cases:
-            # 테스트케이스를 다시 만들면 예제와 배점도 함께 갱신한다
-            info, test_case_id = self.process_cases(cases)
+        test_case_score, test_case_id = self._materialize_cases(request.serializer.validated_data)
+        cases_changed = test_case_id is not None
+        if cases_changed:
             problem.test_case_id = test_case_id
-            problem.test_case_score = [{"input_name": c["input_name"],
-                                        "output_name": c["output_name"],
-                                        "score": 100 // len(info)} for c in info]
-            problem.samples = [{"input": c["input"], "output": c["output"]}
-                               for c in cases if c["is_sample"]]
+            problem.test_case_score = test_case_score
 
+        # 예제는 케이스와 따로 받는다. 케이스를 그대로 두고 예제만 고칠 수 있다.
+        problem.samples = [{"input": s["input"], "output": s["output"]} for s in data["samples"]]
         problem.title = data["title"]
         problem.description = data["description"]
         problem.input_description = data["input_description"]
@@ -396,7 +452,7 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
 
         # 테스트케이스가 바뀌면 이미 채점된 결과가 실제와 어긋난다. 다시 채점하고
         # 거기서 나온 값(정답률·대회 순위·푼 문제 표시)도 함께 다시 만든다.
-        if cases:
+        if cases_changed:
             rejudge_problem_task.send(problem.id)
         return self.success(TeacherProblemListSerializer(problem).data)
 

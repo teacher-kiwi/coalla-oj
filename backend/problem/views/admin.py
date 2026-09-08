@@ -21,7 +21,7 @@ from utils.shortcuts import int_or_none, rand_str, natural_sort_key
 from utils.tasks import delete_files
 from ..models import (ContestProblem, MAX_CONTEST_PROBLEMS, Problem, ProblemRuleType,
                       ProblemTag, ProblemVisibility)
-from ..serializers import (CompileSPJSerializer,
+from ..serializers import (CompileSPJSerializer, MAX_SAMPLE_BYTES,
                            CreateProblemSerializer, EditProblemSerializer,
                            ProblemAdminSerializer, TestCaseUploadForm,
                            AddContestProblemSerializer, ContestProblemAdminSerializer,
@@ -151,7 +151,64 @@ class ProblemTagAdminAPI(APIView):
         return self.success()
 
 
+# 예제로 고르라고 보여줄 케이스 수. 예제는 관례상 앞쪽 케이스라 앞에서 끊는다.
+SAMPLE_PICK_LIMIT = 5
+
+
 class TestCaseZipProcessor(object):
+    def read_case_info(self, test_case_id):
+        """저장된 테스트케이스의 info 를 목록 형태로 읽어 온다.
+
+        process_zip / process_cases 가 돌려주는 것과 같은 모양이라, 이미 올려둔
+        케이스로 문제를 저장할 때 배점을 매기는 데 그대로 쓸 수 있다.
+        """
+        path = os.path.join(settings.TEST_CASE_DIR, test_case_id, "info")
+        try:
+            with open(path, encoding="utf-8") as f:
+                test_case_info = json.load(f)
+        except (IOError, ValueError):
+            return []
+        cases = test_case_info.get("test_cases", {})
+        return [cases[index] for index in sorted(cases, key=int)]
+
+    def read_cases(self, test_case_id, limit=SAMPLE_PICK_LIMIT, max_bytes=MAX_SAMPLE_BYTES):
+        """저장된 테스트케이스의 앞쪽 몇 개를 내용까지 읽어 온다.
+
+        어느 케이스를 예제로 보여줄지 고르게 하려고 쓴다. 손으로 예제를 따로
+        치면 실제 채점 데이터와 어긋날 수 있는데, 여기서 고르면 그럴 수 없다.
+
+        너무 큰 케이스는 내용을 담지 않고 too_large 로만 알린다. 예제는 문제
+        화면에 그대로 나오므로 크면 학생 화면이 망가진다.
+        특수 채점은 정답 파일이 없어 output 이 None 이다(출력은 손으로 받는다).
+        """
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
+        try:
+            with open(os.path.join(test_case_dir, "info"), encoding="utf-8") as f:
+                test_case_info = json.load(f)
+        except (IOError, ValueError):
+            return []
+
+        spj = test_case_info.get("spj", False)
+        cases = []
+        # 키는 문자열로 저장된 번호다. 사전 순으로 읽으면 10 이 2 보다 앞선다.
+        for index in sorted(test_case_info.get("test_cases", {}), key=int)[:limit]:
+            data = test_case_info["test_cases"][index]
+            case = {"index": int(index), "input": None, "output": None, "too_large": False}
+            names = [("input", data.get("input_name"))]
+            if not spj:
+                names.append(("output", data.get("output_name")))
+            for key, name in names:
+                path = os.path.join(test_case_dir, name) if name else None
+                if not path or not os.path.isfile(path):
+                    continue
+                if os.path.getsize(path) > max_bytes:
+                    case["too_large"] = True
+                    continue
+                with open(path, "rb") as f:
+                    case[key] = f.read().decode("utf-8", errors="replace")
+            cases.append(case)
+        return cases
+
     def process_zip(self, uploaded_zip_file, spj, dir=""):
         try:
             zip_file = zipfile.ZipFile(uploaded_zip_file, "r")

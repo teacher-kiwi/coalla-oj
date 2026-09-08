@@ -5,19 +5,101 @@
 """
 import json
 import os
+import shutil
+from zipfile import ZipFile
 
 from django.conf import settings
 
 from account.models import School
 from submission.models import Submission
 from utils.api.tests import APITestCase
+from utils.shortcuts import rand_str
 
 from .models import Problem, ProblemTag, ProblemVisibility
 from .serializers import MAX_CASES, MAX_SAMPLE_BYTES, MAX_SAMPLES
 
 
-def case(input_="1 2", output="3", is_sample=True):
-    return {"input": input_, "output": output, "is_sample": is_sample}
+def case(input_="1 2", output="3"):
+    return {"input": input_, "output": output}
+
+
+# 예제는 케이스와 따로 보낸다. 화면이 케이스 내용을 복사해 채워 주지만
+# 교사가 고칠 수 있어, 서버는 번호가 아니라 최종 글자를 받는다.
+sample = case
+
+
+class TeacherTestCaseAPITest(APITestCase):
+    """교사용 테스트케이스 업로드·미리보기.
+
+    /api/admin/test_case 는 미들웨어가 관리자로 막아 교사가 쓸 수 없다.
+    같은 처리를 교사 경로에서도 할 수 있어야 파일로 케이스를 넣을 수 있다.
+    """
+    def setUp(self):
+        School.objects.create(code="S001", name="코알라초등학교", kind="초등학교")
+        self.teacher = self.create_teacher(username="김선생")
+        self.url = self.reverse("teacher_test_case_api")
+
+    def _zip(self, pairs):
+        base_dir = os.path.join("/tmp", rand_str())
+        os.makedirs(base_dir)
+        self.addCleanup(shutil.rmtree, base_dir, ignore_errors=True)
+        names = []
+        for index, (text_in, text_out) in enumerate(pairs, start=1):
+            for name, text in ((f"{index}.in", text_in), (f"{index}.out", text_out)):
+                with open(os.path.join(base_dir, name), "w", encoding="utf-8") as f:
+                    f.write(text)
+                names.append(name)
+        path = os.path.join(base_dir, "test_case.zip")
+        with ZipFile(path, "w") as f:
+            for name in names:
+                f.write(os.path.join(base_dir, name), name)
+        return path
+
+    def _upload(self, pairs):
+        with open(self._zip(pairs), "rb") as f:
+            return self.client.post(self.url, data={"spj": "false", "file": f},
+                                    format="multipart")
+
+    def test_upload_returns_cases_to_pick_samples_from(self):
+        resp = self._upload([("1 2", "3"), ("4 5", "9")])
+        self.assertSuccess(resp)
+        data = resp.data["data"]
+        self.addCleanup(shutil.rmtree,
+                        os.path.join(settings.TEST_CASE_DIR, data["id"]), ignore_errors=True)
+        self.assertEqual([(c["index"], c["input"], c["output"]) for c in data["cases"]],
+                         [(1, "1 2", "3"), (2, "4 5", "9")])
+
+    def test_preview_of_a_saved_problem(self):
+        data = self._upload([("7 8", "15")]).data["data"]
+        self.addCleanup(shutil.rmtree,
+                        os.path.join(settings.TEST_CASE_DIR, data["id"]), ignore_errors=True)
+        problem = Problem.objects.create(
+            title="t", description="d", input_description="i", output_description="o",
+            samples=[], test_case_id=data["id"], test_case_score=[], time_limit=1000,
+            memory_limit=256, languages=["C"], template={}, created_by=self.teacher,
+            rule_type="ACM", io_mode={}, difficulty="L1")
+        resp = self.client.get(self.url + f"?problem_id={problem.id}")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["cases"][0]["input"], "7 8")
+
+    def test_cannot_preview_another_teachers_problem(self):
+        data = self._upload([("1", "1")]).data["data"]
+        self.addCleanup(shutil.rmtree,
+                        os.path.join(settings.TEST_CASE_DIR, data["id"]), ignore_errors=True)
+        problem = Problem.objects.create(
+            title="t", description="d", input_description="i", output_description="o",
+            samples=[], test_case_id=data["id"], test_case_score=[], time_limit=1000,
+            memory_limit=256, languages=["C"], template={}, created_by=self.teacher,
+            rule_type="ACM", io_mode={}, difficulty="L1")
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        self.assertFailed(self.client.get(self.url + f"?problem_id={problem.id}"),
+                          "문제가 존재하지 않습니다")
+
+    def test_regular_user_denied(self):
+        self.client.logout()
+        self.create_user("일반사용자", "pass123")
+        self.assertFailed(self._upload([("1", "1")]))
 
 
 class TeacherProblemTestBase(APITestCase):
@@ -33,7 +115,8 @@ class TeacherProblemTestBase(APITestCase):
         data = {"title": "두 수의 합", "description": "<p>두 수를 더하세요</p>",
                 "input_description": "두 수", "output_description": "합",
                 "difficulty": "L1", "tags": ["입출력"],
-                "cases": [case("1 2", "3"), case("10 20", "30", is_sample=False)]}
+                "cases": [case("1 2", "3"), case("10 20", "30")],
+                "samples": [sample("1 2", "3")]}
         data.update(overrides)
         return self.client.post(self.url, data=data)
 
@@ -48,11 +131,12 @@ class TeacherProblemCreateTest(TeacherProblemTestBase):
         # 번호는 pk 다. 사람이 정하지 않는다.
         self.assertEqual(problem.display_id, str(problem.id))
 
-    def test_only_checked_cases_become_samples(self):
-        resp = self._create()
+    def test_samples_are_stored_as_given(self):
+        """예제는 케이스와 따로 저장된다. 화면에서 고른 뒤 고칠 수 있기 때문이다."""
+        resp = self._create(samples=[sample("1 2", "3 (예시)")])
         problem = Problem.objects.get(id=resp.data["data"]["id"])
-        self.assertEqual(problem.samples, [{"input": "1 2", "output": "3"}])
-        # 채점에는 두 개 모두 쓰인다
+        self.assertEqual(problem.samples, [{"input": "1 2", "output": "3 (예시)"}])
+        # 채점에는 케이스 두 개가 모두 쓰인다
         self.assertEqual(len(problem.test_case_score), 2)
 
     def test_test_case_files_are_written(self):
@@ -80,25 +164,39 @@ class TeacherProblemCreateTest(TeacherProblemTestBase):
                           "등록되지 않은 태그입니다: 없는태그")
 
     def test_at_least_one_sample_is_required(self):
-        self.assertFailed(self._create(cases=[case(is_sample=False)]))
+        self.assertFailed(self._create(samples=[]))
 
     def test_too_many_samples(self):
-        cases = [case(f"{i}", f"{i}") for i in range(MAX_SAMPLES + 1)]
-        self.assertFailed(self._create(cases=cases))
+        self.assertFailed(self._create(
+            samples=[sample(f"{i}", f"{i}") for i in range(MAX_SAMPLES + 1)]))
 
     def test_too_many_cases(self):
-        cases = [case(f"{i}", f"{i}", is_sample=(i == 0)) for i in range(MAX_CASES + 1)]
-        self.assertFailed(self._create(cases=cases))
+        self.assertFailed(self._create(
+            cases=[case(f"{i}", f"{i}") for i in range(MAX_CASES + 1)]))
 
     def test_sample_size_is_limited(self):
         # 예제는 문제를 여는 모든 학생에게 매번 전송되므로 크기를 제한한다
         big = "x" * (MAX_SAMPLE_BYTES + 1)
-        self.assertFailed(self._create(cases=[case(big, "1")]))
+        self.assertFailed(self._create(samples=[sample(big, "1")]))
 
     def test_big_case_is_allowed_when_not_a_sample(self):
+        """채점용 케이스는 커도 된다. 학생에게 나가지 않는다."""
         big = "x" * (MAX_SAMPLE_BYTES + 1)
-        self.assertSuccess(self._create(cases=[case("1", "1"),
-                                               case(big, "1", is_sample=False)]))
+        self.assertSuccess(self._create(cases=[case("1", "1"), case(big, "1")]))
+
+    def test_cases_are_required(self):
+        self.assertFailed(self._create(cases=[]), "cases: 테스트 케이스를 하나 이상 넣어주세요")
+
+    def test_cannot_use_both_input_methods(self):
+        self.assertFailed(self._create(test_case_id="a" * 32),
+                          "테스트 케이스는 직접 입력과 파일 중 하나로만 넣을 수 있습니다")
+
+    def test_unknown_uploaded_test_case_is_rejected(self):
+        data = {"title": "t", "description": "d", "input_description": "i",
+                "output_description": "o", "difficulty": "L1", "tags": ["입출력"],
+                "samples": [sample()], "test_case_id": "a" * 32}
+        self.assertFailed(self.client.post(self.url, data=data),
+                          "올린 테스트 케이스를 찾을 수 없습니다. 다시 올려주세요")
 
 
 class TeacherProblemEditTest(TeacherProblemTestBase):
@@ -109,7 +207,8 @@ class TeacherProblemEditTest(TeacherProblemTestBase):
     def _edit(self, **overrides):
         data = {"id": self.problem_id, "title": "바뀐 제목",
                 "description": "<p>d</p>", "input_description": "i",
-                "output_description": "o", "difficulty": "L3", "tags": ["반복"]}
+                "output_description": "o", "difficulty": "L3", "tags": ["반복"],
+                "samples": [sample("1 2", "3")]}
         data.update(overrides)
         return self.client.put(self.url, data=data)
 
@@ -123,11 +222,22 @@ class TeacherProblemEditTest(TeacherProblemTestBase):
 
     def test_edit_with_cases_replaces_test_cases(self):
         before = Problem.objects.get(id=self.problem_id).test_case_id
-        self.assertSuccess(self._edit(cases=[case("5", "5")]))
+        self.assertSuccess(self._edit(cases=[case("5", "5")], samples=[sample("5", "5")]))
         problem = Problem.objects.get(id=self.problem_id)
         self.assertNotEqual(problem.test_case_id, before)
         self.assertEqual(problem.samples, [{"input": "5", "output": "5"}])
         self.assertEqual(len(problem.test_case_score), 1)
+
+    def test_samples_can_change_without_touching_cases(self):
+        """예제만 고치려고 케이스를 통째로 다시 보내지 않아도 된다.
+
+        케이스가 그대로면 재채점도 돌지 않는다.
+        """
+        before = Problem.objects.get(id=self.problem_id).test_case_id
+        self.assertSuccess(self._edit(samples=[sample("9", "9")]))
+        problem = Problem.objects.get(id=self.problem_id)
+        self.assertEqual(problem.test_case_id, before)
+        self.assertEqual(problem.samples, [{"input": "9", "output": "9"}])
 
     def test_other_teacher_cannot_edit(self):
         self.client.logout()

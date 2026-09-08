@@ -298,7 +298,7 @@ class ImportProblemSerializer(serializers.Serializer):
 # 예제는 문제를 여는 모든 학생에게 매번 전송되므로 크기와 개수를 제한한다.
 MAX_SAMPLES = 3
 MAX_SAMPLE_BYTES = 2 * 1024
-# 손으로 넣는 테스트케이스. 많거나 크면 zip 업로드(관리자 화면)를 쓰는 게 맞다.
+# 손으로 넣는 테스트케이스. 많거나 크면 zip 으로 올리는 게 맞다.
 MAX_CASES = 20
 MAX_CASE_BYTES = 64 * 1024
 
@@ -308,8 +308,19 @@ class TeacherTestCaseSerializer(serializers.Serializer):
                                   trim_whitespace=False)
     output = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
                                    trim_whitespace=False)
-    # 학생에게 예제로 보여줄지. 체크하지 않은 것은 채점에만 쓰인다.
-    is_sample = serializers.BooleanField(default=False)
+
+
+class TeacherSampleSerializer(serializers.Serializer):
+    """학생에게 보여줄 예제.
+
+    화면이 테스트케이스의 내용을 여기에 복사해 넣어 주지만, 그 뒤 교사가 고칠
+    수 있다. 그래서 서버는 케이스 번호가 아니라 최종 글자만 받는다.
+    번호를 저장하면 손으로 고친 순간 거짓이 된다.
+    """
+    input = serializers.CharField(max_length=MAX_SAMPLE_BYTES, allow_blank=True,
+                                  trim_whitespace=False)
+    output = serializers.CharField(max_length=MAX_SAMPLE_BYTES, allow_blank=True,
+                                   trim_whitespace=False)
 
 
 class TeacherProblemSerializer(serializers.Serializer):
@@ -325,29 +336,44 @@ class TeacherProblemSerializer(serializers.Serializer):
     hint = serializers.CharField(allow_blank=True, required=False, default="")
     difficulty = serializers.ChoiceField(choices=Difficulty.choices())
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
-    cases = serializers.ListField(child=TeacherTestCaseSerializer(), allow_empty=False)
+    samples = serializers.ListField(child=TeacherSampleSerializer(), allow_empty=False)
+    # 테스트케이스를 넣는 두 가지 길. 직접 입력이면 cases, 파일로 올렸으면
+    # 업로드가 돌려준 test_case_id 가 온다. 만들 때는 둘 중 하나가 있어야 한다.
+    cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
+    test_case_id = serializers.CharField(max_length=32, required=False)
 
     def validate_cases(self, cases):
+        if not cases:
+            raise serializers.ValidationError("테스트 케이스를 하나 이상 넣어주세요")
         if len(cases) > MAX_CASES:
             raise serializers.ValidationError(
-                f"테스트 케이스는 {MAX_CASES}개까지 넣을 수 있습니다")
-        samples = [c for c in cases if c["is_sample"]]
-        if not samples:
-            raise serializers.ValidationError("예제로 보여줄 케이스를 하나 이상 골라주세요")
-        if len(samples) > MAX_SAMPLES:
-            raise serializers.ValidationError(f"예제는 {MAX_SAMPLES}개까지 고를 수 있습니다")
-        for case in samples:
-            if (len(case["input"].encode("utf-8")) > MAX_SAMPLE_BYTES
-                    or len(case["output"].encode("utf-8")) > MAX_SAMPLE_BYTES):
-                raise serializers.ValidationError(
-                    f"예제로 보여줄 케이스는 {MAX_SAMPLE_BYTES // 1024}KB 를 넘을 수 없습니다")
+                f"직접 입력하는 테스트 케이스는 {MAX_CASES}개까지입니다. "
+                "더 많으면 파일로 올려주세요")
         return cases
+
+    def validate_samples(self, samples):
+        if len(samples) > MAX_SAMPLES:
+            raise serializers.ValidationError(f"예제는 {MAX_SAMPLES}개까지 넣을 수 있습니다")
+        return samples
+
+    def validate(self, data):
+        if data.get("cases") and data.get("test_case_id"):
+            raise serializers.ValidationError(
+                "테스트 케이스는 직접 입력과 파일 중 하나로만 넣을 수 있습니다")
+        return data
+
+
+class CreateTeacherProblemSerializer(TeacherProblemSerializer):
+    def validate(self, data):
+        data = super().validate(data)
+        if not data.get("cases") and not data.get("test_case_id"):
+            raise serializers.ValidationError("테스트 케이스를 넣어주세요")
+        return data
 
 
 class EditTeacherProblemSerializer(TeacherProblemSerializer):
+    """고칠 때는 케이스를 다시 보내지 않으면 있던 것을 그대로 둔다."""
     id = serializers.IntegerField()
-    # 케이스를 다시 보내지 않으면 기존 테스트케이스를 그대로 둔다
-    cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
 
 
 class ReviewProblemPublishSerializer(serializers.Serializer):

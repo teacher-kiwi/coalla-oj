@@ -17,6 +17,8 @@ from utils.api.tests import APITestCase
 from utils.shortcuts import rand_str
 
 from .models import ProblemFavorite, ProblemTag, ProblemIOMode
+from .serializers import MAX_SAMPLE_BYTES
+from .views.admin import TestCaseZipProcessor
 from .models import (contest_problem_label, contest_problem_order, ContestProblem,
                      Problem, ProblemRuleType)
 from contest.models import Contest
@@ -348,6 +350,70 @@ class ProblemAPITest(ProblemCreateTestBase):
     def get_one_problem(self):
         resp = self.client.get(self.url + "?id=" + str(self.problem.id))
         self.assertSuccess(resp)
+
+
+class ReadCasesTest(APITestCase):
+    """저장된 테스트케이스를 되읽어 예제로 고를 수 있게 보여주는 부분.
+
+    예제를 손으로 따로 치면 실제 채점 데이터와 어긋날 수 있다. 여기서 고르면
+    그럴 수 없다는 것이 이 기능의 요점이다.
+    """
+    def setUp(self):
+        self.processor = TestCaseZipProcessor()
+        self.test_case_id = rand_str()
+        self.dir = os.path.join(settings.TEST_CASE_DIR, self.test_case_id)
+        os.makedirs(self.dir)
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+
+    def _write(self, cases, spj=False):
+        info = {"spj": spj, "test_cases": {}}
+        for index, (text_in, text_out) in enumerate(cases, start=1):
+            data = {"input_name": f"{index}.in", "input_size": len(text_in)}
+            with open(os.path.join(self.dir, f"{index}.in"), "w", encoding="utf-8") as f:
+                f.write(text_in)
+            if not spj:
+                data.update({"output_name": f"{index}.out", "output_size": len(text_out)})
+                with open(os.path.join(self.dir, f"{index}.out"), "w", encoding="utf-8") as f:
+                    f.write(text_out)
+            info["test_cases"][str(index)] = data
+        with open(os.path.join(self.dir, "info"), "w", encoding="utf-8") as f:
+            json.dump(info, f)
+
+    def test_reads_input_and_output(self):
+        self._write([("1 2", "3"), ("4 5", "9")])
+        cases = self.processor.read_cases(self.test_case_id)
+        self.assertEqual([(c["index"], c["input"], c["output"]) for c in cases],
+                         [(1, "1 2", "3"), (2, "4 5", "9")])
+        self.assertFalse(any(c["too_large"] for c in cases))
+
+    def test_only_the_first_few(self):
+        self._write([(str(i), str(i)) for i in range(10)])
+        cases = self.processor.read_cases(self.test_case_id)
+        self.assertEqual([c["index"] for c in cases], [1, 2, 3, 4, 5])
+
+    def test_numbers_are_sorted_as_numbers(self):
+        """키가 문자열이라 사전 순으로 읽으면 10 이 2 보다 앞선다"""
+        self._write([(str(i), str(i)) for i in range(12)])
+        cases = self.processor.read_cases(self.test_case_id, limit=12)
+        self.assertEqual([c["index"] for c in cases], list(range(1, 13)))
+
+    def test_large_case_is_flagged_not_returned(self):
+        """예제는 문제 화면에 그대로 나온다. 크면 학생 화면이 망가진다."""
+        self._write([("x" * (MAX_SAMPLE_BYTES + 1), "y")])
+        case = self.processor.read_cases(self.test_case_id)[0]
+        self.assertTrue(case["too_large"])
+        self.assertIsNone(case["input"])
+        self.assertEqual(case["output"], "y")
+
+    def test_spj_has_no_output(self):
+        """특수 채점은 정답 파일이 없다. 예제 출력은 손으로 받아야 한다."""
+        self._write([("1 2", "")], spj=True)
+        case = self.processor.read_cases(self.test_case_id)[0]
+        self.assertEqual(case["input"], "1 2")
+        self.assertIsNone(case["output"])
+
+    def test_missing_test_case_is_not_an_error(self):
+        self.assertEqual(self.processor.read_cases("없는아이디"), [])
 
 
 class ProblemFavoriteAPITest(ProblemCreateTestBase):
