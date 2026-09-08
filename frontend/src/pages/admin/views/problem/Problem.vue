@@ -19,12 +19,12 @@
         </el-row>
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item prop="input_description" label="입력 설명" required>
+            <el-form-item prop="input_description" label="입력 설명">
               <MarkdownEditor v-model="problem.input_description" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item prop="output_description" label="출력 설명" required>
+            <el-form-item prop="output_description" label="출력 설명">
               <MarkdownEditor v-model="problem.output_description" />
             </el-form-item>
           </el-col>
@@ -226,11 +226,12 @@ const route = useRoute()
 const router = useRouter()
 
 const formRef = ref(null)
+// 입력·출력 설명은 비워둘 수 있다(problem/serializers.py 참고).
+// 입력이 없는 문제도 있고, 교사가 비워 만든 문제를 관리자가 열었을 때
+// 아무것도 고치지 않았는데 저장이 막히면 안 된다.
 const rules = {
   title: { required: true, message: '제목을 입력하세요', trigger: 'blur' },
-  description: { required: true, message: '설명을 입력하세요', trigger: 'blur' },
-  input_description: { required: true, message: '입력 설명을 입력하세요', trigger: 'blur' },
-  output_description: { required: true, message: '출력 설명을 입력하세요', trigger: 'blur' }
+  description: { required: true, message: '설명을 입력하세요', trigger: 'blur' }
 }
 
 const loadingCompile = ref(false)
