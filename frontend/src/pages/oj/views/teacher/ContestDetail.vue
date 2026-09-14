@@ -139,9 +139,14 @@
       </div>
       <el-table v-loading="searching" :data="candidates"
                 class="full-width candidate-table" @selection-change="onSelectionChange">
-        <el-table-column type="selection" width="45" />
+        <el-table-column type="selection" width="45" :selectable="canPick" />
         <el-table-column label="#" prop="display_id" width="100" />
-        <el-table-column label="제목" prop="title" />
+        <el-table-column label="제목">
+          <template #default="{ row }">
+            {{ row.title }}
+            <span v-if="!canPick(row)" class="already-in">넣어 둠</span>
+          </template>
+        </el-table-column>
         <el-table-column label="난이도" width="90">
           <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
         </el-table-column>
@@ -202,6 +207,13 @@ const contestId = parseInt(route.params.contestId)
 
 const contest = ref({})
 const problems = ref([])
+// 이미 넣은 문제. 서버도 건너뛰지만, 고를 수 있으면 몇 개를 넣었는지 어긋나 보인다.
+// (대회 문제 목록은 problem_id 를 id 로 준다)
+const pickedIds = computed(() => new Set(problems.value.map(p => p.id)))
+
+function canPick (row) {
+  return !pickedIds.value.has(row.id)
+}
 const assignments = ref([])
 const myClasses = ref([])
 const candidates = ref([])
@@ -474,6 +486,12 @@ onMounted(() => {
   font-size: 13px;
   color: #606266;
   white-space: nowrap;
+}
+
+.already-in {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .picker-guide {

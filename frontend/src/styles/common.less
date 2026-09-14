@@ -63,6 +63,13 @@ body {
   white-space: pre-line;
 }
 
+// el-form-item 의 내용칸은 display:flex + flex-wrap:wrap 이라, 자식들이 자리가
+// 남는 한 한 줄에 늘어선다. 입력칸 아래에 따로 놓아야 하는 설명·버튼 줄에는
+// 이것을 주어 제 줄을 차지하게 한다.
+.form-item-row {
+  flex-basis: 100%;
+}
+
 // 아이콘과 글자를 한 줄에 나란히 둘 때. 기준선과 글꼴 치수에 기대지 않고
 // 상자 가운데끼리 맞춰서, 아이콘 크기가 달라져도 흔들리지 않는다.
 .icon-label {

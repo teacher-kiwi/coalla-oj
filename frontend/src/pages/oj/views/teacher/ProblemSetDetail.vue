@@ -129,9 +129,14 @@
       </div>
       <el-table v-loading="searching" :data="candidates"
                 class="full-width candidate-table" @selection-change="onSelectionChange">
-        <el-table-column type="selection" width="45" />
+        <el-table-column type="selection" width="45" :selectable="canPick" />
         <el-table-column label="#" prop="display_id" width="100" />
-        <el-table-column label="제목" prop="title" />
+        <el-table-column label="제목">
+          <template #default="{ row }">
+            {{ row.title }}
+            <span v-if="!canPick(row)" class="already-in">담겨 있음</span>
+          </template>
+        </el-table-column>
         <el-table-column label="난이도" width="90">
           <template #default="{ row }"><DifficultyTag :value="row.difficulty" /></template>
         </el-table-column>
@@ -175,6 +180,12 @@ const loading = ref(false)
 const saving = ref(false)
 const info = ref({ items: [], assignments: [] })
 const hasBlocked = computed(() => info.value.items.some(i => !i.problem_visible))
+// 이미 담긴 문제. 서버도 건너뛰지만, 고를 수 있으면 몇 개를 담았는지 어긋나 보인다.
+const pickedIds = computed(() => new Set(info.value.items.map(i => i.problem.id)))
+
+function canPick (row) {
+  return !pickedIds.value.has(row.id)
+}
 
 const editDialogVisible = ref(false)
 const editForm = reactive({ title: '', description: '' })
@@ -381,6 +392,12 @@ onMounted(() => {
   font-size: 13px;
   color: #606266;
   white-space: nowrap;
+}
+
+.already-in {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .picker-guide {

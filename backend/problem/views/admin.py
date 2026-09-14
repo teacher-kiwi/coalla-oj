@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import zipfile
 from wsgiref.util import FileWrapper
 
@@ -12,7 +13,9 @@ from django.http import StreamingHttpResponse, FileResponse
 from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
 from contest.models import Contest, ContestStatus
 from judge.dispatcher import SPJCompiler
-from judge.tasks import rejudge_problem_task
+from judge.tasks import rejudge_problem_task, verify_solution_task
+from judge.verify import attach_verification, clear_verification, read_verification, \
+    spec_from, start_verification
 from options.options import SysOptions
 from submission.models import Submission, JudgeStatus
 from utils.api import APIView, CSRFExemptAPIView, validate_serializer, APIError
@@ -21,7 +24,7 @@ from utils.shortcuts import int_or_none, rand_str, natural_sort_key
 from utils.tasks import delete_files
 from ..models import (ContestProblem, MAX_CONTEST_PROBLEMS, Problem, ProblemRuleType,
                       ProblemTag, ProblemVisibility)
-from ..serializers import (CompileSPJSerializer, MAX_SAMPLE_BYTES,
+from ..serializers import (CompileSPJSerializer, MAX_CASE_BYTES,
                            CreateProblemSerializer, EditProblemSerializer,
                            ProblemAdminSerializer, TestCaseUploadForm,
                            AddContestProblemSerializer, ContestProblemAdminSerializer,
@@ -151,10 +154,6 @@ class ProblemTagAdminAPI(APIView):
         return self.success()
 
 
-# 예제로 고르라고 보여줄 케이스 수. 예제는 관례상 앞쪽 케이스라 앞에서 끊는다.
-SAMPLE_PICK_LIMIT = 5
-
-
 class TestCaseZipProcessor(object):
     def read_case_info(self, test_case_id):
         """저장된 테스트케이스의 info 를 목록 형태로 읽어 온다.
@@ -171,14 +170,15 @@ class TestCaseZipProcessor(object):
         cases = test_case_info.get("test_cases", {})
         return [cases[index] for index in sorted(cases, key=int)]
 
-    def read_cases(self, test_case_id, limit=SAMPLE_PICK_LIMIT, max_bytes=MAX_SAMPLE_BYTES):
-        """저장된 테스트케이스의 앞쪽 몇 개를 내용까지 읽어 온다.
+    def read_cases(self, test_case_id, max_bytes=MAX_CASE_BYTES):
+        """저장된 테스트케이스를 전부, 담을 수 있는 것은 내용까지 읽어 온다.
 
-        어느 케이스를 예제로 보여줄지 고르게 하려고 쓴다. 손으로 예제를 따로
-        치면 실제 채점 데이터와 어긋날 수 있는데, 여기서 고르면 그럴 수 없다.
+        출제 화면이 이것으로 케이스 표를 채운다. 하나만 고치려고 전체를 다시
+        타이핑하지 않아도 되고, 예제도 여기서 골라 채운다.
 
-        너무 큰 케이스는 내용을 담지 않고 too_large 로만 알린다. 예제는 문제
-        화면에 그대로 나오므로 크면 학생 화면이 망가진다.
+        너무 큰 케이스는 내용 없이 크기만 알린다(too_large). 화면에서 고칠 수
+        없으므로, 저장할 때 화면이 {"keep": 번호} 로 돌려보내면 그 파일을 그대로
+        옮겨 살린다.
         특수 채점은 정답 파일이 없어 output 이 None 이다(출력은 손으로 받는다).
         """
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
@@ -191,9 +191,11 @@ class TestCaseZipProcessor(object):
         spj = test_case_info.get("spj", False)
         cases = []
         # 키는 문자열로 저장된 번호다. 사전 순으로 읽으면 10 이 2 보다 앞선다.
-        for index in sorted(test_case_info.get("test_cases", {}), key=int)[:limit]:
+        for index in sorted(test_case_info.get("test_cases", {}), key=int):
             data = test_case_info["test_cases"][index]
-            case = {"index": int(index), "input": None, "output": None, "too_large": False}
+            case = {"index": int(index), "input": None, "output": None,
+                    "input_size": data.get("input_size", 0),
+                    "output_size": data.get("output_size", 0), "too_large": False}
             names = [("input", data.get("input_name"))]
             if not spj:
                 names.append(("output", data.get("output_name")))
@@ -208,6 +210,25 @@ class TestCaseZipProcessor(object):
                     case[key] = f.read().decode("utf-8", errors="replace")
             cases.append(case)
         return cases
+
+    def test_case_digest(self, test_case_id):
+        """케이스 묶음의 내용을 나타내는 값.
+
+        저장할 때 예전 것과 견줘 같으면 파일을 갈아끼우지 않는다. 화면에서
+        숫자를 지웠다 그대로 다시 써도 "고쳤다" 가 되지 않게 하려는 것이다.
+        (화면이 판단하면 그런 것까지 수정으로 세어 재채점이 돈다)
+        """
+        test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id or "")
+        if not os.path.isdir(test_case_dir):
+            return None
+        digest = hashlib.sha256()
+        for name in sorted(os.listdir(test_case_dir)):
+            if name == "info":
+                continue
+            digest.update(name.encode("utf-8"))
+            with open(os.path.join(test_case_dir, name), "rb") as f:
+                digest.update(f.read())
+        return digest.hexdigest()
 
     def process_zip(self, uploaded_zip_file, spj, dir=""):
         try:
@@ -263,12 +284,26 @@ class TestCaseZipProcessor(object):
 
         return info, test_case_id
 
-    def process_cases(self, cases, spj=False):
-        """손으로 입력한 케이스를 테스트케이스로 저장한다.
+    def process_cases(self, cases, spj=False, previous_test_case_id=None):
+        """화면이 보낸 케이스 목록으로 테스트케이스를 다시 만든다.
 
         zip 업로드와 결과물(파일 이름·info)이 같아야 채점 서버가 그대로 읽는다.
         특수 채점은 정답 파일이 없다. 판정은 spj 코드가 하므로 입력만 쓴다.
+
+        {"keep": 번호} 항목은 화면이 내용을 불러오지 못한 케이스다(너무 크다).
+        이전 묶음에서 그 파일을 그대로 옮긴다. 이것이 없으면 큰 케이스가 있는
+        문제는 케이스 하나를 고치는 것만으로 나머지가 전부 사라진다.
         """
+        previous_dir = (os.path.join(settings.TEST_CASE_DIR, previous_test_case_id)
+                        if previous_test_case_id else None)
+        previous_info = {}
+        if previous_dir:
+            try:
+                with open(os.path.join(previous_dir, "info"), encoding="utf-8") as f:
+                    previous_info = json.load(f).get("test_cases", {})
+            except (IOError, ValueError):
+                previous_info = {}
+
         test_case_id = rand_str()
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
         os.mkdir(test_case_dir)
@@ -277,19 +312,11 @@ class TestCaseZipProcessor(object):
         info = []
         test_case_info = {"spj": spj, "test_cases": {}}
         for index, case in enumerate(cases, start=1):
-            input_name = f"{index}.in"
-            # 채점 서버는 줄바꿈을 LF 로 본다(zip 경로와 같게 맞춘다)
-            input_bytes = case["input"].replace("\r\n", "\n").encode("utf-8")
-            with open(os.path.join(test_case_dir, input_name), "wb") as f:
-                f.write(input_bytes)
-            data = {"input_name": input_name, "input_size": len(input_bytes)}
-            if not spj:
-                output_name = f"{index}.out"
-                output_bytes = case["output"].replace("\r\n", "\n").encode("utf-8")
-                with open(os.path.join(test_case_dir, output_name), "wb") as f:
-                    f.write(output_bytes)
-                data.update({"output_name": output_name, "output_size": len(output_bytes),
-                             "stripped_output_md5": hashlib.md5(output_bytes.rstrip()).hexdigest()})
+            kept = previous_info.get(str(case.get("keep"))) if case.get("keep") else None
+            if kept:
+                data = self._copy_case(previous_dir, test_case_dir, kept, index, spj)
+            else:
+                data = self._write_case(test_case_dir, case, index, spj)
             info.append(data)
             test_case_info["test_cases"][str(index)] = data
 
@@ -298,6 +325,37 @@ class TestCaseZipProcessor(object):
         for item in os.listdir(test_case_dir):
             os.chmod(os.path.join(test_case_dir, item), 0o640)
         return info, test_case_id
+
+    @staticmethod
+    def _write_case(test_case_dir, case, index, spj):
+        input_name = f"{index}.in"
+        # 채점 서버는 줄바꿈을 LF 로 본다(zip 경로와 같게 맞춘다)
+        input_bytes = (case.get("input") or "").replace("\r\n", "\n").encode("utf-8")
+        with open(os.path.join(test_case_dir, input_name), "wb") as f:
+            f.write(input_bytes)
+        data = {"input_name": input_name, "input_size": len(input_bytes)}
+        if not spj:
+            output_name = f"{index}.out"
+            output_bytes = (case.get("output") or "").replace("\r\n", "\n").encode("utf-8")
+            with open(os.path.join(test_case_dir, output_name), "wb") as f:
+                f.write(output_bytes)
+            data.update({"output_name": output_name, "output_size": len(output_bytes),
+                         "stripped_output_md5": hashlib.md5(output_bytes.rstrip()).hexdigest()})
+        return data
+
+    @staticmethod
+    def _copy_case(previous_dir, test_case_dir, kept, index, spj):
+        """화면이 불러오지 못한 케이스를 이전 묶음에서 그대로 옮긴다."""
+        data = {"input_name": f"{index}.in", "input_size": kept.get("input_size", 0)}
+        shutil.copyfile(os.path.join(previous_dir, kept["input_name"]),
+                        os.path.join(test_case_dir, data["input_name"]))
+        if not spj and kept.get("output_name"):
+            data.update({"output_name": f"{index}.out",
+                         "output_size": kept.get("output_size", 0),
+                         "stripped_output_md5": kept.get("stripped_output_md5")})
+            shutil.copyfile(os.path.join(previous_dir, kept["output_name"]),
+                            os.path.join(test_case_dir, data["output_name"]))
+        return data
 
     def filter_name_list(self, name_list, spj, dir=""):
         ret = []
@@ -377,6 +435,47 @@ class TestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
                              "cases": self.read_cases(test_case_id)})
 
 
+class SolutionVerifyAPI(APIView, TestCaseZipProcessor):
+    """정답 코드로 테스트케이스가 맞는지 확인한다(교사 화면과 같은 방식).
+
+    저장과 따로 논다. 저장할 때 자동으로 돌지 않고, 통과하지 못해도 저장을
+    막지 않는다. 저장하기 전에도 돌릴 수 있다.
+    """
+    @problem_permission_required
+    def post(self, request):
+        data = request.data
+        if not data.get("solver_code"):
+            return self.error("정답 코드를 입력해주세요")
+        if not data.get("cases") and not data.get("test_case_id"):
+            return self.error("테스트 케이스를 먼저 넣어주세요")
+        spec = spec_from(data, time_limit=data.get("time_limit") or 1000,
+                         memory_limit=data.get("memory_limit") or 256,
+                         io_mode=data.get("io_mode"))
+        if spec.get("cases"):
+            # {"keep": 번호} 는 내용이 없어 그대로는 채점할 수 없다. 저장 경로와
+            # 같은 process_cases 를 태워 이전 묶음에서 옮겨 온다.
+            previous = None
+            problem = Problem.objects.filter(id=int_or_none(data.get("problem_id"))).first()
+            if problem:
+                previous = problem.test_case_id
+            try:
+                _, spec["resolved_test_case_id"] = self.process_cases(
+                    spec["cases"], spj=bool(data.get("spj")), previous_test_case_id=previous)
+            except (KeyError, IOError, OSError):
+                return self.error("테스트 케이스를 읽지 못했습니다. 새로고침 후 다시 시도하세요")
+            spec["resolved_is_temporary"] = True
+        token = start_verification(spec)
+        verify_solution_task.send(token, spec)
+        return self.success({"token": token})
+
+    @problem_permission_required
+    def get(self, request):
+        record = read_verification(request.GET.get("token"))
+        if not record:
+            return self.error("검증 기록을 찾을 수 없습니다. 다시 눌러주세요")
+        return self.success(record)
+
+
 class CompileSPJAPI(APIView):
     @validate_serializer(CompileSPJSerializer)
     def post(self, request):
@@ -418,7 +517,14 @@ class ProblemBase(APIView, TestCaseZipProcessor):
         # 구분되지 않는다(같은 이름·같은 info 를 쓴다).
         cases = data.pop("cases", None)
         if cases:
-            info, data["test_case_id"] = self.process_cases(cases, spj=data["spj"])
+            previous = getattr(request, "_previous_test_case_id", None)
+            info, new_id = self.process_cases(cases, spj=data["spj"],
+                                              previous_test_case_id=previous)
+            # 다시 만든 것이 예전과 똑같으면 예전 것을 그대로 쓴다(재채점이 돌지 않게)
+            if previous and self.test_case_digest(new_id) == self.test_case_digest(previous):
+                delete_files.send(os.path.join(settings.TEST_CASE_DIR, new_id))
+                new_id = previous
+            data["test_case_id"] = new_id
             # 손으로 넣을 때는 배점을 고르게 나눈다. 케이스마다 다른 점수를 주려면
             # 파일로 올린 뒤 표에서 고쳐야 한다.
             data["test_case_score"] = [
@@ -453,6 +559,9 @@ class ProblemAPI(ProblemBase):
     @validate_serializer(CreateProblemSerializer)
     def post(self, request):
         data = request.data
+        # common_checks 가 cases 를 지우고 test_case_id 로 바꾼다. 지문을 뜰 때
+        # 화면이 검증에 보낸 것과 같은 값이 필요해 먼저 챙겨 둔다.
+        verified_cases = data.get("cases")
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
@@ -462,9 +571,28 @@ class ProblemAPI(ProblemBase):
         if error:
             return self.error(error)
         data["created_by"] = request.user
+        token = data.pop("verification_token", None)
         problem = Problem.objects.create(**data)
         problem.tags.set(tag_objs)
+        self._attach_verification(problem, token, data, verified_cases)
         return self.success(ProblemAdminSerializer(problem).data)
+
+    @staticmethod
+    def _attach_verification(problem, token, data, verified_cases=None):
+        """검증해 둔 결과가 지금 저장한 내용의 것이면 붙인다(지문 대조는 서버가 한다).
+
+        지문은 화면이 검증할 때 보낸 것과 같은 값으로 떠야 한다. common_checks 가
+        직접 입력한 cases 를 test_case_id 로 바꿔 두므로, 바뀌기 전 값을 받아 쓴다.
+        """
+        if not token:
+            return
+        source = dict(data)
+        if verified_cases:
+            source["cases"] = verified_cases
+            source["test_case_id"] = None
+        attach_verification(problem, token, spec_from(
+            source, time_limit=data["time_limit"], memory_limit=data["memory_limit"],
+            io_mode=data.get("io_mode")))
 
     @problem_permission_required
     def get(self, request):
@@ -503,10 +631,13 @@ class ProblemAPI(ProblemBase):
         except Problem.DoesNotExist:
             return self.error("문제가 존재하지 않습니다")
 
+        verified_cases = data.get("cases")
+        request._previous_test_case_id = problem.test_case_id
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
         tags = data.pop("tags")
+        token = data.pop("verification_token", None)
         tag_objs, error = get_existing_problem_tags(tags)
         if error:
             return self.error(error)
@@ -521,7 +652,10 @@ class ProblemAPI(ProblemBase):
         problem.tags.set(tag_objs)
 
         if test_cases_changed:
+            # 지난 검증 결과는 새 케이스에 대한 것이 아니다. 그대로 두면 거짓말이 된다.
+            clear_verification(problem.id)
             rejudge_problem_task.send(problem.id)
+        self._attach_verification(problem, token, data, verified_cases)
         return self.success({"rejudging": test_cases_changed})
 
     @problem_permission_required

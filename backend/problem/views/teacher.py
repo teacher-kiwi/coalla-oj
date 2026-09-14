@@ -9,6 +9,7 @@ import os
 from urllib.parse import quote
 
 import xlsxwriter
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q
 from django.http import HttpResponse
@@ -31,7 +32,10 @@ from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSe
                            ProblemSetProblemSerializer, ProblemSetSerializer,
                            TeacherProblemListSerializer, TestCaseUploadForm)
 from judge.dispatcher import SPJCompiler
-from judge.tasks import rejudge_problem_task
+from utils.tasks import delete_files
+from judge.tasks import rejudge_problem_task, verify_solution_task
+from judge.verify import attach_verification, clear_verification, spec_from, start_verification, \
+    read_verification
 from .admin import get_existing_problem_tags, TestCaseZipProcessor
 
 
@@ -345,6 +349,61 @@ class TeacherTestCaseAPI(CSRFExemptAPIView, TestCaseZipProcessor):
         return Problem.objects.filter(id=problem_id, created_by=user).first()
 
 
+class TeacherSolutionVerifyAPI(APIView, TestCaseZipProcessor):
+    """정답 코드로 테스트케이스가 맞는지 확인한다.
+
+    저장과 따로 논다. 저장할 때 자동으로 돌지 않고, 통과하지 못해도 저장을
+    막지 않는다. 참고용 도구라 필요할 때만 누른다.
+    저장하기 전에도 돌릴 수 있다 - 검증이 가장 필요한 때가 문제를 만드는 중이다.
+    채점 서버가 바쁘면 자리가 날 때까지 기다리므로 결과는 표(token)로 찾아간다.
+    """
+    @teacher_required
+    def post(self, request):
+        data = request.data
+        if not data.get("solver_code"):
+            return self.error("정답 코드를 입력해주세요")
+        if not data.get("cases") and not data.get("test_case_id"):
+            return self.error("테스트 케이스를 먼저 넣어주세요")
+        spec = spec_from(data,
+                         time_limit=TeacherProblemAPI.DEFAULT_TIME_LIMIT,
+                         memory_limit=TeacherProblemAPI.DEFAULT_MEMORY_LIMIT)
+        error = self._resolve_cases(request, spec, data)
+        if error:
+            return self.error(error)
+        token = start_verification(spec)
+        verify_solution_task.send(token, spec)
+        return self.success({"token": token})
+
+    def _resolve_cases(self, request, spec, data):
+        """화면이 보낸 케이스를 저장할 때와 똑같이 파일로 만들어 둔다.
+
+        {"keep": 번호} 는 내용이 없어 그대로는 채점할 수 없다. 저장 경로와 같은
+        process_cases 를 태워 이전 묶음에서 옮겨 온다. 검증만을 위한 묶음이라
+        끝나면 지운다(run_verification).
+        """
+        if not spec.get("cases"):
+            return None
+        previous = None
+        problem_id = int_or_none(request.data.get("problem_id"))
+        if problem_id is not None:
+            problem = Problem.objects.filter(id=problem_id, created_by=request.user).first()
+            previous = problem.test_case_id if problem else None
+        try:
+            _, spec["resolved_test_case_id"] = self.process_cases(
+                spec["cases"], spj=bool(data.get("spj")), previous_test_case_id=previous)
+        except (KeyError, IOError, OSError):
+            return "테스트 케이스를 읽지 못했습니다. 새로고침 후 다시 시도하세요"
+        spec["resolved_is_temporary"] = True
+        return None
+
+    @teacher_required
+    def get(self, request):
+        record = read_verification(request.GET.get("token"))
+        if not record:
+            return self.error("검증 기록을 찾을 수 없습니다. 다시 눌러주세요")
+        return self.success(record)
+
+
 class TeacherProblemAPI(APIView, TestCaseZipProcessor):
     """교사가 직접 만드는 문제.
 
@@ -388,14 +447,22 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         return {"spj": True, "spj_language": language, "spj_code": code,
                 "spj_version": version, "spj_compile_ok": True}
 
-    def _materialize_cases(self, validated, spj):
+    def _materialize_cases(self, validated, spj, previous=None):
         """직접 입력이든 파일이든 결국 하나의 test_case_id 로 모인다.
+
+        고쳐서 다시 만든 것이 예전과 똑같으면 예전 것을 그대로 쓴다. 화면에서
+        숫자를 지웠다 그대로 다시 써도 재채점이 돌지 않게 하려는 것이다.
+        (무엇이 바뀌었는지는 화면이 아니라 내용이 정한다)
 
         :return: (test_case_score, test_case_id) 또는 넣은 것이 없으면 (None, None)
         """
         cases = validated.get("cases")
         if cases:
-            info, test_case_id = self.process_cases(cases, spj=spj)
+            info, test_case_id = self.process_cases(cases, spj=spj,
+                                                    previous_test_case_id=previous)
+            if previous and self.test_case_digest(test_case_id) == self.test_case_digest(previous):
+                delete_files.send(os.path.join(settings.TEST_CASE_DIR, test_case_id))
+                return None, None
         elif validated.get("test_case_id"):
             test_case_id = validated["test_case_id"]
             info = self.read_case_info(test_case_id)
@@ -421,7 +488,29 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
             problem = self._build_problem(data, test_case_score, test_case_id,
                                           spj_fields, request.user)
             problem.tags.set(tag_objs)
+        self._attach_verification(request, problem, validated, spj_fields)
         return self.success(TeacherProblemListSerializer(problem).data)
+
+    def _attach_verification(self, request, problem, validated, spj_fields, fallback_id=None):
+        """검증해 둔 결과가 지금 저장한 내용의 것이면 문제에 붙인다.
+
+        지문이 다르면(검증한 뒤 케이스를 고쳤다면) 붙이지 않는다. 실패가 아니라
+        "이 내용은 아직 검증되지 않았다" 이므로 조용히 넘어간다.
+
+        지문은 **화면이 검증할 때 보낸 것과 같은 값**으로 떠야 한다. 직접 입력한
+        케이스를 저장하면서 만들어진 test_case_id 를 넣으면, 검증할 때는 cases 만
+        보냈으므로 지문이 달라져 결과가 영영 붙지 않는다.
+        """
+        token = request.data.get("verification_token")
+        if not token:
+            return
+        source = {**validated, **spj_fields}
+        if not source.get("cases") and not source.get("test_case_id"):
+            # 케이스를 손대지 않은 수정. 화면도 저장돼 있던 id 로 검증했다.
+            source["test_case_id"] = fallback_id
+        spec = spec_from(source, time_limit=self.DEFAULT_TIME_LIMIT,
+                         memory_limit=self.DEFAULT_MEMORY_LIMIT)
+        attach_verification(problem, token, spec)
 
     def _build_problem(self, data, test_case_score, test_case_id, spj_fields, user):
         return Problem.objects.create(
@@ -431,6 +520,8 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
             input_description=data["input_description"],
             output_description=data["output_description"],
             hint=data.get("hint") or "",
+            solver_language=data.get("solver_language") or None,
+            solver_code=data.get("solver_code") or None,
             samples=[{"input": s["input"], "output": s["output"]} for s in data["samples"]],
             test_case_id=test_case_id,
             test_case_score=test_case_score,
@@ -462,7 +553,8 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         spj_fields = self._spj_fields(validated)
         for field, value in spj_fields.items():
             setattr(problem, field, value)
-        test_case_score, test_case_id = self._materialize_cases(validated, spj_fields["spj"])
+        test_case_score, test_case_id = self._materialize_cases(
+            validated, spj_fields["spj"], previous=problem.test_case_id)
         cases_changed = test_case_id is not None
         if cases_changed:
             problem.test_case_id = test_case_id
@@ -475,6 +567,8 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         problem.input_description = data["input_description"]
         problem.output_description = data["output_description"]
         problem.hint = data.get("hint") or ""
+        problem.solver_language = data.get("solver_language") or None
+        problem.solver_code = data.get("solver_code") or None
         problem.difficulty = data["difficulty"]
         problem.last_update_time = now()
         problem.save()
@@ -483,7 +577,11 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         # 테스트케이스가 바뀌면 이미 채점된 결과가 실제와 어긋난다. 다시 채점하고
         # 거기서 나온 값(정답률·대회 순위·푼 문제 표시)도 함께 다시 만든다.
         if cases_changed:
+            # 지난 검증 결과는 새 케이스에 대한 것이 아니다. 그대로 두면 거짓말이 된다.
+            clear_verification(problem.id)
             rejudge_problem_task.send(problem.id)
+        self._attach_verification(request, problem, validated, spj_fields,
+                                  fallback_id=problem.test_case_id)
         return self.success(TeacherProblemListSerializer(problem).data)
 
     @teacher_required

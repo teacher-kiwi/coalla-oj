@@ -2,11 +2,12 @@ from django.urls import re_path
 
 from ..views.admin import (ProblemAPI, TestCaseAPI, CompileSPJAPI, ContestProblemAPI,
                            ExportProblemAPI, ImportProblemAPI, ProblemPublishReviewAPI,
-                           ProblemTagAdminAPI)
+                           ProblemTagAdminAPI, SolutionVerifyAPI)
 
 urlpatterns = [
     re_path(r"^test_case/?$", TestCaseAPI.as_view(), name="test_case_api"),
     re_path(r"^compile_spj/?$", CompileSPJAPI.as_view(), name="compile_spj"),
+    re_path(r"^problem/verify/?$", SolutionVerifyAPI.as_view(), name="solution_verify_api"),
     re_path(r"^problem/tags/?$", ProblemTagAdminAPI.as_view(), name="problem_tag_admin_api"),
     re_path(r"^problem/publish_review/?$", ProblemPublishReviewAPI.as_view(),
             name="problem_publish_review_api"),

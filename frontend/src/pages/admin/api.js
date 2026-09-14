@@ -152,6 +152,12 @@ export default {
   deleteProblem (id) {
     return ajax('admin/problem', 'delete', { params: { id } })
   },
+  verifySolution (data) {
+    return ajax('problem/verify', 'post', { data })
+  },
+  getVerification (token) {
+    return ajax('problem/verify', 'get', { params: { token } })
+  },
   getTestCasePreview (problemId) {
     return ajax('test_case', 'get', { params: { problem_id: problemId, preview: 1 } })
   },

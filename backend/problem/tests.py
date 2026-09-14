@@ -17,7 +17,7 @@ from utils.api.tests import APITestCase
 from utils.shortcuts import rand_str
 
 from .models import ProblemFavorite, ProblemTag, ProblemIOMode
-from .serializers import MAX_SAMPLE_BYTES
+from .serializers import MAX_CASE_BYTES
 from .views.admin import TestCaseZipProcessor
 from .models import (contest_problem_label, contest_problem_order, ContestProblem,
                      Problem, ProblemRuleType)
@@ -435,24 +435,26 @@ class ReadCasesTest(APITestCase):
                          [(1, "1 2", "3"), (2, "4 5", "9")])
         self.assertFalse(any(c["too_large"] for c in cases))
 
-    def test_only_the_first_few(self):
+    def test_reads_them_all(self):
+        """출제 화면이 표를 이것으로 채운다. 빠지면 저장할 때 사라진다."""
         self._write([(str(i), str(i)) for i in range(10)])
         cases = self.processor.read_cases(self.test_case_id)
-        self.assertEqual([c["index"] for c in cases], [1, 2, 3, 4, 5])
+        self.assertEqual([c["index"] for c in cases], list(range(1, 11)))
 
     def test_numbers_are_sorted_as_numbers(self):
         """키가 문자열이라 사전 순으로 읽으면 10 이 2 보다 앞선다"""
         self._write([(str(i), str(i)) for i in range(12)])
-        cases = self.processor.read_cases(self.test_case_id, limit=12)
+        cases = self.processor.read_cases(self.test_case_id)
         self.assertEqual([c["index"] for c in cases], list(range(1, 13)))
 
     def test_large_case_is_flagged_not_returned(self):
-        """예제는 문제 화면에 그대로 나온다. 크면 학생 화면이 망가진다."""
-        self._write([("x" * (MAX_SAMPLE_BYTES + 1), "y")])
+        """표에서 고칠 수 없는 크기다. 저장할 때 화면이 번호만 돌려보낸다."""
+        self._write([("x" * (MAX_CASE_BYTES + 1), "y")])
         case = self.processor.read_cases(self.test_case_id)[0]
         self.assertTrue(case["too_large"])
         self.assertIsNone(case["input"])
         self.assertEqual(case["output"], "y")
+        self.assertEqual(case["input_size"], MAX_CASE_BYTES + 1)
 
     def test_spj_has_no_output(self):
         """특수 채점은 정답 파일이 없다. 예제 출력은 손으로 받아야 한다."""

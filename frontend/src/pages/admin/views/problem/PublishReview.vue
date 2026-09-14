@@ -41,6 +41,19 @@
                 문제 목록에서 테스트 케이스를 내려받아 확인할 수 있습니다.
               </p>
 
+              <p class="detail-title">정답 코드 확인</p>
+              <p class="detail-note">
+                <!-- 테스트 케이스가 잘못되면 학생이 제대로 풀어도 오답이 나온다.
+                     출제자가 정답 코드로 확인해 두었는지 여기서 보고 판단한다. -->
+                <template v-if="!row.solver_verified_at">
+                  확인하지 않았습니다. 출제자가 정답 코드를 넣지 않았거나,
+                  넣은 뒤 테스트 케이스를 고쳤습니다.
+                </template>
+                <span v-else :class="row.solver_passed ? 'verify-ok' : 'verify-bad'">
+                  {{ row.solver_message }} ({{ localtime(row.solver_verified_at) }})
+                </span>
+              </p>
+
               <p v-if="row.hint" class="detail-title">힌트</p>
               <Markdown v-if="row.hint" class="detail-body" :source="row.hint" />
             </div>
@@ -126,6 +139,14 @@ onMounted(load)
 </script>
 
 <style scoped lang="less">
+.verify-ok {
+  color: #67c23a;
+}
+
+.verify-bad {
+  color: #e6a23c;
+}
+
   .full-width {
     width: 100%;
   }

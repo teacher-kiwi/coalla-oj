@@ -31,11 +31,22 @@ class CreateSampleSerializer(serializers.Serializer):
 
 
 class TeacherTestCaseSerializer(serializers.Serializer):
-    """손으로 넣는 테스트케이스 한 줄. 교사·관리자 화면이 함께 쓴다."""
+    """테스트케이스 한 줄. 교사·관리자 화면이 함께 쓴다.
+
+    keep 은 화면이 내용을 불러오지 못한 케이스다(너무 커서 표에서 못 고친다).
+    그 번호의 파일을 이전 묶음에서 그대로 옮긴다. 내용을 보내지 않으므로
+    "새로 입력한 케이스" 개수에도 세지 않는다.
+    """
     input = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
-                                  trim_whitespace=False)
+                                  trim_whitespace=False, required=False)
     output = serializers.CharField(max_length=MAX_CASE_BYTES, allow_blank=True,
-                                   trim_whitespace=False)
+                                   trim_whitespace=False, required=False)
+    keep = serializers.IntegerField(min_value=1, required=False)
+
+    def validate(self, data):
+        if not data.get("keep") and data.get("input") is None:
+            raise serializers.ValidationError("테스트 케이스의 입력이 없습니다")
+        return data
 
 
 class CreateTestCaseScoreSerializer(serializers.Serializer):
@@ -88,6 +99,11 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     tags = serializers.ListField(child=serializers.CharField(max_length=32), allow_empty=False)
     hint = serializers.CharField(allow_blank=True, allow_null=True)
     source = serializers.CharField(max_length=256, allow_blank=True, allow_null=True)
+    # 정답 코드. 넣지 않아도 되고, 넣어도 저장을 막지 않는다.
+    solver_language = LanguageNameChoiceField(required=False, allow_blank=True, allow_null=True)
+    solver_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # 저장 전에 검증했으면 그 표. 서버가 지문을 대조해 맞을 때만 결과를 붙인다.
+    verification_token = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, data):
         if data.get("cases") and data.get("test_case_id"):
@@ -150,8 +166,10 @@ class ProblemSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
+        # solver_code 는 이 문제의 정답이다. 나가면 학생이 그대로 낸다.
         exclude = ("test_case_score", "test_case_id", "visible",
-                   "spj_code", "spj_version", "spj_compile_ok")
+                   "spj_code", "spj_version", "spj_compile_ok",
+                   "solver_code", "solver_language")
 
 
 class _ContestProblemSerializer(serializers.Serializer):
@@ -360,11 +378,19 @@ class TeacherProblemSerializer(serializers.Serializer):
     spj = serializers.BooleanField(default=False)
     spj_language = SPJLanguageNameChoiceField(required=False, allow_blank=True, allow_null=True)
     spj_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # 정답 코드. 넣지 않아도 되고, 넣어도 저장을 막지 않는다.
+    solver_language = LanguageNameChoiceField(required=False, allow_blank=True, allow_null=True)
+    solver_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # 저장 전에 검증했으면 그 표. 서버가 지문을 대조해 맞을 때만 결과를 붙인다.
+    verification_token = serializers.CharField(required=False, allow_blank=True)
 
     def validate_cases(self, cases):
         if not cases:
             raise serializers.ValidationError("테스트 케이스를 하나 이상 넣어주세요")
-        if len(cases) > MAX_CASES:
+        # 불러온 그대로 돌려보내는 것(keep)은 세지 않는다. 상한은 사람이 표에
+        # 직접 쳐 넣는 양을 막으려는 것이지, 이미 있던 케이스를 막는 것이 아니다.
+        typed = [c for c in cases if not c.get("keep")]
+        if len(typed) > MAX_CASES:
             raise serializers.ValidationError(
                 f"직접 입력하는 테스트 케이스는 {MAX_CASES}개까지입니다. "
                 "더 많으면 파일로 올려주세요")

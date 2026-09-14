@@ -120,6 +120,16 @@ class Problem(models.Model):
     archived_accepted_number = models.BigIntegerField(default=0)
     archived_statistic_info = JSONField(default=dict)
 
+    # 출제자가 넣어 두는 정답 코드. 테스트케이스가 맞는지 확인하는 데만 쓴다.
+    # 채점에는 쓰이지 않고, 저장을 막지도 않는다 - 참고용 도구다.
+    # 학생에게 새면 답이 그대로 나가므로 ProblemSerializer 에서 뺀다.
+    solver_language = models.TextField(null=True, blank=True)
+    solver_code = models.TextField(null=True, blank=True)
+    # 마지막 검증 결과. 테스트케이스가 바뀌면 지운다(그대로 두면 거짓말이 된다).
+    solver_verified_at = models.DateTimeField(null=True, blank=True)
+    solver_passed = models.BooleanField(default=False)
+    solver_message = models.TextField(blank=True, default="")
+
     @property
     def display_id(self):
         """화면에 보이는 문제 번호. pk 를 그대로 쓴다.

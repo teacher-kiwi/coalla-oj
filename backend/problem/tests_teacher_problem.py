@@ -13,7 +13,9 @@ from django.conf import settings
 
 from account.models import School
 from submission.models import Submission
+from judge.verify import read_verification
 from utils.api.tests import APITestCase
+from utils.cache import cache
 from utils.shortcuts import rand_str
 
 from .models import Problem, ProblemTag, ProblemVisibility
@@ -247,6 +249,158 @@ class TeacherSpjProblemTest(TeacherProblemTestBase):
         problem = Problem.objects.get(id=problem_id)
         self.assertFalse(problem.spj)
         self.assertIsNone(problem.spj_code)
+
+
+class EditingOneCaseTest(TeacherProblemTestBase):
+    """케이스 하나만 고치는 흐름.
+
+    수정 화면이 저장된 케이스를 그대로 불러오므로 하나만 고쳐 저장할 수 있다.
+    화면이 내용을 불러오지 못한 큰 케이스는 {"keep": 번호} 로 돌려보낸다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.problem_id = self._create(cases=[case("1 2", "3"), case("4 5", "99")]
+                                       ).data["data"]["id"]
+
+    def _edit_cases(self, cases):
+        return self.client.put(self.url, data={
+            "id": self.problem_id, "title": "t", "description": "d",
+            "input_description": "i", "output_description": "o", "difficulty": "L1",
+            "tags": ["반복"], "samples": [sample()], "cases": cases})
+
+    def _read(self):
+        problem = Problem.objects.get(id=self.problem_id)
+        path = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
+        with open(os.path.join(path, "2.out")) as f:
+            return problem, f.read()
+
+    def test_fixing_one_case_keeps_the_others(self):
+        self.assertSuccess(self._edit_cases([case("1 2", "3"), case("4 5", "9")]))
+        problem, second = self._read()
+        self.assertEqual(second, "9")
+        self.assertEqual(len(problem.test_case_score), 2)
+
+    def test_kept_case_is_carried_over(self):
+        """화면이 불러오지 못한 케이스는 번호만 돌려보낸다. 파일이 살아 있어야 한다."""
+        self.assertSuccess(self._edit_cases([case("9 9", "18"), {"keep": 2}]))
+        problem = Problem.objects.get(id=self.problem_id)
+        path = os.path.join(settings.TEST_CASE_DIR, problem.test_case_id)
+        with open(os.path.join(path, "1.in")) as f:
+            self.assertEqual(f.read(), "9 9")
+        with open(os.path.join(path, "2.out")) as f:
+            self.assertEqual(f.read(), "99")
+
+    def test_saving_the_same_cases_is_not_a_change(self):
+        """숫자를 지웠다 그대로 다시 써도 고친 것이 아니다.
+
+        무엇이 바뀌었는지는 화면이 아니라 내용이 정한다. 그러지 않으면 아무것도
+        안 바꾼 저장에도 재채점이 돌고 검증 결과가 풀린다.
+        """
+        before_id = Problem.objects.get(id=self.problem_id).test_case_id
+        self.assertSuccess(self._edit_cases([case("1 2", "3"), case("4 5", "99")]))
+        self.assertEqual(Problem.objects.get(id=self.problem_id).test_case_id, before_id)
+
+    def test_loaded_cases_do_not_count_toward_the_typing_limit(self):
+        """상한은 사람이 표에 쳐 넣는 양을 막는 것이지 있던 케이스를 막지 않는다."""
+        cases = [{"keep": 1}] * (MAX_CASES + 5) + [case("1", "1")]
+        self.assertSuccess(self._edit_cases(cases))
+
+    def test_typed_cases_are_still_limited(self):
+        self.assertFailed(self._edit_cases([case(str(i), str(i))
+                                            for i in range(MAX_CASES + 1)]))
+
+
+class VerificationAttachTest(TeacherProblemTestBase):
+    """검증해 둔 결과가 저장할 때 문제에 붙는지.
+
+    지문은 화면이 검증에 보낸 것과 같은 값으로 떠야 한다. 직접 입력한 케이스는
+    저장하면서 test_case_id 가 만들어지는데, 그 id 로 지문을 뜨면 검증할 때와
+    달라져 결과가 영영 붙지 않는다. 화면에는 아무 오류도 나지 않는다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.verify_url = self.reverse("teacher_solution_verify_api")
+        # 액터에 무엇이 넘어가는지만 본다. 채점 서버는 부르지 않는다.
+        self.sent_specs = {}
+        patcher = mock.patch("problem.views.teacher.verify_solution_task.send",
+                             side_effect=lambda token, spec: self.sent_specs.update({token: spec}))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def verified_spec(self, token):
+        """액터에 넘어간 spec. dramatiq 를 세우지 않고 내용만 본다."""
+        return self.sent_specs[token]
+
+    def _verified_token(self, payload, passed=True):
+        """검증을 걸고, 채점 서버가 이렇게 답했다고 해 둔다"""
+        token = self.client.post(self.verify_url, data=payload).data["data"]["token"]
+        spec = read_verification(token)
+        cache.set("verification:" + token,
+                  {"status": "done", "fingerprint": spec["fingerprint"],
+                   "passed": passed, "message": "테스트 케이스 2개를 모두 통과했습니다"},
+                  60)
+        return token
+
+    def test_verifying_kept_cases(self):
+        """저장된 문제를 고칠 때, 케이스를 손대지 않으면 전부 {"keep": 번호} 로 온다.
+
+        내용이 없어 그대로는 채점할 수 없다. 저장 경로와 같은 방식으로 파일을
+        만들어 두고 그 묶음으로 돌려야 한다.
+        """
+        problem_id = self._create(cases=[case("1 2", "3"), case("4 5", "9")]
+                                  ).data["data"]["id"]
+        resp = self.client.post(self.verify_url, data={
+            "problem_id": problem_id, "cases": [{"keep": 1}, {"keep": 2}],
+            "solver_language": "C", "solver_code": "int main(){}"})
+        self.assertSuccess(resp)
+
+        # 채점 서버에 보낼 payload 가 만들어져야 한다(예전에는 KeyError 로 죽었다)
+        token = resp.data["data"]["token"]
+        spec = self.verified_spec(token)
+        self.assertIsNotNone(spec.get("resolved_test_case_id"))
+        path = os.path.join(settings.TEST_CASE_DIR, spec["resolved_test_case_id"])
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        with open(os.path.join(path, "2.out")) as f:
+            self.assertEqual(f.read(), "9")
+
+    def test_manual_cases_verified_then_saved(self):
+        cases = [case("1 2", "3"), case("10 20", "30")]
+        token = self._verified_token({
+            "cases": cases, "solver_language": "C", "solver_code": "int main(){}"})
+
+        resp = self._create(cases=cases, solver_language="C", solver_code="int main(){}",
+                            verification_token=token)
+        self.assertSuccess(resp)
+
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        self.assertTrue(problem.solver_passed)
+        self.assertIn("모두 통과", problem.solver_message)
+
+    def test_changing_the_cases_before_saving_drops_the_result(self):
+        token = self._verified_token({
+            "cases": [case("1 2", "3")], "solver_language": "C", "solver_code": "int main(){}"})
+
+        resp = self._create(cases=[case("9 9", "18")], solver_language="C",
+                            solver_code="int main(){}", verification_token=token)
+        self.assertSuccess(resp)
+        self.assertFalse(Problem.objects.get(id=resp.data["data"]["id"]).solver_passed)
+
+    def test_editing_without_touching_cases_keeps_the_result(self):
+        """케이스를 손대지 않은 수정. 화면도 저장돼 있던 id 로 검증한다."""
+        problem_id = self._create(solver_language="C", solver_code="int main(){}"
+                                  ).data["data"]["id"]
+        problem = Problem.objects.get(id=problem_id)
+        token = self._verified_token({
+            "test_case_id": problem.test_case_id,
+            "solver_language": "C", "solver_code": "int main(){}"})
+
+        self.assertSuccess(self.client.put(self.url, data={
+            "id": problem_id, "title": "제목만 바꿈", "description": "d",
+            "input_description": "i", "output_description": "o", "difficulty": "L1",
+            "tags": ["반복"], "samples": [sample()],
+            "solver_language": "C", "solver_code": "int main(){}",
+            "verification_token": token}))
+        self.assertTrue(Problem.objects.get(id=problem_id).solver_passed)
 
 
 class TeacherProblemEditTest(TeacherProblemTestBase):

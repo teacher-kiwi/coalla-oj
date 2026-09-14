@@ -23,6 +23,8 @@ class ContestRuleType(Choices):
 
 class CacheKey:
     waiting_queue = "waiting_queue"
+    # 정답 코드 검증. 문제를 저장하기 전에도 돌리므로 결과를 잠시 여기 둔다.
+    verification = "verification:"
     contest_rank_cache = "contest_rank_cache"
     website_config = "website_config"
 

@@ -146,6 +146,12 @@ export default {
   getMyProblems () {
     return ajax('teacher/problem', 'get')
   },
+  verifyTeacherSolution (data) {
+    return ajax('teacher/problem/verify', 'post', { data })
+  },
+  getTeacherVerification (token) {
+    return ajax('teacher/problem/verify', 'get', { params: { token } })
+  },
   getTeacherTestCases (problemId) {
     return ajax('teacher/problem/test_case', 'get', { params: { problem_id: problemId } })
   },

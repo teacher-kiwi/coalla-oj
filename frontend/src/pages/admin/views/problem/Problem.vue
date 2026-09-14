@@ -114,11 +114,7 @@
                   <el-option v-for="c in pickableCases" :key="c.index" :value="c.index"
                              :label="`${c.index}번`" :disabled="c.too_large" />
                 </el-select>
-                <el-button v-if="canLoadSaved" size="small" class="pick-hint"
-                           :loading="loadingCases" @click="loadSavedCases">
-                  저장된 케이스 불러오기
-                </el-button>
-                <span v-else-if="!pickableCases.length" class="pick-hint">
+                <span v-if="!pickableCases.length" class="pick-hint">
                   케이스를 넣으면 여기서 가져올 수 있습니다
                 </span>
               </el-form-item>
@@ -180,14 +176,10 @@
           </el-col>
           <el-col :span="10">
             <el-form-item label="테스트 케이스" :error="error.testCase">
-              <el-radio-group v-model="caseSource" size="small" class="case-source">
-                <el-radio-button value="file">파일 올리기</el-radio-button>
-                <el-radio-button value="manual">직접 입력</el-radio-button>
-              </el-radio-group>
-              <el-upload v-if="caseSource === 'file'"
-                         action="/api/admin/test_case" name="file" :data="{ spj: problem.spj }"
-                         :show-file-list="true" :on-success="uploadSucceeded" :on-error="uploadFailed">
-                <el-button size="small" type="primary">파일 선택</el-button>
+              <el-upload action="/api/admin/test_case" name="file" :data="{ spj: problem.spj }"
+                         :show-file-list="false"
+                         :on-success="uploadSucceeded" :on-error="uploadFailed">
+                <el-button size="small">zip 파일로 채우기</el-button>
               </el-upload>
             </el-form-item>
           </el-col>
@@ -211,51 +203,85 @@
               <el-input v-model="problem.io_mode.output" />
             </el-form-item>
           </el-col>
-          <el-col :span="24" v-if="caseSource === 'manual'">
+          <el-col :span="24">
             <p class="case-guide">
-              입력과 출력의 짝을 적습니다. 배점은 고르게 나뉩니다 - 케이스마다 다른
-              점수를 주려면 파일로 올린 뒤 아래 표에서 고치세요.
+              입력과 출력의 짝을 적습니다. 줄을 펼쳐서 고칠 수 있고, 직접 쳐 넣는 것은
+              {{ MAX_CASES }}개까지입니다(zip 으로 채운 것은 세지 않습니다).
+              너무 큰 케이스는 여기서 고칠 수 없고 그대로 유지됩니다.
               <template v-if="problem.spj">
                 스페셜 저지는 판정 코드가 맞고 틀림을 정하므로 출력을 넣지 않습니다.
               </template>
             </p>
-            <el-table :data="cases" class="full-width" size="small">
-              <el-table-column label="#" width="50" align="center">
+            <el-table :data="cases" class="full-width" size="small" row-key="key">
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div v-if="row.too_large" class="case-locked">
+                    내용이 커서 여기서 고칠 수 없습니다. 저장해도 그대로 유지됩니다.
+                  </div>
+                  <!-- el-row 의 gutter 는 음수 마진이라 표의 펼침 칸을 넘어간다 -->
+                  <div v-else class="case-editor">
+                    <el-input v-model="row.input" type="textarea" :rows="5" placeholder="입력" />
+                    <el-input v-if="!problem.spj" v-model="row.output" type="textarea" :rows="5"
+                              placeholder="출력" />
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="#" width="60" align="center">
                 <template #default="{ $index }">{{ $index + 1 }}</template>
               </el-table-column>
               <el-table-column label="입력">
-                <template #default="{ row }">
-                  <el-input v-model="row.input" type="textarea" :rows="3" placeholder="입력" />
-                </template>
+                <template #default="{ row }"><span class="case-peek">{{ peek(row, 'input') }}</span></template>
               </el-table-column>
               <el-table-column v-if="!problem.spj" label="출력">
+                <template #default="{ row }"><span class="case-peek">{{ peek(row, 'output') }}</span></template>
+              </el-table-column>
+              <el-table-column label="점수" width="120">
                 <template #default="{ row }">
-                  <el-input v-model="row.output" type="textarea" :rows="3" placeholder="출력" />
+                  <el-input size="small" v-model="row.score" placeholder="점수"
+                            :disabled="problem.rule_type !== 'OI'" />
                 </template>
               </el-table-column>
-              <el-table-column width="120" align="center">
+              <el-table-column width="80" align="center">
                 <template #default="{ $index }">
                   <el-button size="small" type="danger" link :disabled="cases.length === 1"
                              @click="cases.splice($index, 1)">삭제</el-button>
                 </template>
               </el-table-column>
+              <template #empty>
+                <span>케이스가 없습니다. "케이스 추가" 나 "zip 파일로 채우기" 를 쓰세요.</span>
+              </template>
             </el-table>
             <el-button size="small" :icon="Plus" class="add-case"
-                       @click="cases.push({ input: '', output: '' })">케이스 추가</el-button>
-          </el-col>
-          <el-col :span="24" v-else>
-            <el-table :data="problem.test_case_score" class="full-width">
-              <el-table-column prop="input_name" label="입력" />
-              <el-table-column prop="output_name" label="출력" />
-              <el-table-column prop="score" label="점수">
-                <template #default="{ row }">
-                  <el-input size="small" placeholder="점수" v-model="row.score"
-                            :disabled="problem.rule_type !== 'OI'" />
-                </template>
-              </el-table-column>
-            </el-table>
+                       @click="cases.push(newCase())">케이스 추가</el-button>
           </el-col>
         </el-row>
+
+        <el-form-item label="정답 코드 (선택)">
+          <!-- 내용칸이 flex + wrap 이라 그냥 두면 셀렉트와 편집기가 한 줄에 선다.
+               편집기는 그 남은 폭으로 초기화되어 좁게 굳는다.
+               이 파일의 다른 편집기들처럼 한 줄씩 감싼다. -->
+          <el-col :span="24">
+            <el-select v-model="problem.solver_language" placeholder="언어" clearable
+                       class="solver-language">
+              <el-option v-for="lang in allLanguage.languages" :key="lang.name"
+                         :value="lang.name" :label="lang.name" />
+            </el-select>
+          </el-col>
+          <el-col :span="24">
+            <code-mirror v-model="problem.solver_code" :mode="solverMode" />
+          </el-col>
+          <div class="verify-row form-item-row">
+            <el-button size="small" :loading="verifying" :disabled="!problem.solver_code"
+                       @click="verify">테스트 케이스 확인</el-button>
+            <span v-if="verifyMessage" :class="['verify-message', { bad: verifyFailed }]">
+              {{ verifyMessage }}
+            </span>
+          </div>
+          <p class="case-guide form-item-row">
+            넣어 둔 출력과 정답 코드의 결과가 같은지 봅니다. 저장과는 따로 돌고,
+            통과하지 못해도 저장할 수 있습니다.
+          </p>
+        </el-form-item>
 
         <el-form-item label="출처">
           <el-input placeholder="출처" v-model="problem.source" />
@@ -267,7 +293,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
@@ -306,42 +332,139 @@ function defaultProblem () {
     time_limit: 1000, memory_limit: 256, difficulty: 'L1', visible: true,
     tags: [], languages: [], template: {}, samples: [{ input: '', output: '' }],
     spj: false, spj_language: '', spj_code: '', spj_compile_ok: false,
+    solver_language: '', solver_code: '',
     test_case_id: '', test_case_score: [], rule_type: 'ACM', hint: '', source: '',
     io_mode: { io_mode: 'Standard IO', input: 'input.txt', output: 'output.txt' }
   }
 }
 
 const problem = ref(defaultProblem())
-// 테스트 케이스를 넣는 두 가지 길. 섞을 수 없어 하나를 고른다.
-const caseSource = ref('file')
-const cases = ref([{ input: '', output: '' }])
-// 업로드가 돌려주는 케이스 내용. 여기서 예제를 가져온다.
-const uploadedCases = ref([])
-const SAMPLE_PICK_LIMIT = 5
-const loadingCases = ref(false)
+const MAX_CASES = 20
+const MAX_SAMPLE_BYTES = 2 * 1024
+// newCase() 가 이 값을 쓴다. 선언 순서를 지켜야 TDZ 에 걸리지 않는다.
+let caseKey = 0
+const cases = ref([])
+const verifying = ref(false)
+const verifyMessage = ref('')
+const verifyFailed = ref(false)
+const verificationToken = ref('')
+const solverMode = ref('text/x-csrc')
+let verifyTimer = null
 
-// 고칠 때 이미 저장된 케이스에서 예제를 다시 고를 수 있게 한다
-const canLoadSaved = computed(() =>
-  caseSource.value === 'file' && !uploadedCases.value.length && !!problem.value.id)
-
-function loadSavedCases () {
-  loadingCases.value = true
-  api.getTestCasePreview(problem.value.id).then(res => {
-    loadingCases.value = false
-    uploadedCases.value = res.data.data.cases
+function verify () {
+  const payload = {
+    ...casePayload(),
+    // keep 으로 보낸 케이스를 서버가 이 문제의 것에서 찾아 쓴다
+    problem_id: problem.value.id,
+    solver_language: problem.value.solver_language,
+    solver_code: problem.value.solver_code,
+    spj: problem.value.spj,
+    spj_language: problem.value.spj_language,
+    spj_code: problem.value.spj_code,
+    time_limit: problem.value.time_limit,
+    memory_limit: problem.value.memory_limit,
+    io_mode: problem.value.io_mode
+  }
+  if (!payload.cases?.length && !payload.test_case_id) {
+    ElMessage.error('테스트 케이스를 먼저 넣어주세요')
+    return
+  }
+  verifying.value = true
+  verifyFailed.value = false
+  verifyMessage.value = '확인하는 중입니다…'
+  api.verifySolution(payload).then(res => {
+    verificationToken.value = res.data.data.token
+    pollVerification()
   }, () => {
-    loadingCases.value = false
+    verifying.value = false
+    verifyMessage.value = ''
   })
 }
 
-const pickableCases = computed(() => {
-  if (caseSource.value === 'file') return uploadedCases.value
-  return cases.value.slice(0, SAMPLE_PICK_LIMIT).map((c, index) => ({
-    // 스페셜 저지는 출력 칸이 없다. null 이면 예제 출력을 건드리지 않는다.
-    index: index + 1, input: c.input, output: problem.value.spj ? null : c.output,
-    too_large: false
+// 채점 서버가 바쁘면 자리가 날 때까지 기다리므로 결과가 늦을 수 있다
+// 화면을 떠나면 검증 결과는 필요 없다. 캐시에 남은 것은 시간이 지나 사라진다.
+onBeforeUnmount(() => clearTimeout(verifyTimer))
+
+function pollVerification () {
+  verifyTimer = setTimeout(() => {
+    api.getVerification(verificationToken.value).then(res => {
+      const record = res.data.data
+      if (record.status !== 'done') {
+        pollVerification()
+        return
+      }
+      verifying.value = false
+      verifyFailed.value = !record.passed
+      verifyMessage.value = record.message
+    }, () => {
+      verifying.value = false
+      verifyMessage.value = '확인하지 못했습니다. 다시 눌러주세요'
+    })
+  }, 2000)
+}
+
+// 예제는 여기서 골라 채운다. 표에 있는 케이스가 곧 후보다.
+const pickableCases = computed(() => cases.value.map((c, index) => ({
+  index: index + 1,
+  input: c.input,
+  // 스페셜 저지는 출력 칸이 없다. null 이면 예제 출력을 건드리지 않는다.
+  output: problem.value.spj ? null : c.output,
+  // 예제는 문제 화면에 그대로 나가므로 큰 것은 고를 수 없다
+  too_large: c.too_large || byteLength(c.input) > MAX_SAMPLE_BYTES ||
+    byteLength(c.output) > MAX_SAMPLE_BYTES
+})))
+
+// 직접 쳐 넣은 것만 센다. zip 으로 채우거나 불러온 것은 상한에 걸리지 않는다.
+const typedCount = computed(() => cases.value.filter(isTyped).length)
+
+function byteLength (text) {
+  return new TextEncoder().encode(text || '').length
+}
+
+function isTyped (row) {
+  if (row.too_large) return false
+  if (!row.loaded) return true
+  return row.input !== row.loaded.input || row.output !== row.loaded.output
+}
+
+function newCase () {
+  return { key: ++caseKey, index: null, input: '', output: '', too_large: false,
+    input_size: 0, output_size: 0, score: 0, loaded: null }
+}
+
+// 표에는 한 줄만 보여준다. 펼치면 전부 고칠 수 있다.
+function peek (row, field) {
+  if (row.too_large) return `${row[field + '_size']}바이트 (여기서 고칠 수 없음)`
+  const text = (row[field] || '').trim()
+  if (!text) return '(비어 있음)'
+  const first = text.split('\n')[0]
+  return first.length > 40 ? first.slice(0, 40) + '…' : first
+}
+
+// 서버가 준 케이스로 표를 채운다. loaded 를 남겨 두어 "고쳤나" 를 알 수 있다.
+function fillCases (loaded, scores = []) {
+  cases.value = loaded.map((c, index) => ({
+    key: ++caseKey,
+    index: c.index,
+    input: c.input || '',
+    output: c.output || '',
+    too_large: c.too_large,
+    input_size: c.input_size,
+    output_size: c.output_size,
+    score: scores[index]?.score ?? Math.floor(100 / (loaded.length || 1)),
+    loaded: c.too_large ? null : { input: c.input || '', output: c.output || '' }
   }))
-})
+  if (!cases.value.length) cases.value = [newCase()]
+}
+
+// 못 고치는 것과 손대지 않은 것은 번호만 보낸다 - 서버가 이전 파일을 그대로 쓴다
+function casePayload () {
+  return {
+    cases: cases.value
+      .filter(c => c.too_large || c.loaded || c.input.trim() || c.output.trim())
+      .map(c => (isTyped(c) ? { input: c.input, output: c.output } : { keep: c.index }))
+  }
+}
 
 // 케이스 내용을 예제 칸에 복사한다. 그 뒤 고치는 것은 사용자 몫이다.
 function fillSample (sample, index) {
@@ -369,11 +492,21 @@ onMounted(() => {
         const data = problemRes.data.data
         if (!data.spj_code) data.spj_code = ''
         data.spj_language = data.spj_language || 'C'
+        data.solver_code = data.solver_code || ''
+        data.solver_language = data.solver_language || ''
         problem.value = data
         testCaseUploaded.value = true
+        api.getTestCasePreview(data.id).then(
+          preview => fillCases(preview.data.data.cases, data.test_case_score), () => {})
+        // 지난 검증 결과를 되살린다. 케이스가 바뀌면 서버가 지워 두므로 없을 수 있다.
+        if (data.solver_verified_at) {
+          verifyFailed.value = !data.solver_passed
+          verifyMessage.value = data.solver_message
+        }
       })
     } else {
       title.value = '문제 추가'
+      cases.value = [newCase()]
       for (const item of res.data.data.languages) {
         problem.value.languages.push(item.name)
       }
@@ -465,7 +598,9 @@ function uploadSucceeded (response) {
   problem.value.test_case_score = fileList
   testCaseUploaded.value = true
   problem.value.test_case_id = response.data.id
-  uploadedCases.value = response.data.cases || []
+  // 올린 케이스로 표를 채운다. 여기서 바로 고칠 수 있다.
+  fillCases(response.data.cases || [], fileList)
+  ElMessage.success(`케이스 ${fileList.length}개를 채웠습니다`)
 }
 
 function uploadFailed () { ElMessage.error('업로드에 실패했습니다') }
@@ -501,15 +636,14 @@ async function submit () {
     if (error.spj) { ElMessage.error(error.spj); return }
   }
   if (!problem.value.languages.length) { error.languages = 'Please choose at least one language for problem'; ElMessage.error(error.languages); return }
-  const filledCases = cases.value.filter(c => c.input.trim() || c.output.trim())
-  if (caseSource.value === 'manual') {
-    if (!filledCases.length) { error.testCase = '테스트 케이스를 넣어주세요'; ElMessage.error(error.testCase); return }
-  } else if (!testCaseUploaded.value) {
-    error.testCase = '테스트 케이스 파일을 올려주세요'; ElMessage.error(error.testCase); return
-  } else if (problem.value.rule_type === 'OI') {
-    // 배점 표는 파일로 올렸을 때만 있다. 직접 입력은 서버가 고르게 나눈다.
-    for (const item of problem.value.test_case_score) {
-      if (parseInt(item.score) <= 0 || isNaN(parseInt(item.score))) {
+  const payloadCases = casePayload().cases
+  if (!payloadCases.length) { error.testCase = '테스트 케이스를 넣어주세요'; ElMessage.error(error.testCase); return }
+  if (typedCount.value > MAX_CASES) {
+    ElMessage.error(`직접 쳐 넣는 테스트 케이스는 ${MAX_CASES}개까지입니다`); return
+  }
+  if (problem.value.rule_type === 'OI') {
+    for (const row of cases.value) {
+      if (parseInt(row.score) <= 0 || isNaN(parseInt(row.score))) {
         ElMessage.error('테스트 케이스 점수가 올바르지 않습니다'); return
       }
     }
@@ -521,13 +655,18 @@ async function submit () {
     if (template.value[k].checked) problem.value.template[k] = template.value[k].code
   }
 
-  // 두 길 중 하나만 보낸다. 서버가 둘 다 오면 거절한다.
   const payload = { ...problem.value }
-  if (caseSource.value === 'manual') {
-    payload.cases = filledCases.map(c => ({ input: c.input, output: c.output }))
-    payload.test_case_id = ''
-    payload.test_case_score = []
-  }
+  // 검증해 둔 것이 있으면 표를 함께 보낸다. 그사이 케이스를 고쳤으면 서버가
+  // 지문을 대조해 붙이지 않는다.
+  if (verificationToken.value) payload.verification_token = verificationToken.value
+  // 케이스는 늘 전부 보낸다. 고치지 않은 것은 번호만 가고, 내용이 예전과 같으면
+  // 서버가 파일을 갈아끼우지 않으므로 재채점도 돌지 않는다.
+  payload.cases = payloadCases
+  payload.test_case_id = ''
+  payload.test_case_score = cases.value.map((row, index) => ({
+    input_name: `${index + 1}.in`, output_name: problem.value.spj ? '' : `${index + 1}.out`,
+    score: parseInt(row.score) || 0
+  }))
 
   const funcName = routeName.value === 'create-problem' ? 'createProblem' : 'editProblem'
   api[funcName](payload).then(res => {
@@ -543,8 +682,51 @@ async function submit () {
 </script>
 
 <style lang="less" scoped>
-.case-source {
+.verify-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.verify-message {
+  font-size: 13px;
+  color: #67c23a;
+  white-space: pre-line;
+}
+
+.verify-message.bad {
+  color: #e6a23c;
+}
+
+.solver-language {
+  width: 160px;
   margin-bottom: 8px;
+}
+
+.case-editor {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+/* 기본값 auto 면 안의 글이 길 때 칸이 줄지 않아 표가 가로로 넘친다 */
+.case-editor > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.case-locked {
+  font-size: 12px;
+  color: #909399;
+  padding: 8px 0;
+}
+
+.case-peek {
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: 12px;
+  color: #606266;
+  white-space: pre;
 }
 
 .case-guide {
