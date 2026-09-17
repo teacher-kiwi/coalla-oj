@@ -73,6 +73,34 @@
           @update:blocks="onWorkspaceChanged"
         />
 
+        <!-- 제출하기 전에 자기 입력으로 돌려 보고 print 로 중간 값을 찍어 보는 자리.
+             제출이 아니라 기록·통계에 남지 않는다(judge/run.py). -->
+        <div class="run-panel">
+          <div class="run-head">
+            <span class="run-title">입력</span>
+            <el-button v-for="(sample, index) in (problem.samples || [])" :key="'run-sample' + index"
+                       size="small" link type="primary" @click="runInput = sample.input">
+              예제 {{ index + 1 }} 넣기
+            </el-button>
+          </div>
+          <el-input v-model="runInput" type="textarea" :rows="3" resize="vertical"
+                    placeholder="실행할 때 프로그램에 넣을 입력" class="run-input" />
+
+          <div v-if="runResult" class="run-output">
+            <div class="run-head">
+              <span class="run-title">출력</span>
+              <span v-if="runMeta" class="run-meta">{{ runMeta }}</span>
+              <span v-if="sampleMatch !== null" :class="['run-match', { bad: !sampleMatch }]">
+                예제 {{ ranSample }}의 출력과 {{ sampleMatch ? '같습니다' : '다릅니다' }}
+              </span>
+            </div>
+            <p v-if="runNotice" :class="['run-notice', { bad: runResult.result !== 'ok' }]">
+              {{ runNotice }}
+            </p>
+            <pre v-if="runText !== null" class="run-pre">{{ runText }}</pre>
+          </div>
+        </div>
+
         <el-row justify="space-between">
           <el-col :span="10">
             <div class="status" v-if="statusVisible">
@@ -102,6 +130,10 @@
                        :disabled="problemSubmitDisabled || submitted" class="fl-right">
               <span v-if="submitting">제출 중</span>
               <span v-else>제출</span>
+            </el-button>
+            <el-button :loading="running" @click="runCode"
+                       :disabled="problemSubmitDisabled" class="fl-right run-button">
+              {{ running ? '실행 중' : '실행' }}
             </el-button>
           </el-col>
         </el-row>
@@ -437,6 +469,104 @@ function checkSubmissionStatus () {
   refreshStatus = setTimeout(checkStatus, 2000)
 }
 
+// ---- 실행 ----
+const runInput = ref('')
+const running = ref(false)
+const runResult = ref(null)
+// 실행한 그 순간의 입력. 결과를 보는 동안 입력 칸을 고쳐도 판단이 흔들리지 않게 따로 둔다.
+const ranInput = ref('')
+let runTimer = null
+
+// 채점기와 같은 기준으로 견준다: 출력 끝의 공백·줄바꿈만 무시한다.
+// (줄마다 끝 공백을 지우면 화면은 "같습니다" 인데 채점은 오답인 경우가 생긴다)
+function sameText (a, b) {
+  const clean = text => (text || '').replace(/\r\n/g, '\n').trimEnd()
+  return clean(a) === clean(b)
+}
+
+// 넣은 입력이 예제와 같으면 몇 번 예제인지
+const ranSample = computed(() => {
+  const index = (problem.value.samples || []).findIndex(s => sameText(s.input, ranInput.value))
+  return index < 0 ? null : index + 1
+})
+
+// 스페셜 저지는 정답이 여럿이라 예제 출력과 달라도 맞을 수 있어 견주지 않는다
+const sampleMatch = computed(() => {
+  if (!runResult.value || runResult.value.result !== 'ok') return null
+  if (!ranSample.value || problem.value.spj) return null
+  return sameText(runResult.value.output, problem.value.samples[ranSample.value - 1].output)
+})
+
+const runMeta = computed(() => {
+  const r = runResult.value
+  if (!r || r.time === undefined || r.time === null) return ''
+  return `${r.time}ms · ${(r.memory / 1024 / 1024).toFixed(1)}MB`
+})
+
+const runText = computed(() => {
+  const r = runResult.value
+  if (!r) return null
+  if (r.result === 'compile_error') return r.message
+  if (r.output === undefined) return null
+  return r.output === '' ? '(출력 없음)' : r.output
+})
+
+const runNotice = computed(() => {
+  const r = runResult.value
+  if (!r) return ''
+  switch (r.result) {
+    case 'ok': return r.truncated ? '출력이 길어 앞부분만 보여줍니다' : ''
+    case 'compile_error': return '컴파일되지 않습니다'
+    case 'runtime_error': return '실행 중 오류가 났습니다. 아래 메시지를 확인하세요'
+    // 가장 흔한 경우: input() 이 입력을 기다리다 시간이 다 된다
+    case 'time_limit': return ranInput.value.trim()
+      ? '시간이 초과했습니다'
+      : '시간이 초과했습니다. 입력을 기다리다 끝났을 수 있습니다 - 입력 칸을 채워보세요'
+    case 'memory_limit': return '메모리가 초과했습니다'
+    default: return r.message || '실행하지 못했습니다'
+  }
+})
+
+function runCode () {
+  if (code.value.trim() === '') {
+    ElMessage.error('코드가 비어있습니다')
+    return
+  }
+  clearTimeout(runTimer)
+  running.value = true
+  runResult.value = null
+  ranInput.value = runInput.value
+  const data = {
+    problem_id: problem.value.id,
+    language: language.value,
+    code: code.value,
+    input: runInput.value
+  }
+  if (contestID.value) data.contest_id = contestID.value
+  api.runCode(data).then(res => pollRun(res.data.data.token), () => {
+    running.value = false
+  })
+}
+
+function pollRun (token) {
+  runTimer = setTimeout(() => {
+    api.getRunResult(token).then(res => {
+      const record = res.data.data
+      if (record.status !== 'done') {
+        pollRun(token)
+        return
+      }
+      running.value = false
+      runResult.value = record
+    }, () => {
+      running.value = false
+    })
+  }, 1000)
+}
+
+// 화면을 떠나면 결과는 필요 없다. 캐시에 남은 것은 시간이 지나 사라진다.
+onBeforeUnmount(() => clearTimeout(runTimer))
+
 function submitCode () {
   if (code.value.trim() === '') {
     ElMessage.error('코드가 비어있습니다')
@@ -516,6 +646,68 @@ watch(() => route.fullPath, () => {
 </script>
 
 <style lang="less" scoped>
+.run-panel {
+  margin: 12px 0;
+}
+
+.run-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.run-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.run-output {
+  margin-top: 12px;
+}
+
+.run-meta {
+  font-size: 12px;
+  color: #909399;
+}
+
+.run-match {
+  font-size: 12px;
+  color: #67c23a;
+
+  &.bad {
+    color: #e6a23c;
+  }
+}
+
+.run-notice {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #606266;
+
+  &.bad {
+    color: #e6a23c;
+  }
+}
+
+.run-pre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 320px;
+  overflow: auto;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.run-button {
+  margin-right: 10px;
+}
+
 .flex-container {
   #problem-main {
     flex: auto;

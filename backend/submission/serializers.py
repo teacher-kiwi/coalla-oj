@@ -11,6 +11,17 @@ class CreateSubmissionSerializer(serializers.Serializer):
     blockly_state = serializers.CharField(required=False, allow_blank=True)
 
 
+class RunCodeSerializer(serializers.Serializer):
+    """문제 화면의 실행. 제출과 같은 문제·언어 검사를 거친다."""
+    problem_id = serializers.IntegerField()
+    language = serializers.CharField()
+    code = serializers.CharField(max_length=1024 * 1024)
+    contest_id = serializers.IntegerField(required=False)
+    # 입력은 비워도 된다(입력이 없는 문제도 있다)
+    input = serializers.CharField(max_length=64 * 1024, allow_blank=True, required=False,
+                                  default="", trim_whitespace=False)
+
+
 class _AuthorMixin:
     """작성자 표시. 학생 아이디는 무작위라 그대로 내보내도 아무것도 드러나지 않는다.
 

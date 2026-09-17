@@ -7,6 +7,7 @@ from problem.models import Problem
 from submission.models import Submission
 from judge.dispatcher import JudgeDispatcher
 from judge.rejudge import rejudge_problem
+from judge.run import run_code
 from judge.verify import run_verification
 from utils.shortcuts import DRAMATIQ_WORKER_ARGS
 
@@ -35,6 +36,12 @@ def verify_solution_task(token, spec):
     """
     passed, message = run_verification(token, spec)
     logger.info(f"Verification {token}: passed={passed} ({message})")
+
+
+@dramatiq.actor(**DRAMATIQ_WORKER_ARGS(max_retries=0))
+def run_code_task(token, user_id, spec):
+    """문제 화면의 실행. 실패해도 다시 시도하지 않는다 - 학생이 다시 누르면 된다."""
+    run_code(token, user_id, spec)
 
 
 @dramatiq.actor(**DRAMATIQ_WORKER_ARGS())

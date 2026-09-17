@@ -25,6 +25,8 @@ class CacheKey:
     waiting_queue = "waiting_queue"
     # 정답 코드 검증. 문제를 저장하기 전에도 돌리므로 결과를 잠시 여기 둔다.
     verification = "verification:"
+    # 문제 화면의 "실행". 제출이 아니라 결과를 잠시 여기 둔다.
+    run = "run:"
     contest_rank_cache = "contest_rank_cache"
     website_config = "website_config"
 

@@ -299,6 +299,13 @@ export default {
   submitCode (data) {
     return ajax('submission', 'post', { data })
   },
+  // 문제 화면의 실행. 제출이 아니라 결과는 표(token)로 찾아간다.
+  runCode (data) {
+    return ajax('run', 'post', { data })
+  },
+  getRunResult (token) {
+    return ajax('run', 'get', { params: { token } })
+  },
   getSubmissionList (offset, limit, params) {
     params.limit = limit
     params.offset = offset

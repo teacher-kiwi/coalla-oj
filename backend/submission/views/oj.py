@@ -5,18 +5,19 @@ from django.utils.timezone import now
 
 from account.decorators import login_required, check_contest_permission
 from contest.models import ContestStatus, ContestRuleType
-from judge.tasks import judge_task
+from judge.run import read_run, start_run
+from judge.tasks import judge_task, run_code_task
 from options.options import SysOptions
 from problem.models import (can_access_problem, ContestProblem, contest_problem_order,
                             Problem, ProblemRuleType)
-from problem.utils import problem_id_or_none
+from problem.utils import parse_problem_template, problem_id_or_none
 from utils.shortcuts import int_or_none
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.throttling import TokenBucket
 from account.models import my_student_ids
 from ..models import Submission
-from ..serializers import CreateSubmissionSerializer, SubmissionModelSerializer
+from ..serializers import CreateSubmissionSerializer, RunCodeSerializer, SubmissionModelSerializer
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
 
 
@@ -39,6 +40,32 @@ class SubmissionAPI(APIView):
                 if not any(user_ip in ipaddress.ip_network(cidr, strict=False) for cidr in contest.allowed_ip_ranges):
                     return self.error("이 대회에서 허용되지 않은 IP입니다")
 
+    @staticmethod
+    def resolve_problem(request, data):
+        """제출할 수 있는 문제와 언어인지. 문제 화면의 실행도 같은 검사를 거친다.
+
+        :return: (problem, None) 또는 (None, 오류 문구)
+        """
+        try:
+            problem = Problem.objects.get(id=data["problem_id"], visible=True)
+        except Problem.DoesNotExist:
+            return None, "문제가 존재하지 않습니다"
+        # 대회 제출이라면 그 대회에 담긴 문제여야 한다
+        if data.get("contest_id") and not ContestProblem.objects.filter(
+                contest_id=data["contest_id"], problem=problem).exists():
+            return None, "문제가 존재하지 않습니다"
+        # 비공개 문제에는 만든 교사와 배포받은 학급 학생만 제출할 수 있다.
+        # (대회 문제는 check_contest_permission 이 이미 판단했다)
+        if not data.get("contest_id") and not can_access_problem(problem, request.user):
+            return None, "문제가 존재하지 않습니다"
+        if data["language"] == "Block Coding":
+            if "Python3" not in problem.languages:
+                return None, "블록 코딩은 이 문제에서 Python3가 허용되어야 사용할 수 있습니다"
+        elif data["language"] not in problem.languages:
+            language = data["language"]
+            return None, f"{language} 언어는 이 문제에서 사용할 수 없습니다"
+        return problem, None
+
     @validate_serializer(CreateSubmissionSerializer)
     @login_required
     def post(self, request):
@@ -56,24 +83,9 @@ class SubmissionAPI(APIView):
         if error:
             return self.error(error)
 
-        try:
-            problem = Problem.objects.get(id=data["problem_id"], visible=True)
-        except Problem.DoesNotExist:
-            return self.error("문제가 존재하지 않습니다")
-        # 대회 제출이라면 그 대회에 담긴 문제여야 한다
-        if data.get("contest_id") and not ContestProblem.objects.filter(
-                contest_id=data["contest_id"], problem=problem).exists():
-            return self.error("문제가 존재하지 않습니다")
-        # 비공개 문제에는 만든 교사와 배포받은 학급 학생만 제출할 수 있다.
-        # (대회 문제는 위에서 check_contest_permission 이 이미 판단했다)
-        if not data.get("contest_id") and not can_access_problem(problem, request.user):
-            return self.error("문제가 존재하지 않습니다")
-        if data["language"] == "Block Coding":
-            if "Python3" not in problem.languages:
-                return self.error("블록 코딩은 이 문제에서 Python3가 허용되어야 사용할 수 있습니다")
-        elif data["language"] not in problem.languages:
-            language = data["language"]
-            return self.error(f"{language} 언어는 이 문제에서 사용할 수 없습니다")
+        problem, error = self.resolve_problem(request, data)
+        if error:
+            return self.error(error)
 
         submission = Submission.objects.create(user_id=request.user.id,
                                                language=data["language"],
@@ -105,6 +117,62 @@ class SubmissionAPI(APIView):
         else:
             submission_data = SubmissionSafeModelSerializer(submission).data
         return self.success(submission_data)
+
+
+class RunCodeAPI(SubmissionAPI):
+    """문제 화면에서 자기 입력으로 코드를 한 번 돌려 본다(judge/run.py).
+
+    제출과 같은 문제·언어·대회 권한 검사를 거치지만 제출은 만들지 않는다.
+    빈도 제한은 제출과 다른 통을 쓴다. 같은 통이면 디버깅하다 제출을 못 하게
+    되고, 실행은 제출보다 훨씬 자주 누른다.
+    """
+    # 사용자마다 10 번까지 몰아서 누를 수 있고, 6 초에 한 번씩 다시 채워진다
+    THROTTLE = {"capacity": 10, "fill_rate": 1 / 6, "default_capacity": 10}
+
+    def throttling(self, request):
+        bucket = TokenBucket(key=f"run:{request.user.id}", redis_conn=cache, **self.THROTTLE)
+        can_consume, wait = bucket.consume()
+        if not can_consume:
+            return f"실행이 너무 잦습니다. {int(wait) + 1}초 후에 다시 눌러주세요"
+
+    @validate_serializer(RunCodeSerializer)
+    @login_required
+    def post(self, request):
+        data = request.data
+        if data.get("contest_id"):
+            error = self.check_contest_permission(request)
+            if error:
+                return error
+
+        error = self.throttling(request)
+        if error:
+            return self.error(error)
+
+        problem, error = self.resolve_problem(request, data)
+        if error:
+            return self.error(error)
+
+        # 제출과 똑같이 감싼다. 빠뜨리면 제출은 되는데 실행은 컴파일 에러가 난다.
+        language = "Python3" if data["language"] == "Block Coding" else data["language"]
+        code = data["code"]
+        if language in problem.template:
+            template = parse_problem_template(problem.template[language])
+            code = "\n".join([template["prepend"], code, template["append"]])
+
+        spec = {"language": language, "code": code, "input": data.get("input") or "",
+                "time_limit": problem.time_limit, "memory_limit": problem.memory_limit,
+                "io_mode": problem.io_mode}
+        token = start_run(request.user.id)
+        run_code_task.send(token, request.user.id, spec)
+        return self.success({"token": token})
+
+    @login_required
+    def get(self, request):
+        record = read_run(request.GET.get("token"), request.user.id)
+        if not record:
+            return self.error("실행 기록을 찾을 수 없습니다. 다시 실행해주세요")
+        record = {k: v for k, v in record.items() if k != "user_id"}
+        return self.success(record)
 
 
 class SubmissionListAPI(APIView):
