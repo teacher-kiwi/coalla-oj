@@ -1,15 +1,20 @@
 <template>
-  <pre v-highlight="code"><code :class="language" :style="styleObject"></code></pre>
+  <pre v-highlight="code"><code :class="hljsName" :style="styleObject"></code></pre>
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
+import { hljsLanguage } from '@/plugins/highlight'
 
 const props = defineProps({
   language: { type: String, default: '' },
   code: { type: String, required: true },
   borderColor: { type: String, default: 'green' }
 })
+
+// 채점 언어 이름(C, Python3, ...)이 그대로 오므로 hljs 의 이름으로 바꿔 준다.
+// 모르는 이름을 주면 hljs 가 색을 입히지 않고 콘솔에 경고만 남긴다.
+const hljsName = computed(() => hljsLanguage(props.language))
 
 const styleObject = reactive({
   'border-left': `2px solid ${props.borderColor}`

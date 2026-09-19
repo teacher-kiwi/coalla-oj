@@ -32,7 +32,6 @@ use([
 import App from './App.vue'
 import router from './router'
 import highlight from '@/plugins/highlight'
-import katex from '@/plugins/katex'
 import { configureMarkdown } from '@/plugins/markdown'
 
 import Panel from '@oj/components/Panel.vue'
@@ -49,7 +48,6 @@ app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: ko })
 app.use(highlight)
-app.use(katex)
 
 for (const [key, component] of Object.entries({
   ArrowDown, Grid, InfoFilled, Medal, TrendCharts, Trophy,

@@ -8,7 +8,9 @@ import globals from 'globals'
 // 여기서는 "버그가 되는 것"만 본다: 미사용 변수, 정의되지 않은 변수, v-for 의 key 누락 등.
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**']
+    // md-editor-icons.js 는 우리가 쓴 코드가 아니라 받아 둔 라이브러리 파일이다
+    // (public/md-editor-icons.js 의 머리말 참고). 압축된 코드라 검사할 것이 없다.
+    ignores: ['dist/**', 'node_modules/**', 'public/md-editor-icons.js']
   },
   js.configs.recommended,
   ...vue.configs['flat/essential'],

@@ -12,7 +12,6 @@ import 'element-plus/dist/index.css'
 
 import App from './App.vue'
 import router from './router'
-import katex from '@/plugins/katex'
 import { configureMarkdown } from '@/plugins/markdown'
 
 import Panel from './components/Panel.vue'
@@ -30,7 +29,6 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: ko })
-app.use(katex)
 
 for (const [key, component] of Object.entries({
   CaretTop, Delete, Document, Download, Edit, InfoFilled,

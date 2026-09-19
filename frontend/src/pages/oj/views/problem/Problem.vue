@@ -3,7 +3,7 @@
     <div id="problem-main">
         <Panel :padding="40" shadow>
         <template #title>{{ problem.title }}</template>
-        <div v-if="problemLoaded" id="problem-content" class="markdown-body" v-katex>
+        <div v-if="problemLoaded" id="problem-content" class="markdown-body">
           <p class="title">문제 설명</p>
           <Markdown class="content" :source="problem.description" />
 

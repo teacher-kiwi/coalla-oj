@@ -128,7 +128,7 @@
         </div>
 
         <el-form-item class="hint-item" label="힌트">
-          <MarkdownEditor v-model="problem.hint" placeholder="" />
+          <MarkdownEditor v-model="problem.hint" />
         </el-form-item>
 
         <el-form-item label="코드 템플릿">

@@ -7,6 +7,9 @@
 //
 // 이 설정이 사라지면 XSS 가 다시 열린다. tests/markdown.spec.js 가 지킨다.
 import { config } from 'md-editor-v3'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+import { hljs } from './highlight'
 
 // 편집기와 미리보기가 함께 쓰는 언어 코드
 export const MD_LANGUAGE = 'ko'
@@ -47,9 +50,20 @@ export function markdownItConfig (md) {
   md.set({ html: false })
 }
 
+// 편집기와 미리보기가 쓰는 곁가지 라이브러리. 넘기지 않으면 화면이 뜰 때마다
+// 밖에서 받아온다 - 아이콘은 at.alicdn.com, 나머지는 unpkg.com 이다.
+// 학교 망에서 막히면 학생 화면의 코드 색과 수식, 도구모음 아이콘이 통째로 빠진다.
+// 그래서 번들에 든 인스턴스를 넘기고, 아이콘만 파일로 받아 같은 서버에서 준다.
+const EDITOR_EXTENSIONS = {
+  highlight: { instance: hljs },
+  katex: { instance: katex },
+  iconfont: '/md-editor-icons.js'
+}
+
 export function configureMarkdown () {
   config({
     markdownItConfig,
+    editorExtensions: EDITOR_EXTENSIONS,
     editorConfig: { languageUserDefined: { [MD_LANGUAGE]: KO_LANGUAGE } }
   })
 }

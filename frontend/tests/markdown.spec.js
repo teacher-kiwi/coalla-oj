@@ -1,6 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, it, expect, vi } from 'vitest'
 import MarkdownIt from 'markdown-it'
-import { markdownItConfig, MD_LANGUAGE, KO_LANGUAGE } from '@/plugins/markdown'
+import katex from 'katex'
+import { hljs } from '@/plugins/highlight'
+
+// 설정으로 무엇을 넘기는지 보려고 라이브러리의 config 만 가로챈다.
+vi.mock('md-editor-v3', () => ({ config: vi.fn() }))
+const { config } = await import('md-editor-v3')
+const { markdownItConfig, MD_LANGUAGE, KO_LANGUAGE, configureMarkdown } =
+  await import('@/plugins/markdown')
 
 // md-editor-v3 는 html 을 켠 채로 markdown-it 을 만들고, 그 인스턴스를
 // markdownItConfig 훅에 넘겨준다(lib/es/chunks/index.mjs). 같은 순서를 재현한다.
@@ -47,5 +57,26 @@ describe('편집기 언어', () => {
     for (const value of Object.values(KO_LANGUAGE.copyCode)) {
       expect(value).not.toMatch(/[\u4e00-\u9fff]/)
     }
+  })
+})
+
+describe('편집기가 쓰는 곁가지 라이브러리', () => {
+  it('번들에 든 것을 넘겨 화면마다 CDN 을 부르지 않는다', () => {
+    // 넘기지 않으면 라이브러리가 unpkg.com 에서 받아온다. 학교 망에서 막히면
+    // 학생 화면의 코드 색과 수식이 통째로 빠진다.
+    configureMarkdown()
+    const { editorExtensions } = config.mock.calls[0][0]
+    expect(editorExtensions.highlight.instance).toBe(hljs)
+    expect(editorExtensions.katex.instance).toBe(katex)
+  })
+
+  it('아이콘은 받아 둔 파일을 같은 서버에서 준다', () => {
+    // 기본값은 at.alicdn.com 이다. 주소가 우리 서버를 가리키는데 파일이 없으면
+    // 도구모음 아이콘이 전부 빈칸이 되므로 파일이 있는지도 함께 본다.
+    configureMarkdown()
+    const { iconfont } = config.mock.calls[0][0].editorExtensions
+    expect(iconfont.startsWith('/')).toBe(true)
+    const here = dirname(fileURLToPath(import.meta.url))
+    expect(existsSync(resolve(here, '..', `public${iconfont}`))).toBe(true)
   })
 })

@@ -40,3 +40,10 @@ for (const target of targets) {
     writable: true
   })
 }
+
+// happy-dom 의 document.compatMode 는 언제나 'BackCompat' 이라, katex 가 그릴 때마다
+// "quirks mode" 경고를 찍는다. 실제 화면(index.html)에는 doctype 이 있어 해당 없다.
+Object.defineProperty(document, 'compatMode', {
+  value: 'CSS1Compat',
+  configurable: true
+})
