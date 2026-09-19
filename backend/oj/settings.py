@@ -118,6 +118,9 @@ STATIC_URL = '/public/'
 
 AUTH_USER_MODEL = 'account.User'
 
+# 테스트는 실제 데이터 폴더(/data) 대신 임시 폴더를 쓴다. oj/test_runner.py 참고.
+TEST_RUNNER = "oj.test_runner.SafeDataDirRunner"
+
 TEST_CASE_DIR = os.path.join(DATA_DIR, "test_case")
 LOG_PATH = os.path.join(DATA_DIR, "log")
 

@@ -6,9 +6,11 @@
 import io
 import os
 import shutil
+import tempfile
 
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from PIL import Image
 
 from utils.api.tests import APITestCase
@@ -25,7 +27,14 @@ def png_bytes(size=(4, 4)):
 class ImageUploadAPITest(APITestCase):
     def setUp(self):
         self.url = self.reverse("image_upload_api")
-        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        # 실제 업로드 폴더(settings.UPLOAD_DIR = /data/public/upload)를 그대로 쓰면
+        # 안 된다. 여기서 폴더를 비우거나 지우면 돌린 서버의 그림이 통째로 날아간다.
+        # (pre-push 훅이 컨테이너 안에서 manage.py test 를 돌린다)
+        self.upload_dir = tempfile.mkdtemp(prefix="oj-image-upload-")
+        self.addCleanup(shutil.rmtree, self.upload_dir, ignore_errors=True)
+        override = override_settings(UPLOAD_DIR=self.upload_dir)
+        override.enable()
+        self.addCleanup(override.disable)
 
     def _upload(self, content=None, name="a.png"):
         content = png_bytes() if content is None else content
@@ -35,9 +44,7 @@ class ImageUploadAPITest(APITestCase):
 
     def _saved_path(self, resp):
         name = resp.data["data"]["url"].rsplit("/", 1)[-1]
-        path = os.path.join(settings.UPLOAD_DIR, name)
-        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
-        return path
+        return os.path.join(self.upload_dir, name)
 
     def test_requires_login(self):
         self.assertFailed(self._upload())
@@ -73,7 +80,7 @@ class ImageUploadAPITest(APITestCase):
         self.create_teacher()
         self.assertFailed(self._upload(content=b"not an image at all"),
                           "그림 파일이 아닙니다")
-        self.assertEqual(os.listdir(settings.UPLOAD_DIR), [])
+        self.assertEqual(os.listdir(self.upload_dir), [])
 
     def test_saved_file_keeps_the_original_bytes(self):
         """올린 그림이 잘리거나 바뀌지 않고 그대로 저장돼야 한다.
@@ -87,6 +94,3 @@ class ImageUploadAPITest(APITestCase):
         self.assertSuccess(resp)
         with open(self._saved_path(resp), "rb") as saved:
             self.assertEqual(saved.read(), content)
-
-    def tearDown(self):
-        shutil.rmtree(settings.UPLOAD_DIR, ignore_errors=True)
