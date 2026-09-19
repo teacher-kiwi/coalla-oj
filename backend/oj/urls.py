@@ -18,5 +18,5 @@ urlpatterns = [
     re_path(r"^api/admin/", include("contest.urls.admin")),
     re_path(r"^api/", include("submission.urls.oj")),
     re_path(r"^api/admin/", include("submission.urls.admin")),
-    re_path(r"^api/admin/", include("utils.urls")),
+    re_path(r"^api/", include("utils.urls")),
 ]

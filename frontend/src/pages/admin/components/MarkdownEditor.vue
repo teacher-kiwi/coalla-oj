@@ -4,6 +4,7 @@
     :editor-id="editorId"
     :language="MD_LANGUAGE"
     :toolbars-exclude="TOOLBARS_EXCLUDE"
+    :on-upload-img="onUploadImg"
     :footers="[]"
     style="height: 400px"
   />
@@ -11,9 +12,11 @@
 
 <script setup>
 import { computed, useId } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { MD_LANGUAGE } from '@/plugins/markdown'
+import { uploadImage } from '@/utils/upload'
 
 // 저장 포맷이 마크다운이라 편집기가 다루는 값이 곧 저장값이다.
 // (예전에는 HTML 로 저장해서, 편집기가 렌더한 HTML 을 부모에게 올려보내고
@@ -35,4 +38,18 @@ const text = computed({
   get: () => props.modelValue || '',
   set: (value) => emit('update:modelValue', value)
 })
+
+// 편집기는 이 훅이 없으면 그림을 올려도 아무 일도 하지 않는다(기본 동작이 없다).
+// 올린 주소를 callback 으로 돌려주면 편집기가 본문에 넣는다.
+async function onUploadImg (files, callback) {
+  const urls = []
+  for (const file of files) {
+    try {
+      urls.push(await uploadImage(file))
+    } catch (e) {
+      ElMessage.error(e.message || '그림을 올리지 못했습니다')
+    }
+  }
+  callback(urls)
+}
 </script>
