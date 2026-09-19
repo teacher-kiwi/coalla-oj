@@ -153,13 +153,13 @@ export default {
     return ajax('admin/problem', 'delete', { params: { id } })
   },
   verifySolution (data) {
-    return ajax('problem/verify', 'post', { data })
+    return ajax('admin/problem/verify', 'post', { data })
   },
   getVerification (token) {
-    return ajax('problem/verify', 'get', { params: { token } })
+    return ajax('admin/problem/verify', 'get', { params: { token } })
   },
   getTestCasePreview (problemId) {
-    return ajax('test_case', 'get', { params: { problem_id: problemId, preview: 1 } })
+    return ajax('admin/test_case', 'get', { params: { problem_id: problemId, preview: 1 } })
   },
   getProblem (id) {
     return ajax('admin/problem', 'get', { params: { id } })
@@ -187,7 +187,7 @@ export default {
     return ajax('sessions', 'get')
   },
   exportProblems (data) {
-    return ajax('export_problem', 'post', { data })
+    return ajax('admin/export_problem', 'post', { data })
   }
 }
 
