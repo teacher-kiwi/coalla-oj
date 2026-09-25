@@ -3,12 +3,12 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi } from 'vitest'
 import MarkdownIt from 'markdown-it'
-import katex from 'katex'
 import { hljs } from '@/plugins/highlight'
 
 // 설정으로 무엇을 넘기는지 보려고 라이브러리의 config 만 가로챈다.
-vi.mock('md-editor-v3', () => ({ config: vi.fn() }))
-const { config } = await import('md-editor-v3')
+// 편집기까지 딸려오지 않도록 전용 진입점에서 가져오므로 그 경로를 가로챈다.
+vi.mock('md-editor-v3/lib/es/config.mjs', () => ({ config: vi.fn() }))
+const { config } = await import('md-editor-v3/lib/es/config.mjs')
 const { markdownItConfig, MD_LANGUAGE, KO_LANGUAGE, configureMarkdown } =
   await import('@/plugins/markdown')
 
@@ -61,13 +61,23 @@ describe('편집기 언어', () => {
 })
 
 describe('편집기가 쓰는 곁가지 라이브러리', () => {
-  it('번들에 든 것을 넘겨 화면마다 CDN 을 부르지 않는다', () => {
+  it('코드 색은 번들에 든 것을 넘겨 화면마다 CDN 을 부르지 않는다', () => {
     // 넘기지 않으면 라이브러리가 unpkg.com 에서 받아온다. 학교 망에서 막히면
-    // 학생 화면의 코드 색과 수식이 통째로 빠진다.
+    // 학생 화면의 코드 색이 통째로 빠진다. 코드 블록은 거의 모든 문제에 있다.
     configureMarkdown()
     const { editorExtensions } = config.mock.calls[0][0]
     expect(editorExtensions.highlight.instance).toBe(hljs)
-    expect(editorExtensions.katex.instance).toBe(katex)
+  })
+
+  it('수식은 번들에 넣지 않고 우리 서버 주소로 넘긴다', () => {
+    // 번들에 넣으면 JS 와 폰트 수십 개를 모든 방문자가 첫 화면에서 받는다.
+    // 주소로 두면 수식이 있는 글에서만 받아가고, 그 곳이 unpkg 가 아니라
+    // 우리 서버여야 학교 망에서도 뜬다(vite.config.js 가 dist/katex 로 복사한다).
+    configureMarkdown()
+    const { katex } = config.mock.calls[0][0].editorExtensions
+    expect(katex.instance).toBeUndefined()
+    expect(katex.js.startsWith('/')).toBe(true)
+    expect(katex.css.startsWith('/')).toBe(true)
   })
 
   it('아이콘은 받아 둔 파일을 같은 서버에서 준다', () => {

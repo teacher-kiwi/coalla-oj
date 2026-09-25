@@ -6,9 +6,9 @@
 // HTML 이 글자로 이스케이프되어, 저장된 글이 스크립트를 실행할 수 없다.
 //
 // 이 설정이 사라지면 XSS 가 다시 열린다. tests/markdown.spec.js 가 지킨다.
-import { config } from 'md-editor-v3'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
+// config 만 쓰는데 'md-editor-v3' 에서 가져오면 편집기(MdEditor)까지 딸려와, 그것을
+// 쓰지 않는 학생 화면 번들에도 CodeMirror 가 들어간다. 전용 진입점을 쓴다.
+import { config } from 'md-editor-v3/lib/es/config.mjs'
 import { hljs } from './highlight'
 
 // 편집기와 미리보기가 함께 쓰는 언어 코드
@@ -53,10 +53,17 @@ export function markdownItConfig (md) {
 // 편집기와 미리보기가 쓰는 곁가지 라이브러리. 넘기지 않으면 화면이 뜰 때마다
 // 밖에서 받아온다 - 아이콘은 at.alicdn.com, 나머지는 unpkg.com 이다.
 // 학교 망에서 막히면 학생 화면의 코드 색과 수식, 도구모음 아이콘이 통째로 빠진다.
-// 그래서 번들에 든 인스턴스를 넘기고, 아이콘만 파일로 받아 같은 서버에서 준다.
-const EDITOR_EXTENSIONS = {
+//
+// 코드 색(hljs)은 번들에 든 인스턴스를 넘긴다. 코드 블록은 거의 모든 문제에 있다.
+//
+// 수식(katex)은 파일 주소로 넘긴다. 번들에 넣으면 JS 와 폰트 수십 개를 모든
+// 방문자가 첫 화면에서 받는데, 지금 저장된 글에는 수식이 한 건도 없다.
+// 주소로 두면 라이브러리가 필요할 때 받아가고, 받아오는 곳은 unpkg 가 아니라
+// 우리 서버다(vite.config.js 가 dist/katex 로 복사한다).
+// 테스트가 "수식은 우리 서버에서 받아온다" 를 지킬 수 있도록 내보낸다.
+export const EDITOR_EXTENSIONS = {
   highlight: { instance: hljs },
-  katex: { instance: katex },
+  katex: { js: '/katex/katex.min.js', css: '/katex/katex.min.css' },
   iconfont: '/md-editor-icons.js'
 }
 

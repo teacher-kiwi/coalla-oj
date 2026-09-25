@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { createApp, h, nextTick } from 'vue'
-import { MdPreview } from 'md-editor-v3'
-import { configureMarkdown, MD_LANGUAGE } from '@/plugins/markdown'
+// 화면이 쓰는 것과 같은 진입점이라야 설정이 걸린 상태를 본다.
+// 묶음 진입점('md-editor-v3')은 config 가 다른 인스턴스라 설정이 적용되지 않는다.
+import MdPreview from 'md-editor-v3/lib/es/MdPreview.mjs'
+import { configureMarkdown, MD_LANGUAGE, EDITOR_EXTENSIONS } from '@/plugins/markdown'
 
 configureMarkdown()
 
@@ -21,12 +23,21 @@ function preview (source) {
 }
 
 describe('저장된 마크다운 그리기', () => {
-  it('수식과 코드를 번들에 든 라이브러리로 그린다', async () => {
-    const el = preview('$x^2$\n\n```python\nprint(1)\n```')
+  it('코드를 번들에 든 라이브러리로 그린다', async () => {
+    const el = preview('```python\nprint(1)\n```')
     await nextTick()
-    // katex·hljs 인스턴스를 못 받았으면 수식은 글자로, 코드는 색 없이 나온다
-    expect(el.innerHTML).toContain('class="katex"')
+    // hljs 인스턴스를 못 받았으면 코드가 색 없이 나온다
     expect(el.innerHTML).toContain('hljs-')
+  })
+
+  it('수식은 우리 서버에서 늦게 받아온다', async () => {
+    // 수식은 쓰는 글이 드물어 번들에 넣지 않는다(plugins/markdown.js).
+    // 주소만 넘기므로 라이브러리가 필요할 때 받아간다. 그 주소가 밖(unpkg)이
+    // 아니라 우리 서버인지가 여기서 지켜야 할 것이다.
+    const { katex } = EDITOR_EXTENSIONS
+    expect(katex.instance).toBeUndefined()
+    expect(katex.js).toMatch(/^\//)
+    expect(katex.css).toMatch(/^\//)
   })
 
   it('화면을 그리면서 밖에서 무엇도 받아오지 않는다', async () => {

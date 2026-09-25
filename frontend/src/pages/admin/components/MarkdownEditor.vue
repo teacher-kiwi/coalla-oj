@@ -15,7 +15,11 @@
 <script setup>
 import { computed, useId } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MdEditor, config } from 'md-editor-v3'
+// 'md-editor-v3' 묶음 진입점과 전용 진입점은 설정 상태를 공유하지 않는다
+// (config 가 서로 다른 인스턴스가 된다). 학생 화면이 전용 진입점을 쓰므로
+// 여기서도 맞춰야 plugins/markdown.js 의 설정이 양쪽에 걸린다.
+import MdEditor from 'md-editor-v3/lib/es/MdEditor.mjs'
+import { config } from 'md-editor-v3/lib/es/config.mjs'
 import 'md-editor-v3/lib/style.css'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.css'

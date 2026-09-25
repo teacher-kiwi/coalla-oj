@@ -14,7 +14,9 @@
 
 <script setup>
 import { useId } from 'vue'
-import { MdPreview } from 'md-editor-v3'
+// 'md-editor-v3' 에서 가져오면 편집기(MdEditor)까지 딸려온다. 학생 화면은 글을
+// 보기만 하므로 미리보기 전용 진입점을 써서 CodeMirror·도구모음을 들이지 않는다.
+import MdPreview from 'md-editor-v3/lib/es/MdPreview.mjs'
 import 'md-editor-v3/lib/preview.css'
 import { MD_LANGUAGE } from '@/plugins/markdown'
 
