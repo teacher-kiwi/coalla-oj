@@ -1,0 +1,9 @@
+# 이 파일이 없으면 /robots.txt 요청이 SPA 폴백에 걸려 index.html 이 돌아간다.
+# 크롤러는 그것을 robots.txt 로 읽으려다 실패한다.
+
+User-agent: *
+Allow: /
+
+# 관리·교사 화면과 API 는 검색 결과에 올릴 것이 없다.
+Disallow: /admin/
+Disallow: /api/

@@ -15,6 +15,9 @@ function preview (source) {
     editorId: 'test-preview',
     language: MD_LANGUAGE,
     noMermaid: true,
+    // 화면(Markdown.vue)과 같은 조건으로 그린다. 여기서 빠뜨리면 아래의
+    // "무엇도 받아오지 않는다" 가 실제 화면을 지키지 못한다.
+    noKatex: true,
     // 아이콘만 파일을 받아 쓴다. 테스트 DOM 은 스크립트를 실행하지 않으니 끄고,
     // 그 주소가 우리 서버인지는 markdown.spec.js 가 본다.
     noIconfont: true
@@ -30,10 +33,20 @@ describe('저장된 마크다운 그리기', () => {
     expect(el.innerHTML).toContain('hljs-')
   })
 
-  it('수식은 우리 서버에서 늦게 받아온다', async () => {
-    // 수식은 쓰는 글이 드물어 번들에 넣지 않는다(plugins/markdown.js).
-    // 주소만 넘기므로 라이브러리가 필요할 때 받아간다. 그 주소가 밖(unpkg)이
-    // 아니라 우리 서버인지가 여기서 지켜야 할 것이다.
+  it('수식 파일은 아예 받아오지 않는다', async () => {
+    // 라이브러리는 내용에 수식이 있는지 보지 않고 화면마다 katex(74KB)를
+    // 받아간다. 지금 저장된 글에 수식은 0건이라 no-katex 로 끈다.
+    // 쓰게 되면 그 속성만 지우면 되고, 주소가 우리 서버를 가리키는지는 아래에서 본다.
+    preview('$x^2$')
+    await nextTick()
+    const urls = Array.from(document.querySelectorAll('script[src], link[href]'))
+      .map((node) => node.getAttribute('src') || node.getAttribute('href'))
+    expect(urls.filter((url) => url.includes('katex'))).toEqual([])
+  })
+
+  it('수식을 다시 켜더라도 받아올 곳은 우리 서버다', () => {
+    // 번들에 넣지 않고 주소로 넘긴다(plugins/markdown.js).
+    // 기본값으로 두면 unpkg.com 을 부르는데 학교 망에서 막힌다.
     const { katex } = EDITOR_EXTENSIONS
     expect(katex.instance).toBeUndefined()
     expect(katex.js).toMatch(/^\//)

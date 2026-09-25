@@ -4,11 +4,16 @@
        원시 HTML 은 plugins/markdown.js 에서 꺼둬(html: false) 글자로 이스케이프된다. -->
   <!-- no-mermaid: 순서도 문법은 쓰지 않는다. 켜 두면 화면마다 unpkg 에서
        mermaid 를 받아온다(수식·코드 색은 plugins/markdown.js 가 번들에서 준다). -->
+  <!-- no-katex: 수식은 쓰지 않는다. 켜 두면 내용에 수식이 있는지 보지 않고 화면마다
+       katex(74KB)를 받아간다 - "필요할 때만" 이 아니다. 저장된 글에 수식은 0건이다.
+       쓰게 되면 이 속성만 지우면 되고, 파일은 이미 /katex/ 에 있다.
+       편집기(MarkdownEditor.vue)도 함께 꺼야 한쪽만 보이는 일이 없다. -->
   <MdPreview
     :model-value="source || ''"
     :editor-id="previewId"
     :language="MD_LANGUAGE"
     no-mermaid
+    no-katex
   />
 </template>
 

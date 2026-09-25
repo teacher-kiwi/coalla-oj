@@ -8,6 +8,7 @@
     :footers="[]"
     no-mermaid
     no-prettier
+    no-katex
     style="height: 400px"
   />
 </template>
@@ -40,8 +41,10 @@ config({
 // 문제 설명·공지에 쓸 일이 없거나, 눌러도 할 일이 없는 것을 뺀다.
 // mermaid(순서도 문법)·prettier(마크다운 정렬)는 각각 밖에서 라이브러리를
 // 받아와야 하고, save 는 폼의 저장 단추가 따로 있어 눌러도 아무 일이 없다.
+// katex 를 끈 채로 단추를 두면 눌러서 넣은 수식이 어디에서도 그려지지 않는다.
 const TOOLBARS_EXCLUDE = [
-  'github', 'mermaid', 'prettier', 'save', 'previewOnly', 'htmlPreview', 'catalog'
+  'github', 'mermaid', 'prettier', 'save', 'previewOnly', 'htmlPreview', 'catalog',
+  'katex'
 ]
 
 const props = defineProps({
