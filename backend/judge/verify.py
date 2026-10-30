@@ -59,7 +59,8 @@ RESULT_MESSAGES = {
 # 판정을 좌우하는 것들. 하나라도 달라지면 지난 결과는 그 내용의 것이 아니다.
 # resolved_test_case_id 는 여기 없다. 검증하려고 잠시 만든 묶음의 id 라 매번
 # 달라지는데, 판정을 좌우하는 것은 그 안의 내용(cases)이지 id 가 아니다.
-FINGERPRINT_FIELDS = ("solver_language", "solver_code", "test_case_id", "cases",
+# keep_from 은 cases 의 {"keep": 번호} 가 어느 묶음의 번호인지 정하므로 함께 본다.
+FINGERPRINT_FIELDS = ("solver_language", "solver_code", "test_case_id", "cases", "keep_from",
                       "spj_language", "spj_code", "time_limit", "memory_limit")
 
 
@@ -154,6 +155,7 @@ def spec_from(data, *, time_limit, memory_limit, io_mode=None):
         "solver_code": data.get("solver_code") or None,
         "test_case_id": data.get("test_case_id") or None,
         "cases": data.get("cases") or None,
+        "keep_from": (data.get("keep_from") or None) if data.get("cases") else None,
         "spj_language": data.get("spj_language") if data.get("spj") else None,
         "spj_code": data.get("spj_code") if data.get("spj") else None,
         "spj_version": data.get("spj_version"),

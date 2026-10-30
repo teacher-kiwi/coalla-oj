@@ -390,7 +390,8 @@ class TeacherSolutionVerifyAPI(APIView, TestCaseZipProcessor):
             previous = problem.test_case_id if problem else None
         try:
             _, spec["resolved_test_case_id"] = self.process_cases(
-                spec["cases"], spj=bool(data.get("spj")), previous_test_case_id=previous)
+                spec["cases"], spj=bool(data.get("spj")),
+                keep_from=self.keep_source(data.get("keep_from"), previous))
         except (KeyError, IOError, OSError):
             return "테스트 케이스를 읽지 못했습니다. 새로고침 후 다시 시도하세요"
         spec["resolved_is_temporary"] = True
@@ -458,8 +459,8 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         """
         cases = validated.get("cases")
         if cases:
-            info, test_case_id = self.process_cases(cases, spj=spj,
-                                                    previous_test_case_id=previous)
+            keep_from = self.keep_source(validated.get("keep_from"), previous)
+            info, test_case_id = self.process_cases(cases, spj=spj, keep_from=keep_from)
             if previous and self.test_case_digest(test_case_id) == self.test_case_digest(previous):
                 delete_files.send(os.path.join(settings.TEST_CASE_DIR, test_case_id))
                 return None, None

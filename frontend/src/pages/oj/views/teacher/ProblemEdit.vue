@@ -274,6 +274,8 @@ const form = reactive({
 // newCase() 가 이 값을 쓴다. ref 초기값이 setup 실행 중에 만들어지므로
 // 선언이 뒤에 있으면 TDZ 에 걸린다.
 let caseKey = 0
+// 표의 index(= {keep: 번호})가 가리키는 묶음. 업로드했으면 그 묶음이고 저장된 문제의 것이 아니다.
+let casesFrom = ''
 const cases = ref([newCase()])
 const uploading = ref(false)
 const samples = ref([newSample()])
@@ -322,7 +324,9 @@ function peek (row, field) {
 }
 
 // 서버가 준 케이스로 표를 채운다. loaded 를 남겨 두어 "고쳤나" 를 알 수 있다.
-function fillCases (loaded) {
+// from 은 그 케이스들이 든 묶음의 id 다. 번호와 늘 짝으로 다닌다.
+function fillCases (loaded, from) {
+  casesFrom = from || ''
   cases.value = loaded.map(c => ({
     key: ++caseKey,
     index: c.index,
@@ -355,7 +359,8 @@ function casePayload () {
   return {
     cases: cases.value
       .filter(c => c.too_large || c.loaded || c.input.trim() || c.output.trim())
-      .map(c => (isTyped(c) ? { input: c.input, output: c.output } : { keep: c.index }))
+      .map(c => (isTyped(c) ? { input: c.input, output: c.output } : { keep: c.index })),
+    keep_from: casesFrom || undefined
   }
 }
 
@@ -438,7 +443,7 @@ function onUploaded (response) {
     return
   }
   // 올린 케이스로 표를 채운다. 여기서 바로 고칠 수 있다.
-  fillCases(response.data.cases)
+  fillCases(response.data.cases, response.data.id)
   ElMessage.success(`케이스 ${response.data.info.length}개를 채웠습니다`)
 }
 
@@ -555,7 +560,7 @@ onMounted(() => {
       solver_language: p.solver_language || '', solver_code: p.solver_code || ''
     })
     useSolver.value = !!p.solver_code
-    api.getTeacherTestCases(problemId).then(res => fillCases(res.data.data.cases), () => {})
+    api.getTeacherTestCases(problemId).then(res => fillCases(res.data.data.cases, res.data.data.id), () => {})
     if (p.solver_verified_at) {
       verifyFailed.value = !p.solver_passed
       verifyMessage.value = p.solver_message

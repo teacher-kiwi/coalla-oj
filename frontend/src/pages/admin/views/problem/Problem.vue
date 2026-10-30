@@ -343,6 +343,8 @@ const MAX_CASES = 20
 const MAX_SAMPLE_BYTES = 2 * 1024
 // newCase() 가 이 값을 쓴다. 선언 순서를 지켜야 TDZ 에 걸리지 않는다.
 let caseKey = 0
+// 표의 index(= {keep: 번호})가 가리키는 묶음. 업로드했으면 그 묶음이고 저장된 문제의 것이 아니다.
+let casesFrom = ''
 const cases = ref([])
 const verifying = ref(false)
 const verifyMessage = ref('')
@@ -442,7 +444,9 @@ function peek (row, field) {
 }
 
 // 서버가 준 케이스로 표를 채운다. loaded 를 남겨 두어 "고쳤나" 를 알 수 있다.
-function fillCases (loaded, scores = []) {
+// from 은 그 케이스들이 든 묶음의 id 다. 번호와 늘 짝으로 다닌다.
+function fillCases (loaded, from, scores = []) {
+  casesFrom = from || ''
   cases.value = loaded.map((c, index) => ({
     key: ++caseKey,
     index: c.index,
@@ -462,7 +466,8 @@ function casePayload () {
   return {
     cases: cases.value
       .filter(c => c.too_large || c.loaded || c.input.trim() || c.output.trim())
-      .map(c => (isTyped(c) ? { input: c.input, output: c.output } : { keep: c.index }))
+      .map(c => (isTyped(c) ? { input: c.input, output: c.output } : { keep: c.index })),
+    keep_from: casesFrom || undefined
   }
 }
 
@@ -497,7 +502,7 @@ onMounted(() => {
         problem.value = data
         testCaseUploaded.value = true
         api.getTestCasePreview(data.id).then(
-          preview => fillCases(preview.data.data.cases, data.test_case_score), () => {})
+          preview => fillCases(preview.data.data.cases, preview.data.data.id, data.test_case_score), () => {})
         // 지난 검증 결과를 되살린다. 케이스가 바뀌면 서버가 지워 두므로 없을 수 있다.
         if (data.solver_verified_at) {
           verifyFailed.value = !data.solver_passed
@@ -599,7 +604,7 @@ function uploadSucceeded (response) {
   testCaseUploaded.value = true
   problem.value.test_case_id = response.data.id
   // 올린 케이스로 표를 채운다. 여기서 바로 고칠 수 있다.
-  fillCases(response.data.cases || [], fileList)
+  fillCases(response.data.cases || [], response.data.id, fileList)
   ElMessage.success(`케이스 ${fileList.length}개를 채웠습니다`)
 }
 
@@ -636,7 +641,7 @@ async function submit () {
     if (error.spj) { ElMessage.error(error.spj); return }
   }
   if (!problem.value.languages.length) { error.languages = 'Please choose at least one language for problem'; ElMessage.error(error.languages); return }
-  const payloadCases = casePayload().cases
+  const { cases: payloadCases, keep_from: keepFrom } = casePayload()
   if (!payloadCases.length) { error.testCase = '테스트 케이스를 넣어주세요'; ElMessage.error(error.testCase); return }
   if (typedCount.value > MAX_CASES) {
     ElMessage.error(`직접 쳐 넣는 테스트 케이스는 ${MAX_CASES}개까지입니다`); return
@@ -662,6 +667,7 @@ async function submit () {
   // 케이스는 늘 전부 보낸다. 고치지 않은 것은 번호만 가고, 내용이 예전과 같으면
   // 서버가 파일을 갈아끼우지 않으므로 재채점도 돌지 않는다.
   payload.cases = payloadCases
+  payload.keep_from = keepFrom
   payload.test_case_id = ''
   payload.test_case_score = cases.value.map((row, index) => ({
     input_name: `${index + 1}.in`, output_name: problem.value.spj ? '' : `${index + 1}.out`,

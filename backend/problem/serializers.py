@@ -84,6 +84,8 @@ class CreateOrEditProblemSerializer(serializers.Serializer):
     test_case_score = serializers.ListField(child=CreateTestCaseScoreSerializer(),
                                             allow_empty=True, required=False)
     cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
+    # cases 의 {"keep": 번호} 가 가리키는 묶음(표를 채운 업로드나 저장된 케이스)
+    keep_from = serializers.CharField(max_length=32, required=False, allow_blank=True)
     time_limit = serializers.IntegerField(min_value=1, max_value=1000 * 60)
     memory_limit = serializers.IntegerField(min_value=1, max_value=1024)
     languages = LanguageNameMultiChoiceField()
@@ -372,6 +374,8 @@ class TeacherProblemSerializer(serializers.Serializer):
     # 테스트케이스를 넣는 두 가지 길. 직접 입력이면 cases, 파일로 올렸으면
     # 업로드가 돌려준 test_case_id 가 온다. 만들 때는 둘 중 하나가 있어야 한다.
     cases = serializers.ListField(child=TeacherTestCaseSerializer(), required=False)
+    # cases 의 {"keep": 번호} 가 가리키는 묶음(표를 채운 업로드나 저장된 케이스)
+    keep_from = serializers.CharField(max_length=32, required=False, allow_blank=True)
     test_case_id = serializers.CharField(max_length=32, required=False)
     # 채점 방식. 특수 채점은 정답 파일 대신 judge 코드가 판정한다
     # ("4보다 작은 수를 모두 출력" 처럼 답이 여럿인 문제).

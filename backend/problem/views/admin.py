@@ -284,18 +284,35 @@ class TestCaseZipProcessor(object):
 
         return info, test_case_id
 
-    def process_cases(self, cases, spj=False, previous_test_case_id=None):
+    def keep_source(self, keep_from, fallback):
+        """{"keep": 번호} 의 번호가 가리키는 묶음.
+
+        화면은 표를 채운 묶음의 id 를 keep_from 으로 함께 보낸다. zip 을 올려 채운
+        표라면 그 업로드 묶음이고, 문제에 저장된 것이 아니다. 새 문제는 저장된
+        묶음이 아예 없어서, 이것 없이 문제의 것을 찾으면 케이스가 전부 빈 파일이
+        된다(2026-10-30, 케이스 78개가 비어 제출이 모두 런타임 에러가 났다).
+        keep_from 을 보내지 않는 예전 화면은 문제에 저장된 묶음(fallback)을 쓴다.
+        묶음이 실제로 있는지는 process_cases 가 번호를 찾으면서 본다.
+        """
+        if not keep_from:
+            return fallback
+        if not TEST_CASE_ID_RE.match(keep_from):
+            raise APIError("올린 테스트 케이스를 찾을 수 없습니다. 다시 올려주세요")
+        return keep_from
+
+    def process_cases(self, cases, spj=False, keep_from=None):
         """화면이 보낸 케이스 목록으로 테스트케이스를 다시 만든다.
 
         zip 업로드와 결과물(파일 이름·info)이 같아야 채점 서버가 그대로 읽는다.
         특수 채점은 정답 파일이 없다. 판정은 spj 코드가 하므로 입력만 쓴다.
 
-        {"keep": 번호} 항목은 화면이 내용을 불러오지 못한 케이스다(너무 크다).
-        이전 묶음에서 그 파일을 그대로 옮긴다. 이것이 없으면 큰 케이스가 있는
-        문제는 케이스 하나를 고치는 것만으로 나머지가 전부 사라진다.
+        {"keep": 번호} 항목은 화면이 불러온 그대로 손대지 않았거나, 너무 커서
+        불러오지 못한 케이스다. keep_from 묶음에서 그 파일을 그대로 옮긴다.
+        이것이 없으면 큰 케이스가 있는 문제는 케이스 하나를 고치는 것만으로
+        나머지가 전부 사라진다. 찾을 수 없는 번호는 빈 케이스로 만들지 않고 막는다.
         """
-        previous_dir = (os.path.join(settings.TEST_CASE_DIR, previous_test_case_id)
-                        if previous_test_case_id else None)
+        previous_dir = (os.path.join(settings.TEST_CASE_DIR, keep_from)
+                        if keep_from else None)
         previous_info = {}
         if previous_dir:
             try:
@@ -303,6 +320,11 @@ class TestCaseZipProcessor(object):
                     previous_info = json.load(f).get("test_cases", {})
             except (IOError, ValueError):
                 previous_info = {}
+        missing = [case["keep"] for case in cases
+                   if case.get("keep") and str(case["keep"]) not in previous_info]
+        if missing:
+            raise APIError(f"불러온 테스트 케이스({missing[0]}번)를 찾을 수 없습니다. "
+                           "새로고침하거나 테스트 케이스를 다시 올려주세요")
 
         test_case_id = rand_str()
         test_case_dir = os.path.join(settings.TEST_CASE_DIR, test_case_id)
@@ -460,7 +482,8 @@ class SolutionVerifyAPI(APIView, TestCaseZipProcessor):
                 previous = problem.test_case_id
             try:
                 _, spec["resolved_test_case_id"] = self.process_cases(
-                    spec["cases"], spj=bool(data.get("spj")), previous_test_case_id=previous)
+                    spec["cases"], spj=bool(data.get("spj")),
+                    keep_from=self.keep_source(data.get("keep_from"), previous))
             except (KeyError, IOError, OSError):
                 return self.error("테스트 케이스를 읽지 못했습니다. 새로고침 후 다시 시도하세요")
             spec["resolved_is_temporary"] = True
@@ -516,10 +539,11 @@ class ProblemBase(APIView, TestCaseZipProcessor):
         # 직접 입력한 케이스는 여기서 파일로 만든다. 그 뒤로는 파일로 올린 것과
         # 구분되지 않는다(같은 이름·같은 info 를 쓴다).
         cases = data.pop("cases", None)
+        keep_from = data.pop("keep_from", None)
         if cases:
             previous = getattr(request, "_previous_test_case_id", None)
             info, new_id = self.process_cases(cases, spj=data["spj"],
-                                              previous_test_case_id=previous)
+                                              keep_from=self.keep_source(keep_from, previous))
             # 다시 만든 것이 예전과 똑같으면 예전 것을 그대로 쓴다(재채점이 돌지 않게)
             if previous and self.test_case_digest(new_id) == self.test_case_digest(previous):
                 delete_files.send(os.path.join(settings.TEST_CASE_DIR, new_id))
@@ -562,6 +586,7 @@ class ProblemAPI(ProblemBase):
         # common_checks 가 cases 를 지우고 test_case_id 로 바꾼다. 지문을 뜰 때
         # 화면이 검증에 보낸 것과 같은 값이 필요해 먼저 챙겨 둔다.
         verified_cases = data.get("cases")
+        verified_keep_from = data.get("keep_from")
         error_info = self.common_checks(request)
         if error_info:
             return self.error(error_info)
@@ -574,21 +599,24 @@ class ProblemAPI(ProblemBase):
         token = data.pop("verification_token", None)
         problem = Problem.objects.create(**data)
         problem.tags.set(tag_objs)
-        self._attach_verification(problem, token, data, verified_cases)
+        self._attach_verification(problem, token, data, verified_cases,
+                                  verified_keep_from)
         return self.success(ProblemAdminSerializer(problem).data)
 
     @staticmethod
-    def _attach_verification(problem, token, data, verified_cases=None):
+    def _attach_verification(problem, token, data, verified_cases=None, keep_from=None):
         """검증해 둔 결과가 지금 저장한 내용의 것이면 붙인다(지문 대조는 서버가 한다).
 
         지문은 화면이 검증할 때 보낸 것과 같은 값으로 떠야 한다. common_checks 가
-        직접 입력한 cases 를 test_case_id 로 바꿔 두므로, 바뀌기 전 값을 받아 쓴다.
+        직접 입력한 cases 를 test_case_id 로 바꾸고 keep_from 을 지워 두므로,
+        바뀌기 전 값을 받아 쓴다.
         """
         if not token:
             return
         source = dict(data)
         if verified_cases:
             source["cases"] = verified_cases
+            source["keep_from"] = keep_from
             source["test_case_id"] = None
         attach_verification(problem, token, spec_from(
             source, time_limit=data["time_limit"], memory_limit=data["memory_limit"],
@@ -632,6 +660,7 @@ class ProblemAPI(ProblemBase):
             return self.error("문제가 존재하지 않습니다")
 
         verified_cases = data.get("cases")
+        verified_keep_from = data.get("keep_from")
         request._previous_test_case_id = problem.test_case_id
         error_info = self.common_checks(request)
         if error_info:
@@ -655,7 +684,8 @@ class ProblemAPI(ProblemBase):
             # 지난 검증 결과는 새 케이스에 대한 것이 아니다. 그대로 두면 거짓말이 된다.
             clear_verification(problem.id)
             rejudge_problem_task.send(problem.id)
-        self._attach_verification(problem, token, data, verified_cases)
+        self._attach_verification(problem, token, data, verified_cases,
+                                  verified_keep_from)
         return self.success({"rejudging": test_cases_changed})
 
     @problem_permission_required

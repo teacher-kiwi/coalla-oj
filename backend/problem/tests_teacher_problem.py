@@ -310,6 +310,67 @@ class EditingOneCaseTest(TeacherProblemTestBase):
                                             for i in range(MAX_CASES + 1)]))
 
 
+class UploadThenSaveTest(TeacherProblemTestBase):
+    """zip 을 올려 표를 채운 뒤 저장하는 흐름.
+
+    손대지 않은 줄은 {"keep": 번호} 로 가고, 그 번호는 업로드 묶음(keep_from)의
+    것이다. 문제에 저장된 묶음에서 찾으면 새 문제는 케이스가 전부 빈 파일이 되고
+    (2026-10-30 실제로 78개가 비었다), 고치는 문제는 새로 올린 zip 이 무시된다.
+    """
+    _zip = TeacherTestCaseAPITest._zip
+
+    def _upload(self, pairs):
+        with open(self._zip(pairs), "rb") as f:
+            data = self.client.post(self.reverse("teacher_test_case_api"),
+                                    data={"spj": "false", "file": f},
+                                    format="multipart").data["data"]
+        self.addCleanup(shutil.rmtree, os.path.join(settings.TEST_CASE_DIR, data["id"]),
+                        ignore_errors=True)
+        return data["id"]
+
+    def _file(self, problem_id, name):
+        problem = Problem.objects.get(id=problem_id)
+        with open(os.path.join(settings.TEST_CASE_DIR, problem.test_case_id, name)) as f:
+            return f.read()
+
+    def test_new_problem_from_an_upload(self):
+        uploaded = self._upload([("1 2", "3"), ("4 5", "9")])
+        resp = self._create(cases=[{"keep": 1}, {"keep": 2}], keep_from=uploaded)
+        self.assertSuccess(resp)
+        self.assertEqual(self._file(resp.data["data"]["id"], "2.in"), "4 5")
+        self.assertEqual(self._file(resp.data["data"]["id"], "2.out"), "9")
+
+    def test_new_upload_replaces_the_saved_cases(self):
+        problem_id = self._create(cases=[case("1 2", "3")]).data["data"]["id"]
+        uploaded = self._upload([("7 8", "15")])
+        self.assertSuccess(self.client.put(self.url, data={
+            "id": problem_id, "title": "t", "description": "d",
+            "input_description": "i", "output_description": "o", "difficulty": "L1",
+            "tags": ["반복"], "samples": [sample()],
+            "cases": [{"keep": 1}], "keep_from": uploaded}))
+        self.assertEqual(self._file(problem_id, "1.in"), "7 8")
+
+    def test_kept_case_without_a_source_is_refused(self):
+        """예전에는 조용히 빈 케이스를 만들었다. 저장이 성공해 아무도 몰랐다."""
+        resp = self._create(cases=[{"keep": 1}, {"keep": 2}])
+        self.assertFailed(resp)
+        self.assertIn("찾을 수 없습니다", resp.data["data"])
+        self.assertFalse(Problem.objects.exists())
+
+    def test_verifying_an_upload_before_saving(self):
+        uploaded = self._upload([("1 2", "3")])
+        sent = {}
+        with mock.patch("problem.views.teacher.verify_solution_task.send",
+                        side_effect=lambda token, spec: sent.update(spec)):
+            self.assertSuccess(self.client.post(self.reverse("teacher_solution_verify_api"), data={
+                "cases": [{"keep": 1}], "keep_from": uploaded,
+                "solver_language": "C", "solver_code": "int main(){}"}))
+        path = os.path.join(settings.TEST_CASE_DIR, sent["resolved_test_case_id"])
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        with open(os.path.join(path, "1.out")) as f:
+            self.assertEqual(f.read(), "3")
+
+
 class VerificationAttachTest(TeacherProblemTestBase):
     """검증해 둔 결과가 저장할 때 문제에 붙는지.
 

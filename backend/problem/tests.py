@@ -388,6 +388,28 @@ class AdminManualCasesTest(ProblemCreateTestBase):
             self.assertEqual(f.read(), "9")
         self.assertEqual(len(problem.test_case_score), 2)
 
+    def test_creating_from_an_uploaded_zip(self):
+        """zip 을 올려 채운 표를 손대지 않고 저장하면 전부 {"keep": 번호} 로 온다.
+
+        번호는 업로드 묶음의 것이다. 새 문제에는 저장된 묶음이 없어 예전에는
+        케이스가 전부 빈 파일이 됐다.
+        """
+        _, uploaded = TestCaseZipProcessor().process_cases(
+            [{"input": "1 2", "output": "3"}, {"input": "4 5", "output": "9"}])
+        self.addCleanup(shutil.rmtree, os.path.join(settings.TEST_CASE_DIR, uploaded),
+                        ignore_errors=True)
+        resp = self._create(cases=[{"keep": 1}, {"keep": 2}], keep_from=uploaded)
+        self.assertSuccess(resp)
+        problem = Problem.objects.get(id=resp.data["data"]["id"])
+        with open(os.path.join(settings.TEST_CASE_DIR, problem.test_case_id, "2.out")) as f:
+            self.assertEqual(f.read(), "9")
+
+    def test_kept_case_that_cannot_be_found_is_refused(self):
+        resp = self._create(cases=[{"keep": 1}])
+        self.assertFailed(resp)
+        self.assertIn("찾을 수 없습니다", resp.data["data"])
+        self.assertFalse(Problem.objects.exists())
+
     def test_cannot_use_both_input_methods(self):
         data = copy.deepcopy(DEFAULT_PROBLEM_DATA)
         data["cases"] = [{"input": "1", "output": "1"}]
