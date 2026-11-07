@@ -210,8 +210,11 @@ class ProblemSafeSerializer(BaseProblemSerializer):
 
     class Meta:
         model = Problem
+        # 정답 코드(solver_*)는 ProblemSerializer 와 똑같이 뺀다. 이 직렬화기는 OI 대회 중
+        # 학생이 받는 것이라, 빠지면 대회 문제의 정답이 그대로 나간다.
         exclude = ("test_case_score", "test_case_id", "visible",
                    "spj_code", "spj_version", "spj_compile_ok",
+                   "solver_code", "solver_language",
                    "difficulty", "submission_number", "accepted_number", "statistic_info")
 
 

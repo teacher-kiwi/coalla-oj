@@ -21,7 +21,7 @@ from .serializers import MAX_CASE_BYTES
 from .views.admin import TestCaseZipProcessor
 from .models import (contest_problem_label, contest_problem_order, ContestProblem,
                      Problem, ProblemRuleType)
-from contest.models import Contest
+from contest.models import Contest, ContestRuleType
 from contest.tests import DEFAULT_CONTEST_DATA
 
 from django.core.management import call_command
@@ -797,6 +797,25 @@ class ContestProblemTest(ProblemCreateTestBase):
         contest.save()
         resp = self.client.get(self.url + "?contest_id=" + str(self.contest["id"]))
         self.assertSuccess(resp)
+
+    def test_solver_code_is_hidden_during_an_oi_contest(self):
+        """OI 대회 중(실시간 순위 끔)에는 학생이 다른 직렬화기로 문제를 받는다.
+
+        그 직렬화기가 정답 코드를 빼지 않아 대회 문제의 정답이 그대로 나갔다.
+        """
+        self.problem.solver_language = "Python3"
+        self.problem.solver_code = "print(int(input()) * 2)"
+        self.problem.save()
+        contest = Contest.objects.first()
+        contest.rule_type = ContestRuleType.OI
+        contest.real_time_rank = False
+        contest.start_time = contest.start_time - timedelta(hours=1)
+        contest.save()
+        self.create_user("test", "test123")
+        resp = self.client.get(self.url + "?contest_id=" + str(contest.id))
+        self.assertSuccess(resp)
+        self.assertNotIn("solver_code", resp.data["data"][0])
+        self.assertNotIn("solver_language", resp.data["data"][0])
 
 
 class ParseProblemTemplateTest(APITestCase):
