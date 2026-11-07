@@ -3,6 +3,7 @@
 로그인을 보지 않는다. 학생은 session.py 의 출입증으로 알아본다.
 """
 from django.db.models import Count, Q
+from django.middleware.csrf import get_token
 
 from judge.run import read_run, start_run
 from judge.tasks import judge_task, run_code_task
@@ -108,6 +109,9 @@ class HomeworkStudentAPI(APIView):
 class HomeworkAPI(APIView):
     def get(self, request, code):
         """입장 화면이 보여 줄 것. 참가 전이라 제목과 상태만 준다."""
+        # 입장(POST)에 쓸 CSRF 쿠키를 여기서 준다. 사이트 화면은 상단 메뉴가 /api/profile 을
+        # 불러 쿠키를 받는데, 과제 화면은 메뉴를 감춰서 링크로 바로 들어오면 쿠키가 없다.
+        get_token(request)
         return self.success(HomeworkSerializer(find_homework(request, code)).data)
 
 
@@ -150,6 +154,7 @@ class HomeworkJoinAPI(APIView):
 class HomeworkMeAPI(HomeworkStudentAPI):
     def get(self, request, code):
         """과제 화면이 처음 열릴 때. 출입증이 없으면(hw-join-required) 입장 화면으로 보낸다."""
+        get_token(request)  # 위 HomeworkAPI.get 과 같은 이유
         participant = self.participant(request, code)
         return self.success(joined_data(participant.homework, participant))
 

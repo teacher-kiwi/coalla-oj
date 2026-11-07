@@ -135,6 +135,32 @@ class JoinTest(HomeworkTestBase):
         self.assertSuccess(self.join(number="5"))
 
 
+class FreshBrowserTest(HomeworkTestBase):
+    """링크·QR 로 과제 화면에 바로 들어온 브라우저. 사이트의 다른 화면을 거치지 않았다.
+
+    과제 화면은 상단 메뉴를 감춘다. 사이트 화면에서는 그 메뉴가 /api/profile 을 불러
+    CSRF 쿠키를 받는데, 과제 화면만 열면 쿠키가 없어 입장(POST)이 403 으로 막혔다.
+    """
+    def setUp(self):
+        super().setUp()
+        self.client = self.client_class(enforce_csrf_checks=True)
+
+    def test_can_join_after_opening_the_homework_page(self):
+        for name in ("homework_me_api", "homework_api"):
+            self.client = self.client_class(enforce_csrf_checks=True)
+            self.client.get(self.reverse(name, kwargs={"code": self.homework.code}))
+            token = self.client.cookies["csrftoken"].value
+            resp = self.client.post(
+                self.reverse("homework_join_api", kwargs={"code": self.homework.code}),
+                data={"number": "5", "nickname": "코알라", "pin": "1234"},
+                HTTP_X_CSRFTOKEN=token)
+            self.assertSuccess(resp)
+
+    def test_without_the_token_it_is_refused(self):
+        resp = self.join()
+        self.assertEqual(resp.status_code, 403)
+
+
 class PassTest(HomeworkTestBase):
     def test_me_needs_a_pass(self):
         resp = self.me()
