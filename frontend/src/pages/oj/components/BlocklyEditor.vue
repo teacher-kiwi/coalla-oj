@@ -41,7 +41,7 @@ import 'blockly/blocks'
 import * as Ko from 'blockly/msg/ko'
 import { pythonGenerator } from 'blockly/python'
 import './blockly/blocks'
-import { toolboxConfig } from './blockly/toolbox'
+import { toolboxConfig, IO_VARIABLE_CATEGORY, ioVariableFlyout } from './blockly/toolbox'
 
 const props = defineProps({
   initialBlocks: { type: String, default: '' },
@@ -101,6 +101,7 @@ function initBlockly () {
     trashcan: true,
     renderer: 'thrasos'
   })
+  workspace.registerToolboxCategoryCallback(IO_VARIABLE_CATEGORY, ioVariableFlyout)
 
   if (props.initialBlocks) {
     try {

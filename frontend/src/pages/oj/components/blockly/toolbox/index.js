@@ -4,19 +4,19 @@ import { loopCategory } from "./loopCategory";
 import { mathCategory } from "./mathCategory";
 import { textCategory } from "./textCategory";
 import { listCategory } from "./listCategory";
-import { variablesCategory } from "./variablesCategory";
 import { procedureCategory } from "./procedureCategory";
+
+export { IO_VARIABLE_CATEGORY, ioVariableFlyout } from "./ioCategory";
 
 export const toolboxConfig = {
   kind: "categoryToolbox",
   contents: [
-    ioCategory, // 입출력
+    ioCategory, // 입출력/변수
     logicCategory, // 논리
     loopCategory, // 반복
     mathCategory, // 수학
     textCategory, // 텍스트
     listCategory, // 리스트
-    variablesCategory, // 변수
     procedureCategory, // 함수
   ],
 };
