@@ -12,6 +12,8 @@ class AdminType(object):
     TEACHER = "Teacher"
     ADMIN = "Admin"
     SUPER_ADMIN = "Super Admin"
+    # 바로 과제 참가자의 임시 계정(homework 앱). 로그인할 수 없고 순위·목록에 나오지 않는다.
+    GUEST = "Guest"
 
 
 # 순위(공개 순위·대회 순위)에 이름이 오르는 계정.

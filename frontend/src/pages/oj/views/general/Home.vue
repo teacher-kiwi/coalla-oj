@@ -1,6 +1,14 @@
 <template>
   <el-row type="flex" justify="space-around">
     <el-col :span="22">
+      <el-card shadow="never" class="homework-entry">
+        <form @submit.prevent="goHomework">
+          <span class="homework-label">바로 과제</span>
+          <el-input v-model="homeworkCode" maxlength="6" inputmode="numeric"
+                    placeholder="선생님께 받은 6자리 숫자" class="homework-code" />
+          <el-button type="primary" native-type="submit">들어가기</el-button>
+        </form>
+      </el-card>
       <Panel shadow :padding="10" v-if="contests.length" class="contest">
         <template #title>
           <el-button text class="contest-title" @click="goContest">
@@ -40,6 +48,7 @@
 import { ref, onMounted } from 'vue'
 import Markdown from '@oj/components/Markdown.vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { Calendar, Timer, Trophy } from '@element-plus/icons-vue'
 import Announcements from './Announcements.vue'
 import api from '@oj/api'
@@ -48,6 +57,16 @@ import { CONTEST_STATUS } from '@/utils/constants'
 
 const router = useRouter()
 const contests = ref([])
+const homeworkCode = ref('')
+
+function goHomework () {
+  const code = homeworkCode.value.trim()
+  if (!/^\d{6}$/.test(code)) {
+    ElMessage.error('6자리 숫자를 넣어주세요')
+    return
+  }
+  router.push({ name: 'homework-home', params: { code } })
+}
 const index = ref(0)
 
 function onCarouselChange (newIndex) {
@@ -77,6 +96,22 @@ onMounted(() => {
 </script>
 
 <style lang="less" scoped>
+  .homework-entry {
+    margin-bottom: 20px;
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .homework-label {
+      font-weight: 600;
+    }
+    .homework-code {
+      flex: 1 1 180px;
+      max-width: 260px;
+    }
+  }
   .contest {
     &-title {
       font-style: italic;

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from account.decorators import super_admin_required
-from account.models import User
+from account.models import AdminType, User
 from contest.models import Contest
 from judge.dispatcher import process_pending_task
 from options.options import SysOptions
@@ -152,7 +152,7 @@ class DashboardInfoAPI(APIView):
         recent_contest_count = Contest.objects.exclude(end_time__lt=timezone.now()).count()
         judge_server_count = len(list(filter(lambda x: x.status == "normal", JudgeServer.objects.all())))
         return self.success({
-            "user_count": User.objects.count(),
+            "user_count": User.objects.exclude(admin_type=AdminType.GUEST).count(),
             "recent_contest_count": recent_contest_count,
             "today_submission_count": today_submission_count,
             "judge_server_count": judge_server_count,

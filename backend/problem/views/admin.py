@@ -13,6 +13,7 @@ from django.http import StreamingHttpResponse, FileResponse
 from account.decorators import problem_permission_required, ensure_created_by, super_admin_required, admin_role_required
 from contest.models import Contest, ContestStatus
 from judge.dispatcher import SPJCompiler
+from homework.models import active_homework_with
 from judge.tasks import rejudge_problem_task, verify_solution_task
 from judge.verify import attach_verification, clear_verification, read_verification, \
     spec_from, start_verification
@@ -702,6 +703,10 @@ class ProblemAPI(ProblemBase):
         if entry:
             return self.error(f"대회 〈{entry.contest.title}〉에 담긴 문제입니다. "
                               "대회에서 먼저 빼주세요")
+        homework = active_homework_with(problem)
+        if homework:
+            return self.error(f"진행 중인 바로 과제 〈{homework.title}〉에 담긴 문제입니다. "
+                              "과제가 끝난 뒤에 지워주세요")
         problem.delete()
         return self.success()
 

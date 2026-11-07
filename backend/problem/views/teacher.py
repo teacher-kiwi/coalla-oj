@@ -33,6 +33,7 @@ from ..serializers import (CreateProblemSetAssignmentSerializer, CreateProblemSe
                            TeacherProblemListSerializer, TestCaseUploadForm)
 from judge.dispatcher import SPJCompiler
 from utils.tasks import delete_files
+from homework.models import active_homework_with
 from judge.tasks import rejudge_problem_task, verify_solution_task
 from judge.verify import attach_verification, clear_verification, spec_from, start_verification, \
     read_verification
@@ -596,6 +597,10 @@ class TeacherProblemAPI(APIView, TestCaseZipProcessor):
         if entry:
             return self.error(f"대회 〈{entry.contest.title}〉에 담긴 문제입니다. "
                               "대회에서 먼저 빼주세요")
+        homework = active_homework_with(problem)
+        if homework:
+            return self.error(f"진행 중인 바로 과제 〈{homework.title}〉에 담긴 문제입니다. "
+                              "과제가 끝난 뒤에 지워주세요")
         if Submission.objects.filter(problem=problem).exists():
             return self.error("이미 제출 기록이 있어 삭제할 수 없습니다")
         problem.delete()

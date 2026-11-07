@@ -5,7 +5,7 @@
         <div>
           <span>언어:</span>
           <el-select :model-value="language" @change="onLangChange" class="adjust">
-            <el-option v-if="languages.includes('Python3')" value="Block Coding" label="블록 코딩" />
+            <el-option v-if="showBlockCoding" value="Block Coding" label="블록 코딩" />
             <el-option v-for="item in languages" :key="item" :value="item" :label="item" />
           </el-select>
 
@@ -54,8 +54,13 @@ const props = defineProps({
   value: { type: String, default: '' },
   languages: { type: Array, default: () => ['C', 'C++', 'Java', 'Python2'] },
   language: { type: String, default: 'C++' },
-  theme: { type: String, default: 'solarized' }
+  theme: { type: String, default: 'solarized' },
+  // 블록 코딩을 고를 수 있는지. 주지 않으면 Python3 가 되는 문제에서 고를 수 있다.
+  // 바로 과제는 교사가 언어를 따로 고르므로 직접 정해서 준다.
+  blockCoding: { type: Boolean, default: null }
 })
+
+const showBlockCoding = computed(() => props.blockCoding ?? props.languages.includes('Python3'))
 
 const emit = defineEmits(['update:value', 'changeLang', 'changeTheme', 'resetCode'])
 const fileInputRef = ref(null)

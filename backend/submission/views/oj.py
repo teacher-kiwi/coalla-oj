@@ -15,10 +15,22 @@ from utils.shortcuts import int_or_none
 from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.throttling import TokenBucket
-from account.models import my_student_ids
+from account.models import AdminType, my_student_ids
 from ..models import Submission
 from ..serializers import CreateSubmissionSerializer, RunCodeSerializer, SubmissionModelSerializer
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
+
+
+def build_run_spec(problem, language, code, input_text):
+    """실행(judge/run.py)에 넘길 것. 바로 과제 화면의 실행도 이것을 쓴다."""
+    # 제출과 똑같이 감싼다. 빠뜨리면 제출은 되는데 실행은 컴파일 에러가 난다.
+    language = "Python3" if language == "Block Coding" else language
+    if language in problem.template:
+        template = parse_problem_template(problem.template[language])
+        code = "\n".join([template["prepend"], code, template["append"]])
+    return {"language": language, "code": code, "input": input_text or "",
+            "time_limit": problem.time_limit, "memory_limit": problem.memory_limit,
+            "io_mode": problem.io_mode}
 
 
 class SubmissionAPI(APIView):
@@ -152,16 +164,7 @@ class RunCodeAPI(SubmissionAPI):
         if error:
             return self.error(error)
 
-        # 제출과 똑같이 감싼다. 빠뜨리면 제출은 되는데 실행은 컴파일 에러가 난다.
-        language = "Python3" if data["language"] == "Block Coding" else data["language"]
-        code = data["code"]
-        if language in problem.template:
-            template = parse_problem_template(problem.template[language])
-            code = "\n".join([template["prepend"], code, template["append"]])
-
-        spec = {"language": language, "code": code, "input": data.get("input") or "",
-                "time_limit": problem.time_limit, "memory_limit": problem.memory_limit,
-                "io_mode": problem.io_mode}
+        spec = build_run_spec(problem, data["language"], data["code"], data.get("input"))
         token = start_run(request.user.id)
         run_code_task.send(token, request.user.id, spec)
         return self.success({"token": token})
@@ -187,6 +190,7 @@ class SubmissionListAPI(APIView):
         # 저장해두지 않고 그때그때 시각으로 판단하므로 되돌릴 상태가 없다.
         submissions = Submission.objects.filter(
             Q(contest__isnull=True) | Q(contest__end_time__lt=now())) \
+            .exclude(user__admin_type=AdminType.GUEST) \
             .select_related("problem__created_by", "user")
         problem_id = request.GET.get("problem_id")
         myself = request.GET.get("myself")

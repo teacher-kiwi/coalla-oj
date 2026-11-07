@@ -89,7 +89,8 @@ class UserAdminAPI(APIView):
                 return self.error("사용자가 존재하지 않습니다")
             return self.success(UserAdminSerializer(user).data)
 
-        user = User.objects.all().order_by("-create_time")
+        # 바로 과제 임시 계정은 과제마다 수십 개씩 생겼다 사라진다. 관리할 대상이 아니다.
+        user = User.objects.exclude(admin_type=AdminType.GUEST).order_by("-create_time")
 
         keyword = request.GET.get("keyword", None)
         if keyword:

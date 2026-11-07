@@ -1,6 +1,6 @@
 <template>
   <div>
-    <NavBar />
+    <NavBar v-if="!route.meta.homework" />
     <div class="content-app">
       <router-view v-slot="{ Component }">
         <transition name="fadeInUp" mode="out-in">

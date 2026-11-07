@@ -37,6 +37,9 @@ const ProblemSetList = () => import('@oj/views/problem/ProblemSetList.vue')
 const ProblemSetDetail = () => import('@oj/views/problem/ProblemSetDetail.vue')
 const StudentPasswordSetting = () => import('@oj/views/setting/children/StudentPasswordSetting.vue')
 const AccountSetting = () => import('@oj/views/setting/children/AccountSetting.vue')
+const HomeworkEntry = () => import('@oj/views/homework/HomeworkEntry.vue')
+const HomeworkHome = () => import('@oj/views/homework/HomeworkHome.vue')
+const HomeworkProblem = () => import('@oj/views/homework/HomeworkProblem.vue')
 
 export default [
   {
@@ -276,6 +279,25 @@ export default [
     name: 'faq',
     meta: { title: '자주 묻는 질문' },
     component: FAQ
+  },
+  // 바로 과제 학생 화면. 계정 없이 쓰므로 사이트 메뉴(로그인·문제 목록 등)를 감춘다(meta.homework).
+  {
+    name: 'homework-entry',
+    path: '/hw',
+    meta: { title: '바로 과제', homework: true },
+    component: HomeworkEntry
+  },
+  {
+    name: 'homework-home',
+    path: '/hw/:code(\\d{6})',
+    meta: { title: '바로 과제', homework: true },
+    component: HomeworkHome
+  },
+  {
+    name: 'homework-problem',
+    path: '/hw/:code(\\d{6})/problem/:problemId(\\d+)',
+    meta: { title: '바로 과제', homework: true },
+    component: HomeworkProblem
   },
   {
     path: '/:pathMatch(.*)*',

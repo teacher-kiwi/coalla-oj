@@ -340,6 +340,41 @@ export default {
   },
   updateACInfoCheckedStatus (data) {
     return ajax('admin/contest/acm_helper', 'put', { data })
+  },
+
+  // ---- 바로 과제 (학생) ----
+  // 로그인이 아니라 과제마다 받는 출입증(쿠키)으로 알아본다. 아직 입장하지 않았으면
+  // hw-join-required 가 오는데, 화면이 입장 칸을 보여 주면 되므로 알림을 띄우지 않는다.
+  getHomework (code) {
+    return ajax(`hw/${code}`, 'get')
+  },
+  joinHomework (code, data) {
+    return ajax(`hw/${code}/join`, 'post', { data })
+  },
+  getHomeworkMe (code) {
+    return ajax(`hw/${code}/me`, 'get', { quiet: ['hw-join-required'] })
+  },
+  leaveHomework (code) {
+    return ajax(`hw/${code}/me`, 'delete')
+  },
+  getHomeworkProblem (code, problemId) {
+    return ajax(`hw/${code}/problem`, 'get', { params: { problem_id: problemId },
+      quiet: ['hw-join-required'] })
+  },
+  submitHomework (code, data) {
+    return ajax(`hw/${code}/submission`, 'post', { data })
+  },
+  getHomeworkSubmission (code, id) {
+    return ajax(`hw/${code}/submission`, 'get', { params: { id } })
+  },
+  getHomeworkSubmissions (code, problemId) {
+    return ajax(`hw/${code}/submission`, 'get', { params: { problem_id: problemId } })
+  },
+  runHomework (code, data) {
+    return ajax(`hw/${code}/run`, 'post', { data })
+  },
+  getHomeworkRun (code, token) {
+    return ajax(`hw/${code}/run`, 'get', { params: { token } })
   }
 }
 
@@ -360,16 +395,18 @@ function errorMessage (res) {
 }
 
 function ajax (url, method, options) {
+  // quiet: 알림을 띄우지 않을 에러 코드. 화면이 직접 처리하는 경우에 쓴다.
   if (options !== undefined) {
-    var { params = {}, data = {} } = options
+    var { params = {}, data = {}, quiet = [] } = options
   } else {
     params = data = {}
+    quiet = []
   }
   return new Promise((resolve, reject) => {
     axios({ url, method, params, data }).then(res => {
       if (res.data.error !== null) {
         const detail = errorMessage(res)
-        ElMessage.error(detail)
+        if (!quiet.includes(res.data.error)) ElMessage.error(detail)
         reject(res)
         if (isLoginRequired(res, detail)) {
           import('@/store/app').then(({ useAppStore }) => {
