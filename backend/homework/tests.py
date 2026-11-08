@@ -381,3 +381,134 @@ class StudentSolveTest(HomeworkTestBase):
         result = self.client.get(self.url("homework_run_api"), data={"token": token})
         self.assertSuccess(result)
         self.assertEqual(result.data["data"]["status"], "running")
+
+
+class TeacherHomeworkTest(HomeworkTestBase):
+    """3단계: 교사가 만들고, 현황판을 보고, 진행을 바꾼다."""
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="김선생", password="teacher")
+        self.url = self.reverse("teacher_homework_api")
+        self.second = make_problem(self.teacher, title="반복문")
+
+    def create(self, **overrides):
+        data = {"title": " 3월 7일 반복문 ", "problems": [self.second.id, self.problem.id],
+                "languages": ["Python3", "Block Coding"],
+                "end_time": (now() + timedelta(hours=1)).isoformat()}
+        data.update(overrides)
+        return self.client.post(self.url, data=data)
+
+    def test_create(self):
+        resp = self.create()
+        self.assertSuccess(resp)
+        data = resp.data["data"]
+        self.assertRegex(data["code"], r"^\d{6}$")
+        self.assertEqual(data["title"], "3월 7일 반복문")
+        # 고른 순서 그대로
+        self.assertEqual([p["id"] for p in data["problems"]], [self.second.id, self.problem.id])
+        self.assertFalse(data["ended"])
+
+    def test_create_rules(self):
+        self.assertFailed(self.create(end_time=(now() - timedelta(minutes=1)).isoformat()),
+                          "마감 시각은 지금보다 뒤여야 합니다")
+        self.assertFailed(self.create(languages=["Fortran"]))
+        self.assertFailed(self.create(problems=[]))
+        # 다른 교사의 비공개 문제는 담을 수 없다
+        other = make_problem(self.create_teacher(username="박선생", login=False), title="남의 문제")
+        self.assertFailed(self.create(problems=[other.id]))
+
+    def test_regular_user_cannot_create(self):
+        self.client.logout()
+        self.create_user("학생", "pass")
+        self.assertFailed(self.create())
+
+    def test_teachers_see_only_their_own(self):
+        self.create()
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        listed = self.client.get(self.url).data["data"]
+        self.assertEqual(listed, [])
+        self.assertFailed(self.client.get(self.url, data={"id": self.homework.id}))
+
+    def test_report_lists_newest_first(self):
+        newer = self.create().data["data"]
+        listed = self.client.get(self.url).data["data"]
+        self.assertEqual([h["id"] for h in listed], [newer["id"], self.homework.id])
+
+    def test_end_early_then_cannot_reopen(self):
+        resp = self.client.put(self.url, data={"id": self.homework.id, "end": True})
+        self.assertSuccess(resp)
+        self.assertTrue(resp.data["data"]["ended"])
+        self.assertFailed(self.client.put(self.url, data={
+            "id": self.homework.id, "end_time": (now() + timedelta(hours=2)).isoformat()}),
+            "이미 종료된 과제입니다")
+        # 제목은 끝난 뒤에도 고칠 수 있다(레포트에서 알아보기 쉽게)
+        self.assertSuccess(self.client.put(self.url, data={"id": self.homework.id, "title": "새 제목"}))
+
+    def test_extend_and_lock(self):
+        later = now() + timedelta(hours=5)
+        self.assertSuccess(self.client.put(self.url, data={
+            "id": self.homework.id, "end_time": later.isoformat(), "entry_locked": True}))
+        self.homework.refresh_from_db()
+        self.assertEqual(self.homework.end_time, later)
+        self.assertTrue(self.homework.entry_locked)
+
+    def _guest_submits(self, number, result):
+        self.client_as_student = self.client_class()
+        self.client_as_student.post(
+            self.reverse("homework_join_api", kwargs={"code": self.homework.code}),
+            data={"number": number, "nickname": f"학생{number}", "pin": "1234"})
+        user = HomeworkParticipant.objects.get(number=int(number)).user
+        return Submission.objects.create(user=user, problem=self.problem, code="print(1)",
+                                         language="Python3", result=result)
+
+    def test_board(self):
+        self._guest_submits("3", -1)
+        self._guest_submits("3", 0)
+        self._guest_submits("1", -1)
+        resp = self.client.get(self.reverse("teacher_homework_board_api"),
+                               data={"id": self.homework.id})
+        self.assertSuccess(resp)
+        data = resp.data["data"]
+        rows = data["participants"]
+        self.assertEqual([r["number"] for r in rows], [1, 3])
+        self.assertEqual(rows[1]["pin"], "1234")
+        self.assertEqual(rows[1]["cells"][str(self.problem.id)],
+                         {"attempts": 2, "solved": True, "last_result": 0})
+        self.assertEqual(rows[0]["cells"][str(self.problem.id)]["solved"], False)
+        self.assertEqual(data["homework"]["problems"][0]["solved_count"], 1)
+
+    def test_cell_submissions_include_code(self):
+        self._guest_submits("3", 0)
+        participant = HomeworkParticipant.objects.get()
+        resp = self.client.get(self.reverse("teacher_homework_submission_api"),
+                               data={"participant_id": participant.id, "problem_id": self.problem.id})
+        self.assertEqual(resp.data["data"][0]["code"], "print(1)")
+
+    def test_manage_participants(self):
+        self._guest_submits("3", 0)
+        participant = HomeworkParticipant.objects.get()
+        url = self.reverse("teacher_homework_participant_api")
+        # 4자리 숫자를 틀려 잠긴 자리도 새 숫자로 바로 풀린다
+        cache.set(f"homework:wrong_pin:{self.homework.id}:3", 99, 300)
+        self.assertSuccess(self.client.put(url, data={"id": participant.id, "pin": "5678",
+                                                      "nickname": "바른이름"}))
+        participant.refresh_from_db()
+        self.assertEqual((participant.pin, participant.nickname), ("5678", "바른이름"))
+        self.assertIsNone(cache.get(f"homework:wrong_pin:{self.homework.id}:3"))
+
+        self.assertSuccess(self.client.delete(url + f"?id={participant.id}"))
+        self.assertFalse(HomeworkParticipant.objects.exists())
+        self.assertFalse(Submission.objects.exists())
+
+    def test_cannot_touch_other_teachers_participants(self):
+        self._guest_submits("3", 0)
+        participant = HomeworkParticipant.objects.get()
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        url = self.reverse("teacher_homework_participant_api")
+        self.assertFailed(self.client.delete(url + f"?id={participant.id}"))
+        self.assertFailed(self.client.get(self.reverse("teacher_homework_submission_api"),
+                                          data={"participant_id": participant.id,
+                                                "problem_id": self.problem.id}))
+        self.assertTrue(HomeworkParticipant.objects.exists())

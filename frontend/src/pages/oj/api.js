@@ -375,6 +375,33 @@ export default {
   },
   getHomeworkRun (code, token) {
     return ajax(`hw/${code}/run`, 'get', { params: { token } })
+  },
+
+  // ---- 바로 과제 (교사) ----
+  getTeacherHomeworks () {
+    return ajax('teacher/hw', 'get')
+  },
+  getTeacherHomework (id) {
+    return ajax('teacher/hw', 'get', { params: { id } })
+  },
+  createHomework (data) {
+    return ajax('teacher/hw', 'post', { data })
+  },
+  editHomework (data) {
+    return ajax('teacher/hw', 'put', { data })
+  },
+  getHomeworkBoard (id) {
+    return ajax('teacher/hw/board', 'get', { params: { id } })
+  },
+  getHomeworkCellSubmissions (participantId, problemId) {
+    return ajax('teacher/hw/submission', 'get',
+      { params: { participant_id: participantId, problem_id: problemId } })
+  },
+  editHomeworkParticipant (data) {
+    return ajax('teacher/hw/participant', 'put', { data })
+  },
+  removeHomeworkParticipant (id) {
+    return ajax('teacher/hw/participant', 'delete', { params: { id } })
   }
 }
 

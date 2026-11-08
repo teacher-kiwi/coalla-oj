@@ -1,3 +1,4 @@
+from options.options import SysOptions
 from problem.serializers import ProblemSerializer
 from submission.models import Submission
 from utils.api import serializers
@@ -67,6 +68,75 @@ class StudentProblemSerializer(ProblemSerializer):
 
 class StudentSubmissionSerializer(serializers.ModelSerializer):
     """내 제출. 채점 상세(info)는 일반 화면(ACM)과 같이 감추고 결과·시간·메모리만 준다."""
+    class Meta:
+        model = Submission
+        fields = ("id", "problem", "language", "code", "blockly_state", "result",
+                  "statistic_info", "create_time")
+
+
+BLOCK_CODING = "Block Coding"
+MAX_PROBLEMS = 30
+
+
+def validate_languages(languages):
+    allowed = set(SysOptions.language_names) | {BLOCK_CODING}
+    unknown = [language for language in languages if language not in allowed]
+    if unknown:
+        raise serializers.ValidationError("모르는 언어입니다: " + ", ".join(unknown))
+    return languages
+
+
+class CreateHomeworkSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=128)
+    # 고른 순서가 곧 학생에게 보이는 순서다
+    problems = serializers.ListField(child=serializers.IntegerField(), min_length=1,
+                                     max_length=MAX_PROBLEMS)
+    languages = serializers.ListField(child=serializers.CharField(), min_length=1)
+    end_time = serializers.DateTimeField()
+
+    def validate_languages(self, value):
+        return validate_languages(value)
+
+
+class EditHomeworkSerializer(serializers.Serializer):
+    """진행 중에 고칠 수 있는 것은 제목과 마감 시각뿐이다. 문제·언어는 고정."""
+    id = serializers.IntegerField()
+    title = serializers.CharField(max_length=128, required=False)
+    end_time = serializers.DateTimeField(required=False)
+    entry_locked = serializers.BooleanField(required=False)
+    # 마감 전에 끝내기
+    end = serializers.BooleanField(required=False)
+
+
+class EditParticipantSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    nickname = serializers.CharField(max_length=NICKNAME_MAX_LENGTH, required=False)
+    pin = serializers.RegexField(r"^\d{4}$", required=False, error_messages={
+        "invalid": "4자리 숫자를 넣어주세요"})
+
+
+class TeacherHomeworkSerializer(serializers.ModelSerializer):
+    ended = serializers.BooleanField(source="is_ended")
+    participant_count = serializers.IntegerField(read_only=True)
+    problem_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Homework
+        fields = ("id", "code", "title", "languages", "create_time", "end_time", "ended_at",
+                  "ended", "entry_locked", "participant_count", "problem_count")
+
+
+class TeacherHomeworkDetailSerializer(TeacherHomeworkSerializer):
+    problems = serializers.SerializerMethodField()
+
+    class Meta(TeacherHomeworkSerializer.Meta):
+        fields = TeacherHomeworkSerializer.Meta.fields + ("problems",)
+
+    def get_problems(self, homework):
+        return [{"id": problem.id, "title": problem.title} for problem in homework.problems()]
+
+
+class TeacherSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ("id", "problem", "language", "code", "blockly_state", "result",

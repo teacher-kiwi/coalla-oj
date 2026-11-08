@@ -7,6 +7,7 @@ urlpatterns = [
     re_path(r"^api/teacher/", include("account.urls.teacher")),
     re_path(r"^api/teacher/", include("problem.urls.teacher")),
     re_path(r"^api/teacher/", include("contest.urls.teacher")),
+    re_path(r"^api/teacher/", include("homework.urls.teacher")),
     re_path(r"^api/student/", include("account.urls.student")),
     re_path(r"^api/", include("announcement.urls.oj")),
     re_path(r"^api/admin/", include("announcement.urls.admin")),

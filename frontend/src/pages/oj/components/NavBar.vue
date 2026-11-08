@@ -35,6 +35,15 @@
         <el-menu-item index="/teacher/problem-set">문제집</el-menu-item>
         <el-menu-item index="/teacher/contest">대회</el-menu-item>
       </el-sub-menu>
+      <!-- 계정 없이 코드로 들어와 푸는 일회성 과제. 수업(학급·문제집)과 별개다. -->
+      <el-sub-menu v-if="userStore.isTeacher" index="homework">
+        <template #title>
+          <el-icon><Tickets /></el-icon>
+          바로 과제
+        </template>
+        <el-menu-item index="/teacher/hw/create">만들기</el-menu-item>
+        <el-menu-item index="/teacher/hw">레포트</el-menu-item>
+      </el-sub-menu>
       <!-- 수업용 학생만 보인다. 개인 학생(구글 가입)은 배포받을 학급이 없다. -->
       <el-menu-item v-if="isStudent" index="/problem-set">
         <el-icon><Notebook /></el-icon>
@@ -89,7 +98,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store/app'
-import { Notebook, School } from '@element-plus/icons-vue'
+import { Notebook, School, Tickets } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import Login from '@oj/views/user/Login.vue'
 const route = useRoute()
@@ -103,7 +112,9 @@ onMounted(() => {
 
 const activeMenu = computed(() => {
   // 교사 메뉴는 하위 항목(/teacher/class, /teacher/problem-set)이 각각 활성화되어야 한다
-  const [, first, second] = route.path.split('/')
+  const [, first, second, third] = route.path.split('/')
+  // 바로 과제는 만들기(/teacher/hw/create)와 레포트(/teacher/hw, 현황판 포함)로 나뉜다
+  if (first === 'teacher' && second === 'hw') return third === 'create' ? '/teacher/hw/create' : '/teacher/hw'
   return first === 'teacher' ? `/teacher/${second || 'class'}` : '/' + first
 })
 

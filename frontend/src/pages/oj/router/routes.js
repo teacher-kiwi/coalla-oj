@@ -38,6 +38,9 @@ const ProblemSetDetail = () => import('@oj/views/problem/ProblemSetDetail.vue')
 const StudentPasswordSetting = () => import('@oj/views/setting/children/StudentPasswordSetting.vue')
 const AccountSetting = () => import('@oj/views/setting/children/AccountSetting.vue')
 const HomeworkEntry = () => import('@oj/views/homework/HomeworkEntry.vue')
+const TeacherHomeworkCreate = () => import('@oj/views/teacher/HomeworkCreate.vue')
+const TeacherHomeworkReport = () => import('@oj/views/teacher/HomeworkReport.vue')
+const TeacherHomeworkBoard = () => import('@oj/views/teacher/HomeworkBoard.vue')
 const HomeworkHome = () => import('@oj/views/homework/HomeworkHome.vue')
 const HomeworkProblem = () => import('@oj/views/homework/HomeworkProblem.vue')
 
@@ -279,6 +282,25 @@ export default [
     name: 'faq',
     meta: { title: '자주 묻는 질문' },
     component: FAQ
+  },
+  // 바로 과제 교사 화면
+  {
+    path: '/teacher/hw/create',
+    name: 'teacher-homework-create',
+    meta: { requiresAuth: true, title: '바로 과제 만들기' },
+    component: TeacherHomeworkCreate
+  },
+  {
+    path: '/teacher/hw',
+    name: 'teacher-homework-report',
+    meta: { requiresAuth: true, title: '바로 과제 레포트' },
+    component: TeacherHomeworkReport
+  },
+  {
+    path: '/teacher/hw/:id(\\d+)',
+    name: 'teacher-homework-board',
+    meta: { requiresAuth: true, title: '바로 과제 현황' },
+    component: TeacherHomeworkBoard
   },
   // 바로 과제 학생 화면. 계정 없이 쓰므로 사이트 메뉴(로그인·문제 목록 등)를 감춘다(meta.homework).
   {
