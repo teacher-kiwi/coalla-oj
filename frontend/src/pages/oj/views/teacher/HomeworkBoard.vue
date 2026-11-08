@@ -9,6 +9,8 @@
       <template #extra>
         <el-button @click="router.push({ name: 'teacher-homework-report' })">레포트</el-button>
         <el-button @click="editTitle">제목 수정</el-button>
+        <el-button :disabled="!homework.id" @click="download">엑셀로 내려받기</el-button>
+        <el-button v-if="homework.ended" type="danger" plain @click="remove">과제 삭제</el-button>
       </template>
 
       <div v-if="homework.id" class="summary">
@@ -242,6 +244,23 @@ function endNow () {
   ElMessageBox.confirm('지금 끝내면 더 제출할 수 없고, 새로 들어올 수도 없습니다. 다시 열 수 없습니다.',
     '과제 종료', { confirmButtonText: '종료', cancelButtonText: '취소', type: 'warning' })
     .then(() => edit({ end: true }, '과제를 종료했습니다')).catch(() => {})
+}
+
+// 결과 표만 담긴다(코드는 넣지 않는다). 문제집 학습 현황 엑셀과 같은 방식.
+function download () {
+  window.open(`/api/teacher/hw/board?id=${homeworkId}&download=1`)
+}
+
+function remove () {
+  ElMessageBox.confirm(
+    `"${homework.value.title}" 과제를 지웁니다. 참가한 학생 ${participants.value.length}명의 ` +
+    '제출과 코드가 모두 지워지고 되돌릴 수 없습니다. 필요하면 먼저 엑셀로 내려받으세요.',
+    '과제 삭제', { confirmButtonText: '삭제', cancelButtonText: '취소', type: 'warning' })
+    .then(() => api.deleteHomework(homeworkId))
+    .then(() => {
+      ElMessage.success('과제를 지웠습니다')
+      router.push({ name: 'teacher-homework-report' })
+    }).catch(() => {})
 }
 
 // ---- 참가자 관리 ----

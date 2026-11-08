@@ -3,7 +3,13 @@
 교사는 자기가 만든 과제만 본다. 최고관리자는 운영·점검을 위해 전부 본다
 (수업 기능의 owned_class·owned_problem_set 과 같은 규칙).
 """
+import io
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
+
+import xlsxwriter
 from django.db import transaction
+from django.http import HttpResponse
 from django.db.models import Count, Q
 from django.utils.timezone import now
 
@@ -119,43 +125,113 @@ class TeacherHomeworkAPI(APIView):
             homework.save(update_fields=fields)
         return self.success(TeacherHomeworkDetailSerializer(homework).data)
 
+    @teacher_required
+    def delete(self, request):
+        """종료된 과제를 지운다. 참가자의 임시 계정과 제출까지 모두 지워진다(되돌릴 수 없다)."""
+        homework = owned_homework(request.user, request.GET.get("id"))
+        if not homework:
+            return self.error("과제가 존재하지 않습니다")
+        if not homework.is_ended:
+            return self.error("진행 중인 과제는 지울 수 없습니다. 먼저 종료하세요")
+        homework.delete()
+        return self.success()
+
+
+def build_board(homework):
+    """현황판: 학생 × 문제. 칸마다 몇 번 냈는지, 맞혔는지, 마지막 결과.
+
+    시각은 datetime 그대로 둔다. 화면(JSON)과 엑셀이 각자 바꿔 쓴다.
+    """
+    participants = list(homework.participants.all())
+    problems = homework.problems()
+    cells = {}
+    last_submit = {}
+    rows = Submission.objects.filter(
+        user_id__in=[p.user_id for p in participants],
+        problem_id__in=[problem.id for problem in problems]) \
+        .order_by("create_time").values("user_id", "problem_id", "result", "create_time")
+    for row in rows:
+        cell = cells.setdefault((row["user_id"], row["problem_id"]),
+                                {"attempts": 0, "solved": False, "last_result": None})
+        cell["attempts"] += 1
+        cell["solved"] = cell["solved"] or row["result"] == JudgeStatus.ACCEPTED
+        cell["last_result"] = row["result"]
+        last_submit[row["user_id"]] = row["create_time"]
+
+    board = [{"id": participant.id, "number": participant.number,
+              "nickname": participant.nickname, "pin": participant.pin,
+              "join_time": participant.join_time,
+              "last_submit_time": last_submit.get(participant.user_id),
+              "cells": {str(problem.id): cells.get((participant.user_id, problem.id))
+                        for problem in problems}}
+             for participant in participants]
+    data = TeacherHomeworkDetailSerializer(homework).data
+    for problem in data["problems"]:
+        problem["solved_count"] = sum(
+            1 for row in board if (row["cells"][str(problem["id"])] or {}).get("solved"))
+    return data, board
+
+
+# 엑셀은 사람이 읽는 표라 학교 시각으로 적는다(서버는 UTC 로 저장한다)
+LOCAL_TZ = ZoneInfo("Asia/Seoul")
+
+
+def board_xlsx(homework_data, board):
+    """결과 표만 담는다. 코드는 과제가 끝나면 쓸 데가 없어 넣지 않는다.
+
+    표시는 문제집 학습 현황 엑셀과 같다: 맞힘 O, 냈지만 못 맞힘 △(낸 횟수), 안 냄 빈칸.
+    """
+    def local(value):
+        return value.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M") if value else ""
+
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+    worksheet = workbook.add_worksheet()
+    problems = homework_data["problems"]
+    headers = ["번호", "닉네임", "4자리 숫자", "입장 시각", "마지막 제출"] \
+        + ["{}. {}".format(index + 1, problem["title"]) for index, problem in enumerate(problems)] \
+        + ["맞힌 문제"]
+    worksheet.set_column(0, 0, 8)
+    worksheet.set_column(1, 1, 16)
+    worksheet.set_column(3, 4, 17)
+    for col, header in enumerate(headers):
+        worksheet.write_string(0, col, header)
+    for row_index, row in enumerate(board, start=1):
+        worksheet.write_number(row_index, 0, row["number"])
+        worksheet.write_string(row_index, 1, row["nickname"])
+        worksheet.write_string(row_index, 2, row["pin"])
+        worksheet.write_string(row_index, 3, local(row["join_time"]))
+        worksheet.write_string(row_index, 4, local(row["last_submit_time"]))
+        solved = 0
+        for index, problem in enumerate(problems):
+            cell = row["cells"][str(problem["id"])]
+            if cell and cell["solved"]:
+                text = "O"
+                solved += 1
+            elif cell:
+                text = "△({})".format(cell["attempts"])
+            else:
+                text = ""
+            worksheet.write_string(row_index, 5 + index, text)
+        worksheet.write_string(row_index, 5 + len(problems), f"{solved}/{len(problems)}")
+    workbook.close()
+
+    response = HttpResponse(output.getvalue())
+    filename = quote("바로과제 {} {}.xlsx".format(homework_data["title"], homework_data["code"]))
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{filename}"
+    response["Content-Type"] = "application/xlsx"
+    return response
+
 
 class TeacherHomeworkBoardAPI(APIView):
     @teacher_required
     def get(self, request):
-        """현황판: 학생 × 문제. 칸마다 몇 번 냈는지, 맞혔는지, 마지막 결과."""
         homework = owned_homework(request.user, request.GET.get("id"))
         if not homework:
             return self.error("과제가 존재하지 않습니다")
-        participants = list(homework.participants.all())
-        problems = homework.problems()
-        cells = {}
-        last_submit = {}
-        rows = Submission.objects.filter(
-            user_id__in=[p.user_id for p in participants],
-            problem_id__in=[problem.id for problem in problems]) \
-            .order_by("create_time").values("user_id", "problem_id", "result", "create_time")
-        for row in rows:
-            cell = cells.setdefault((row["user_id"], row["problem_id"]),
-                                    {"attempts": 0, "solved": False, "last_result": None})
-            cell["attempts"] += 1
-            cell["solved"] = cell["solved"] or row["result"] == JudgeStatus.ACCEPTED
-            cell["last_result"] = row["result"]
-            last_submit[row["user_id"]] = row["create_time"]
-
-        board = []
-        for participant in participants:
-            board.append({
-                "id": participant.id, "number": participant.number,
-                "nickname": participant.nickname, "pin": participant.pin,
-                "join_time": participant.join_time,
-                "last_submit_time": last_submit.get(participant.user_id),
-                "cells": {str(problem.id): cells.get((participant.user_id, problem.id))
-                          for problem in problems}})
-        data = TeacherHomeworkDetailSerializer(homework).data
-        for problem in data["problems"]:
-            problem["solved_count"] = sum(
-                1 for row in board if (row["cells"][str(problem["id"])] or {}).get("solved"))
+        data, board = build_board(homework)
+        if request.GET.get("download") == "1":
+            return board_xlsx(data, board)
         # DRF 를 거치지 않은 시각은 직렬화기로 바꿔 둔다(JSON 이 datetime 을 못 싣는다)
         field = TeacherSubmissionSerializer().fields["create_time"]
         for row in board:

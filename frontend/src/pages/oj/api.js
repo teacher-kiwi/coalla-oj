@@ -402,6 +402,9 @@ export default {
   },
   removeHomeworkParticipant (id) {
     return ajax('teacher/hw/participant', 'delete', { params: { id } })
+  },
+  deleteHomework (id) {
+    return ajax('teacher/hw', 'delete', { params: { id } })
   }
 }
 

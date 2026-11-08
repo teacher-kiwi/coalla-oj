@@ -3,6 +3,8 @@
 학생은 로그인하지 않고 과제마다 받는 출입증(쿠키)으로 알아본다. 들어오는 순간
 보이지 않는 임시 계정이 생기고, 그 계정은 로그인·순위·목록 어디에도 나오면 안 된다.
 """
+import io
+import zipfile
 from datetime import timedelta
 from unittest import mock
 
@@ -512,3 +514,42 @@ class TeacherHomeworkTest(HomeworkTestBase):
                                           data={"participant_id": participant.id,
                                                 "problem_id": self.problem.id}))
         self.assertTrue(HomeworkParticipant.objects.exists())
+
+    # ---- 4단계: 엑셀과 삭제 ----
+    def test_excel_has_results_but_no_code(self):
+        self._guest_submits("3", -1)
+        self._guest_submits("3", 0)
+        self._guest_submits("1", -1)
+        resp = self.client.get(self.reverse("teacher_homework_board_api"),
+                               data={"id": self.homework.id, "download": "1"})
+        self.assertEqual(resp["Content-Type"], "application/xlsx")
+        self.assertIn(self.homework.code, resp["Content-Disposition"])
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as book:
+            strings = book.read("xl/sharedStrings.xml").decode("utf-8")
+        for text in ("4자리 숫자", "학생3", "1234", "O", "△(1)", "1/1", "0/1"):
+            self.assertIn(text, strings)
+        self.assertNotIn("print(1)", strings)
+
+    def test_open_homework_cannot_be_deleted(self):
+        self._guest_submits("3", 0)
+        resp = self.client.delete(self.url + f"?id={self.homework.id}")
+        self.assertFailed(resp, "진행 중인 과제는 지울 수 없습니다. 먼저 종료하세요")
+        self.assertTrue(Homework.objects.filter(id=self.homework.id).exists())
+
+    def test_deleting_an_ended_homework_removes_every_record(self):
+        self._guest_submits("3", 0)
+        self.client.put(self.url, data={"id": self.homework.id, "end": True})
+        self.assertSuccess(self.client.delete(self.url + f"?id={self.homework.id}"))
+        self.assertFalse(Homework.objects.filter(id=self.homework.id).exists())
+        self.assertFalse(User.objects.filter(admin_type=AdminType.GUEST).exists())
+        self.assertFalse(Submission.objects.exists())
+        # 문제는 남는다
+        self.assertTrue(Problem.objects.filter(id=self.problem.id).exists())
+
+    def test_cannot_delete_other_teachers_homework(self):
+        self.homework.ended_at = now()
+        self.homework.save()
+        self.client.logout()
+        self.create_teacher(username="박선생")
+        self.assertFailed(self.client.delete(self.url + f"?id={self.homework.id}"))
+        self.assertTrue(Homework.objects.filter(id=self.homework.id).exists())
