@@ -11,7 +11,9 @@
     </el-alert>
 
     <el-table v-loading="loading" :data="contests" class="full-width">
-      <el-table-column label="제목">
+      <!-- 1024px(태블릿 가로)에서도 제목이 잘리지 않게 제목 칸의 최소 폭을 두고,
+           기간은 두 줄(시작 / ~ 종료)로 접어 폭을 줄였다 -->
+      <el-table-column label="제목" min-width="180">
         <template #default="{ row }">
           <!-- 제목은 학생이 보는 대회 화면으로 간다. 관리 화면은 오른쪽 "관리" 로 간다. -->
           <el-button link type="primary" @click="goContest(row.id)">{{ row.title }}</el-button>
@@ -25,14 +27,15 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="기간" width="300">
+      <el-table-column label="기간" width="170">
         <template #default="{ row }">
-          {{ localtime(row.start_time) }} ~ {{ localtime(row.end_time) }}
+          <div>{{ localtime(row.start_time) }}</div>
+          <div>~ {{ localtime(row.end_time) }}</div>
         </template>
       </el-table-column>
       <el-table-column label="문제" prop="problem_count" width="80" />
       <el-table-column label="배포 학급" prop="class_count" width="100" />
-      <el-table-column label="관리" width="280">
+      <el-table-column label="관리" width="210">
         <template #default="{ row }">
           <!-- 수정은 상세 화면에서 한다. 목록에는 열어보기와 삭제만 둔다. -->
           <el-button size="small" type="primary" @click="goDetail(row.id)">관리</el-button>

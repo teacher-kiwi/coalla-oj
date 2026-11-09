@@ -1,6 +1,8 @@
 <template>
-  <el-row justify="space-around">
-    <el-col :span="20" id="status">
+  <div class="submission-details">
+    <!-- 다른 화면과 같은 본문 폭을 쓴다(예전에는 83% 로 가운데에 좁혀 있었다).
+         주석은 루트 안에 둔다: 라우트 화면은 루트 요소가 하나여야 전환 효과가 걸린다 -->
+    <div id="status">
       <el-alert :type="statusInfo.type === 'danger' ? 'error' : statusInfo.type" show-icon :closable="false">
         <template #title>
           <span class="title">{{ statusInfo.label }}</span>
@@ -12,14 +14,14 @@
           <template v-else>
             <span>시간: {{ submissionTimeFormat(submission.statistic_info.time_cost) }}</span>
             <span>메모리: {{ submissionMemoryFormat(submission.statistic_info.memory_cost) }}</span>
-            <span>언어: {{ submission.language }}</span>
+            <span>언어: {{ submission.language === 'Block Coding' ? '블록 코딩' : submission.language }}</span>
             <span>작성자: {{ submission.username }}</span>
           </template>
         </div>
       </el-alert>
-    </el-col>
+    </div>
 
-    <el-col v-if="submission.info && !isCE" :span="20">
+    <div v-if="submission.info && !isCE">
       <el-table :key="`${showScoreColumn}-${isAdminRole}`" :data="submission.info.data"
                 v-loading="loading" stripe>
         <el-table-column type="index" label="ID" align="center" />
@@ -42,16 +44,16 @@
         </el-table-column>
         <el-table-column v-if="isAdminRole" label="시그널" align="center" prop="signal" />
       </el-table>
-    </el-col>
+    </div>
 
-    <el-col v-if="submission.language === 'Block Coding'" :span="20">
+    <div v-if="submission.language === 'Block Coding'">
       <BlocklyViewer :blocks="submission.blockly_state" />
-    </el-col>
+    </div>
 
-    <el-col :span="20">
+    <div>
       <Highlight :code="submission.code" :language="highlightLanguage" :border-color="statusInfo.color" />
-    </el-col>
-  </el-row>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -113,6 +115,15 @@ onMounted(() => {
 </script>
 
 <style scoped lang="less">
+.submission-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  > * {
+    min-width: 0;
+  }
+}
+
 #status {
   .title {
     font-size: 20px;

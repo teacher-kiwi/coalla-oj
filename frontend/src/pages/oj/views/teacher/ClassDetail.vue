@@ -20,7 +20,8 @@
 
     <el-table v-loading="loading" :data="students" class="full-width">
       <el-table-column label="번호" prop="number" width="80" />
-      <el-table-column label="이름" width="220">
+      <!-- 태블릿 세로 폭에서도 관리 버튼이 잘리지 않게 이름 칸은 남는 폭을 쓴다 -->
+      <el-table-column label="이름" min-width="130">
         <template #default="{ row }">
           <!-- 학생을 알아보기 위한 이름. 공개 화면에는 나가지 않는다. -->
           <el-input v-if="editing === row.id" v-model="editingName" size="small"
@@ -36,10 +37,10 @@
           <span class="username">{{ row.username }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="마지막 로그인">
+      <el-table-column label="마지막 로그인" width="150" class-name="nowrap-cell">
         <template #default="{ row }">{{ row.last_login ? localtime(row.last_login) : '접속 기록 없음' }}</template>
       </el-table-column>
-      <el-table-column label="관리" width="330">
+      <el-table-column label="관리" width="300">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="goSubmissions(row)">제출 기록</el-button>
           <el-button size="small" @click="resetPassword(row)">비밀번호 초기화</el-button>
@@ -194,6 +195,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+:deep(.nowrap-cell) {
+  white-space: nowrap;
+}
+
 .full-width {
   width: 100%;
 }

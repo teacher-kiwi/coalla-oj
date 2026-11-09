@@ -51,4 +51,20 @@ function handleClick () {
       border-bottom: none;
     }
   }
+
+  // 가로로 눕힌 메뉴(verticalMenu.vue): 칸 사이를 세로 점선으로 나누고, 고른 표시는 밑줄로
+  @media (max-width: 1000px) {
+    li {
+      border-bottom: none;
+      border-right: 1px dashed #e9eaec;
+      padding: 12px 18px;
+      &:last-child {
+        border-right: none;
+      }
+      &:hover {
+        border-left: none;
+        box-shadow: inset 0 -2px 0 #5cadff;
+      }
+    }
+  }
 </style>

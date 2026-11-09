@@ -3,7 +3,7 @@
     <div class="avatar-container">
       <img class="avatar" :src="profile.avatar" />
     </div>
-    <el-card :body-style="{ padding: '100px' }">
+    <el-card class="profile-card">
       <div v-if="profile.user">
         <p class="user-info">
           <span v-if="profile.user" class="emphasis">{{ profile.user.username }}</span>
@@ -27,7 +27,7 @@
 
         <div id="problems">
           <div v-if="problems.length">해결한 문제 목록</div>
-          <p v-else>아직 문제를 해결하지 않은 게으른 사람입니다.</p>
+          <p v-else class="empty">아직 해결한 문제가 없습니다.</p>
           <div class="btns">
             <div class="problem-btn" v-for="problemID of problems" :key="problemID">
               <el-button @click="goProblem(problemID)">{{ problemID }}</el-button>
@@ -84,10 +84,11 @@ watch(() => route.fullPath, init)
 </script>
 
 <style lang="less" scoped>
+  // 다른 화면과 같은 카드 폭 안에서 가운데에 둔다(예전에는 창의 75% 라 넓은 화면에서 휑했다)
   .container {
     position: relative;
-    width: 75%;
-    margin: 170px auto;
+    max-width: 860px;
+    margin: 100px auto 40px;
     text-align: center;
     p {
       margin-top: 8px;
@@ -106,8 +107,15 @@ watch(() => route.fullPath, init)
         box-shadow: 0 1px 1px 0;
       }
     }
+    .profile-card :deep(.el-card__body) {
+      padding: 80px 48px 40px;
+    }
     .user-info {
       margin-top: -10px;
+    }
+    .empty {
+      color: #909399;
+      font-size: 15px;
     }
     .emphasis {
       font-size: 20px;
@@ -116,14 +124,16 @@ watch(() => route.fullPath, init)
     #split {
       margin: 20px auto;
       width: 90%;
+      border: none;
+      border-top: 1px solid #ebeef5;
     }
     .flex-container {
       display: flex;
       margin-top: 30px;
       .left, .middle, .right { flex: 1 1; }
       .middle {
-        border-left: 1px solid #999;
-        border-right: 1px solid #999;
+        border-left: 1px solid #ebeef5;
+        border-right: 1px solid #ebeef5;
       }
     }
     #problems {

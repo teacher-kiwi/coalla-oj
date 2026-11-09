@@ -72,9 +72,10 @@ function goRoute (path) {
 <style lang="less" scoped>
   @avatar-radius: 50%;
 
+  // 다른 화면과 같은 본문 폭을 쓰되 너무 벌어지지 않게 1100px 에서 멈춘다.
+  // (예전 min-width: 800px 은 태블릿 세로 폭에서 화면을 넘겼다)
   .container {
-    width: 90%;
-    min-width: 800px;
+    max-width: 1100px;
     margin: auto;
   }
 
@@ -142,7 +143,8 @@ function goRoute (path) {
       margin-left: 20px;
     }
     .mini-container {
-      width: 500px;
+      width: 100%;
+      max-width: 500px;
     }
   }
 </style>

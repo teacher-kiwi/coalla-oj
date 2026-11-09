@@ -218,6 +218,20 @@ onBeforeUnmount(() => {
       width: 210px;
       margin-left: 20px;
     }
+    // 태블릿 세로: 메뉴(개요·공지·문제…)를 본문 위 가로 줄로 옮긴다
+    @media (max-width: 1000px) {
+      & {
+        flex-wrap: wrap;
+      }
+      #contest-main {
+        flex: 1 1 100%;
+      }
+      #contest-menu {
+        order: -1;
+        width: 100%;
+        margin: 0 0 20px;
+      }
+    }
     .contest-password {
       margin-top: 20px;
       margin-bottom: -10px;

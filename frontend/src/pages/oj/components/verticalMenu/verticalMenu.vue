@@ -21,4 +21,11 @@ provide('verticalMenuOnClick', (route) => {
   margin: 0;
   padding: 0;
 }
+/* 태블릿 세로(1000px 아래)에서는 오른쪽 칸이 본문 위·아래로 옮겨 가므로 메뉴를 가로로 눕힌다 */
+@media (max-width: 1000px) {
+  .menu-list {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
 </style>

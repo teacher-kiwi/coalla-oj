@@ -2,7 +2,7 @@
   <Panel shadow :padding="10">
     <template #title>{{ title }}</template>
     <template #extra>
-      <el-button v-if="listVisible" type="info" :loading="btnLoading" @click="init">새로고침</el-button>
+      <el-button v-if="listVisible" :icon="Refresh" :loading="btnLoading" @click="init">새로고침</el-button>
       <el-button v-else :icon="Back" @click="goBack">뒤로</el-button>
     </template>
 
@@ -35,7 +35,7 @@
 import { ref, computed, onMounted } from 'vue'
 import Markdown from '@oj/components/Markdown.vue'
 import { useRoute } from 'vue-router'
-import { Back } from '@element-plus/icons-vue'
+import { Back, Refresh } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import Pagination from '@oj/components/Pagination.vue'
 import time from '@/utils/time'
@@ -138,6 +138,18 @@ onMounted(init)
           width: 200px;
           text-align: center;
         }
+      }
+    }
+  }
+
+  // 태블릿 세로 폭에서는 날짜·작성자 칸을 줄여 제목 칸을 넓힌다
+  @media (max-width: 1000px) {
+    .announcements-container li .flex-container {
+      .date {
+        width: 150px;
+      }
+      .creator {
+        width: 130px;
       }
     }
   }

@@ -64,18 +64,22 @@ export const useContestStore = defineStore('contest', {
     },
     contestStartTime: (state) => dayjs(state.contest.start_time),
     contestEndTime: (state) => dayjs(state.contest.end_time),
+    // 대회 화면 오른쪽 위 시계. 예전에는 "-0:59:58" / "Start At in an hour" / "Ended" 처럼
+    // 영어와 기호로 나왔고, 시작 전 조건(asWeeks() > 0)이 늘 참이라 시작 전에는 항상 영어 문장이었다.
     countdown () {
-      if (this.contestStatus === CONTEST_STATUS.NOT_START) {
-        let dur = dayjs.duration(this.contestStartTime.diff(this.now, 'seconds'), 'seconds')
-        if (dur.asWeeks() > 0) return 'Start At ' + dur.humanize()
-        let texts = [Math.floor(dur.asHours()), dur.minutes(), dur.seconds()]
-        return '-' + texts.join(':')
-      } else if (this.contestStatus === CONTEST_STATUS.UNDERWAY) {
-        let dur = dayjs.duration(this.contestEndTime.diff(this.now, 'seconds'), 'seconds')
-        let texts = [Math.floor(dur.asHours()), dur.minutes(), dur.seconds()]
-        return '-' + texts.join(':')
+      const clock = (target) => {
+        const seconds = Math.max(0, target.diff(this.now, 'seconds'))
+        const dur = dayjs.duration(seconds, 'seconds')
+        const pad = (n) => String(n).padStart(2, '0')
+        return `${Math.floor(dur.asHours())}:${pad(dur.minutes())}:${pad(dur.seconds())}`
       }
-      return 'Ended'
+      if (this.contestStatus === CONTEST_STATUS.NOT_START) {
+        const days = Math.floor(this.contestStartTime.diff(this.now, 'day', true))
+        return days >= 1 ? `${days}일 뒤 시작` : `시작까지 ${clock(this.contestStartTime)}`
+      } else if (this.contestStatus === CONTEST_STATUS.UNDERWAY) {
+        return `남은 시간 ${clock(this.contestEndTime)}`
+      }
+      return '종료'
     }
   },
   actions: {

@@ -29,9 +29,15 @@ watch(() => props.borderColor, (newVal) => {
   pre {
     padding: 0;
     display: block;
+    // hljs 가 칠하기 전(또는 모르는 언어)에도 상자 모양을 유지한다. code 는 원래 줄 안
+    // 요소라, 그대로 두면 왼쪽 선과 여백이 첫 줄에만 붙었다.
     code {
+      display: block;
+      overflow-x: auto;
       padding: 20px;
       font-size: 1.1em;
+      background: #fafafa;
+      border-radius: 4px;
     }
   }
 </style>
