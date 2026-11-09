@@ -97,10 +97,10 @@
             </el-row>
           </li>
         </ol>
+        <Pagination :total="total" :page-size="limit" :current="page"
+                    @on-change="onPageChange" :show-sizer="true"
+                    @on-page-size-change="onPageSizeChange" />
       </Panel>
-      <Pagination :total="total" :page-size="limit" :current="page"
-                  @on-change="onPageChange" :show-sizer="true"
-                  @on-page-size-change="onPageSizeChange" />
     </el-col>
   </el-row>
 </template>
@@ -137,7 +137,7 @@ const contests = ref([])
 const query = reactive({ status: '', keyword: '', rule_type: '', scope: '' })
 
 function localtime (val) {
-  return time.utcToLocal(val, 'YYYY-M-D HH:mm')
+  return time.utcToLocal(val, 'YYYY-MM-DD HH:mm')
 }
 
 function getDuration (startTime, endTime) {

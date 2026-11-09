@@ -134,7 +134,7 @@ function handlePage (p = 1) {
     if (v.init) continue
     v.init = true
     v.problem_display_id = problemsMap.value[v.problem_id]
-    v.ac_time = dayjs(contest.value.start_time).add(v.ac_info.ac_time, 'seconds').local().format('YYYY-M-D  HH:mm:ss')
+    v.ac_time = dayjs(contest.value.start_time).add(v.ac_info.ac_time, 'seconds').local().format('YYYY-MM-DD HH:mm:ss')
   }
   pagedAcInfo.value = pageInfo
   loadingTable.value = false

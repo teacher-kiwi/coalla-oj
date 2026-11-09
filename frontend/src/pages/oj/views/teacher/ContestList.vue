@@ -90,7 +90,7 @@ const contests = ref([])
 const form = reactive({ title: '', description: '', start_time: '', end_time: '' })
 
 function localtime (val) {
-  return time.utcToLocal(val, 'YYYY-M-D HH:mm')
+  return time.utcToLocal(val, 'YYYY-MM-DD HH:mm')
 }
 
 function goDetail (id) {

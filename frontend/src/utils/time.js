@@ -7,7 +7,9 @@ dayjs.extend(duration)
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 
-function utcToLocal (utcDt, format = 'YYYY-M-D HH:mm:ss') {
+// 사이트 전체의 날짜 표기는 2026-09-24 14:05 처럼 0 을 채운 꼴 하나로 맞춘다.
+// 초는 대부분 쓸모가 없어 빼고, 필요한 화면(채점 목록 등)만 따로 붙인다.
+function utcToLocal (utcDt, format = 'YYYY-MM-DD HH:mm') {
   return dayjs.utc(utcDt).local().format(format)
 }
 

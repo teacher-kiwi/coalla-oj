@@ -70,7 +70,7 @@
       </div>
       <el-dropdown v-else class="drop-menu" trigger="click" @command="handleRoute">
         <el-button text class="drop-menu-title">
-          {{ userStore.displayName }}
+          <span class="user-name">{{ userStore.displayName }}</span>
           <el-icon><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>
@@ -207,6 +207,50 @@ function openLogin () {
       margin-right: 10px;
       .btn-register {
         margin-left: 5px;
+      }
+    }
+  }
+
+  // 크롬북(1280px 안팎)·태블릿(768~1024px)에서 메뉴가 넘치지 않게 단계적으로 줄인다.
+  // 교사는 메뉴가 둘(수업·바로 과제) 더 많아 1024px 에서 로고가 밀려 사라졌었다.
+  @media (max-width: 1280px) {
+    #header {
+      :deep(.el-menu-item), :deep(.el-sub-menu__title) {
+        padding: 0 12px;
+      }
+      .drop-menu {
+        margin-right: 16px;
+      }
+    }
+  }
+  @media (max-width: 1100px) {
+    #header {
+      // 아이콘을 빼고 글자만 남긴다(하위 메뉴의 펼침 화살표는 남긴다)
+      :deep(.el-menu-item > .el-icon),
+      :deep(.el-sub-menu__title > .el-icon:not(.el-sub-menu__icon-arrow)) {
+        display: none;
+      }
+      :deep(.el-menu-item), :deep(.el-sub-menu__title) {
+        padding: 0 10px;
+      }
+      .logo {
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .drop-menu {
+        margin-right: 8px;
+      }
+      .drop-menu-title {
+        font-size: 15px;
+      }
+      // "닉네임(학생12345678)" 이 길면 줄여서 보인다
+      .user-name {
+        display: inline-block;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: middle;
       }
     }
   }

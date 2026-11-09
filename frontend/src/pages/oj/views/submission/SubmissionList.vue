@@ -38,10 +38,12 @@
           </ul>
         </template>
         <el-table :key="rejudgeColumnVisible" :data="submissions" v-loading="loadingTable" stripe>
-          <el-table-column label="제출 시각" align="center" width="180" class-name="value-cell">
+          <el-table-column label="제출 시각" align="center" :width="narrow ? 110 : 180" class-name="value-cell">
             <template #default="{ row }">{{ localtime(row.create_time) }}</template>
           </el-table-column>
-          <el-table-column label="ID" align="center" width="130">
+          <!-- 태블릿 세로 폭에서는 문제 제목이 한두 글자씩 꺾였다. 덜 보는 ID·메모리 열을 뺀다
+               (ID 를 눌러 들어가던 상세 화면은 상태 표시를 눌러도 들어간다) -->
+          <el-table-column v-if="!narrow" label="ID" align="center" width="130">
             <template #default="{ row }">
               <span v-if="row.show_link" class="link-text submission-id"
                     @click="router.push('/status/' + row.id)">
@@ -52,12 +54,13 @@
           </el-table-column>
           <el-table-column label="상태" align="center" width="120">
             <template #default="{ row }">
-              <el-tag :type="JUDGE_STATUS[row.result].type">
+              <el-tag :type="JUDGE_STATUS[row.result].type" :class="{ 'link-tag': row.show_link }"
+                      @click="row.show_link && router.push('/status/' + row.id)">
                 {{ JUDGE_STATUS[row.result].label }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="문제" align="center">
+          <el-table-column label="문제" align="center" min-width="140" class-name="title-cell">
             <template #default="{ row }">
               <!-- 번호(row.problem)는 주소를 만드는 데 쓰고, 화면에는 제목을 보여준다 -->
               <span class="link-text" @click="goToProblem(row)">{{ row.problem_title }}</span>
@@ -66,11 +69,13 @@
           <el-table-column label="실행 시간" align="center" width="100" class-name="value-cell">
             <template #default="{ row }">{{ submissionTimeFormat(row.statistic_info.time_cost) }}</template>
           </el-table-column>
-          <el-table-column label="메모리" align="center" width="100" class-name="value-cell">
+          <el-table-column v-if="!narrow" label="메모리" align="center" width="100" class-name="value-cell">
             <template #default="{ row }">{{ submissionMemoryFormat(row.statistic_info.memory_cost) }}</template>
           </el-table-column>
-          <el-table-column label="언어" align="center" prop="language" width="120" />
-          <el-table-column label="작성자" align="center" width="200">
+          <el-table-column label="언어" align="center" width="110">
+            <template #default="{ row }">{{ row.language === 'Block Coding' ? '블록 코딩' : row.language }}</template>
+          </el-table-column>
+          <el-table-column label="작성자" align="center" :width="narrow ? 150 : 200">
             <template #default="{ row }">
               <UserLabel :username="row.username" :nickname="row.nickname" />
             </template>
@@ -91,6 +96,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useMaxWidth } from '@/utils/media'
 import UserLabel from '@oj/components/UserLabel.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -106,6 +112,7 @@ const { submissionTimeFormat, submissionMemoryFormat } = utils
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const narrow = useMaxWidth(1100)
 
 const formFilter = reactive({ myself: false, myStudents: false, result: '', username: '' })
 const loadingTable = ref(false)
@@ -139,8 +146,9 @@ const rejudgeColumnVisible = computed(() => {
   return !contestID.value && userStore.user.admin_type === USER_TYPE.SUPER_ADMIN
 })
 
+// 채점 목록은 몇 초 차이로 낸 제출을 구분해야 해서 초까지 적는다. 좁으면 연도를 뺀다.
 function localtime (val) {
-  return time.utcToLocal(val)
+  return time.utcToLocal(val, narrow.value ? 'MM-DD HH:mm' : 'YYYY-MM-DD HH:mm:ss')
 }
 
 function buildQuery () {
@@ -275,6 +283,16 @@ watch(() => [userStore.profileReady, userStore.user.id], ([ready]) => {
     font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
     font-size: 13px;
     white-space: nowrap;
+  }
+
+  // 좁을 때 "삼각수?(ha / rd)" 처럼 낱말 가운데서 꺾이지 않게 낱말 단위로 줄을 바꾼다
+  :deep(.title-cell) {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  .link-tag {
+    cursor: pointer;
   }
 
   .truncate {

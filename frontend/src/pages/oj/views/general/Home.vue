@@ -1,6 +1,5 @@
 <template>
-  <el-row type="flex" justify="space-around">
-    <el-col :span="22">
+  <div>
       <el-card shadow="never" class="homework-entry">
         <form @submit.prevent="goHomework">
           <span class="homework-label">바로 과제</span>
@@ -23,7 +22,7 @@
             <div class="contest-content">
               <div class="contest-content-tags">
                 <el-button type="info" round size="small" :icon="Calendar">
-                  {{ localtime(contest.start_time, 'YYYY-M-D HH:mm') }}
+                  {{ localtime(contest.start_time, 'YYYY-MM-DD HH:mm') }}
                 </el-button>
                 <el-button type="success" round size="small" :icon="Timer">
                   {{ getDuration(contest.start_time, contest.end_time) }}
@@ -40,8 +39,7 @@
         </el-carousel>
       </Panel>
       <Announcements class="announcement" />
-    </el-col>
-  </el-row>
+  </div>
 </template>
 
 <script setup>

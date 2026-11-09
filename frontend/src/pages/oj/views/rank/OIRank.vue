@@ -1,12 +1,11 @@
 <template>
-  <el-row justify="space-around">
-    <el-col :span="22">
-      <Panel :padding="10">
+  <div>
+      <!-- 그래프·표·쪽 넘기기를 한 카드에 담는다(예전에는 표와 쪽 넘기기가 카드 밖에 떠 있었다) -->
+      <Panel shadow>
         <template #title>OI 순위</template>
         <div class="echarts">
           <VChart :option="options" autoresize />
         </div>
-      </Panel>
       <el-table :data="dataRank" size="large" stripe>
         <el-table-column align="center" width="60">
           <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
@@ -26,8 +25,8 @@
       <Pagination :total="total" :page-size="limit" :current="page"
                   @on-change="onPageChange" :show-sizer="true"
                   @on-page-size-change="onPageSizeChange" />
-    </el-col>
-  </el-row>
+      </Panel>
+  </div>
 </template>
 
 <script setup>
@@ -47,8 +46,9 @@ const options = ref({
   tooltip: { trigger: 'axis' },
   legend: { data: ['점수'] },
   grid: { x: '3%', x2: '3%' },
+  // 그래프 오른쪽 위 도구 아이콘(표 보기·모양 바꾸기·저장)은 학생이 쓰지 않고 화면만 어지럽혀 감춘다
   toolbox: {
-    show: true,
+    show: false,
     feature: {
       dataView: { show: true, readOnly: true },
       magicType: { show: true, type: ['line', 'bar'] },

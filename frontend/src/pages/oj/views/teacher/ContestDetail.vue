@@ -242,7 +242,7 @@ const classRows = computed(() => {
 })
 
 function localtime (val) {
-  return val ? time.utcToLocal(val, 'YYYY-M-D HH:mm') : ''
+  return val ? time.utcToLocal(val, 'YYYY-MM-DD HH:mm') : ''
 }
 
 function goList () {

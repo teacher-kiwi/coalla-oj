@@ -1,5 +1,6 @@
 <template>
-  <div class="page">
+  <!-- 한 쪽에 다 들어가면 넘길 쪽이 없다. 빈 목록 밑에 "1" 만 뜨는 것도 막는다. -->
+  <div v-if="total > pageSize || (showSizer && total > 10)" class="page">
     <el-pagination
       background
       :total="total"
@@ -36,8 +37,16 @@ function onPageSizeChange (size) {
 </script>
 
 <style scoped lang="less">
+  // 카드 안 표 바로 밑에 오른쪽으로 붙인다. 예전에는 float 이라 카드 밖에 두면
+  // 회색 바탕에 떠 있었고, 화면마다 카드 안·밖이 섞여 있었다.
   .page {
-    margin: 20px;
-    float: right;
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 20px;
+    :deep(.el-pagination) {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      row-gap: 8px;
+    }
   }
 </style>

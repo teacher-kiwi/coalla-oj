@@ -71,9 +71,17 @@ watch(() => route.fullPath, updateTitle)
   // (el-menu 의 가로 모드는 줄바꿈하지 않는다). 그만큼 본문을 내린다.
   // 예전에는 좁은 화면에서 내비가 두 줄이 된다고 보고 160px 를 줬는데,
   // 두 줄이 되지 않아 1200px 아래에서 100px 가 그냥 비어 있었다.
+  // 본문 폭은 모든 화면이 같다. 넓은 모니터에서 표가 끝없이 벌어지지 않게 1440px 에서 멈춘다.
+  // (예전에는 홈·순위만 따로 91% 로 좁혀서, 메뉴를 옮길 때마다 카드 왼쪽 끝이 움직였다)
   .content-app {
-    margin-top: 80px;
-    padding: 0 2%;
+    max-width: 1440px;
+    margin: 80px auto 0;
+    padding: 0 24px;
+  }
+  @media (max-width: 1000px) {
+    .content-app {
+      padding: 0 16px;
+    }
   }
 
   // 바로 과제 화면은 상단 메뉴가 없다. 메뉴 자리만큼 내리지 않는다.
@@ -83,11 +91,32 @@ watch(() => route.fullPath, updateTitle)
     padding-bottom: 40px;
   }
 
+  // 바닥글은 카드처럼 보이지 않게 바탕 위에 옅게 둔다
   .footer {
-    margin-top: 20px;
-    margin-bottom: 10px;
+    margin: 32px 0 16px;
     text-align: center;
-    font-size: small;
+    font-size: 13px;
+    color: #909399;
+    line-height: 1.6;
+    p {
+      margin: 0;
+    }
+    // 사이트 설정의 바닥글 글은 마크다운 미리보기로 그린다. 그 흰 바탕·여백을 걷어낸다.
+    .md-editor {
+      background: transparent;
+    }
+    .md-editor-preview-wrapper, .md-editor-preview {
+      padding: 0;
+      font-size: 13px;
+      color: inherit;
+    }
+    a {
+      color: inherit;
+      text-decoration: underline;
+      &:hover {
+        color: var(--el-color-primary);
+      }
+    }
   }
 
   .fadeInUp-enter-active {

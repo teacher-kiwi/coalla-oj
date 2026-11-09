@@ -2,7 +2,7 @@
   <div class="flex-container">
     <div id="problem-main">
         <Panel :padding="40" shadow>
-        <template #title>{{ problem.title }}</template>
+        <template #title><span class="problem-title">{{ problem.title }}</span></template>
         <div v-if="problemLoaded" id="problem-content" class="markdown-body">
           <p class="title">문제 설명</p>
           <Markdown class="content" :source="problem.description" />
@@ -28,7 +28,8 @@
                     <el-icon><DocumentCopy /></el-icon>
                   </a>
                 </p>
-                <pre>{{ sample.input }}</pre>
+                <pre v-if="sample.input.trim()">{{ sample.input }}</pre>
+                <pre v-else class="empty-sample">(입력 없음)</pre>
               </div>
               <div class="sample-output">
                 <p class="title">출력 예제 {{ index + 1 }}</p>
@@ -180,7 +181,7 @@
         </template>
         <ul>
           <li><p>ID</p><p>{{ problem.display_id }}</p></li>
-          <li><p>시간 제한</p><p>{{ problem.time_limit }}MS</p></li>
+          <li><p>시간 제한</p><p>{{ problem.time_limit }}ms</p></li>
           <li><p>메모리 제한</p><p>{{ problem.memory_limit }}MB</p></li>
           <li><p>IO 모드</p><p>{{ problem.io_mode.io_mode }}</p></li>
           <!-- 출제 교사가 탈퇴해도 공개 문제는 남는다(created_by 가 null 이 된다) -->
@@ -723,13 +724,20 @@ watch(() => route.fullPath, () => {
   }
 }
 
+// 문제 제목이 화면의 큰 제목이다. 본문 소제목(문제 설명·입력…)보다 커야 한다.
+.problem-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+
 #problem-content {
   margin-top: -50px;
+  // 소제목은 바로 과제 문제 화면과 같은 모양(굵은 검정)으로 맞춘다
   .title {
-    font-size: 20px;
-    font-weight: 400;
-    margin: 25px 0 8px 0;
-    color: #3091f2;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 28px 0 8px 0;
+    color: #303133;
     .copy {
       padding-left: 8px;
       cursor: pointer;
@@ -742,19 +750,23 @@ watch(() => route.fullPath, () => {
   }
   .sample {
     align-items: stretch;
+    gap: 20px;
     &-input,
     &-output {
       width: 50%;
       flex: 1 1 auto;
       display: flex;
       flex-direction: column;
-      margin-right: 5%;
+      min-width: 0;
     }
     pre {
       flex: 1 1 auto;
       align-self: stretch;
       border-style: solid;
       background: transparent;
+    }
+    .empty-sample {
+      color: #c0c4cc;
     }
   }
 }
@@ -778,17 +790,28 @@ watch(() => route.fullPath, () => {
     margin: 0;
     padding: 0;
     list-style-type: none;
+    // 이름과 값을 한 줄에 양 끝으로. 값이 길면(작성자 등) 그 칸 안에서 줄을 바꾼다.
     li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
       border-bottom: 1px dotted #e9eaec;
-      margin-bottom: 10px;
+      font-size: 14px;
+      &:last-child {
+        border-bottom: none;
+      }
       p {
-        display: inline-block;
+        margin: 0;
       }
       p:first-child {
-        width: 90px;
+        flex: none;
+        color: #909399;
       }
       p:last-child {
-        float: right;
+        text-align: right;
+        overflow-wrap: anywhere;
       }
     }
   }
@@ -831,5 +854,34 @@ watch(() => route.fullPath, () => {
 .large-pie-chart {
   width: 500px;
   height: 480px;
+}
+
+// 태블릿 세로(768~1000px): 오른쪽 칸을 본문 아래로 내린다. 편집기가 본문 폭을 다 쓴다.
+@media (max-width: 1000px) {
+  // 바깥 틀에만 건다(예제 입력·출력 칸도 .flex-container 라 함께 꺾이지 않게)
+  .flex-container:not(.sample) {
+    flex-wrap: wrap;
+    #problem-main {
+      flex: 1 1 100%;
+      margin-right: 0;
+    }
+    #right-column {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 20px;
+      > * {
+        margin: 0;
+      }
+      // 제출 목록으로 가는 메뉴는 한 줄을 다 쓴다(좁은 상자로 남으면 덩그러니 보인다)
+      > :first-child {
+        flex: 1 1 100%;
+      }
+      #info {
+        flex: 1 1 300px;
+      }
+    }
+  }
 }
 </style>

@@ -1,6 +1,7 @@
 <template>
   <el-row :gutter="18">
-    <el-col :span="19" class="list-column">
+    <!-- 1000px 아래(태블릿 세로)에서는 태그 칸을 목록 아래로 내린다 -->
+    <el-col :span="24" :md="18" :lg="19" class="list-column">
       <Panel shadow>
         <template #title>문제 목록</template>
         <template #extra>
@@ -56,27 +57,27 @@
               <FavoriteHeart :on="!!row.my_favorite" @toggle="toggleFavorite(row)" />
             </template>
           </el-table-column>
-          <el-table-column label="#" width="80">
+          <el-table-column label="#" width="70">
             <template #default="{ row }">
               <el-button link type="primary" @click="router.push({ name: 'problem-details', params: { problemID: row.display_id } })">
                 {{ row.display_id }}
               </el-button>
             </template>
           </el-table-column>
-          <el-table-column label="제목" width="400">
+          <el-table-column label="제목" min-width="240">
             <template #default="{ row }">
               <el-button link type="primary" class="title-btn" @click="router.push({ name: 'problem-details', params: { problemID: row.display_id } })">
                 {{ row.title }}
               </el-button>
             </template>
           </el-table-column>
-          <el-table-column label="난이도">
+          <el-table-column label="난이도" min-width="80">
             <template #default="{ row }">
               <DifficultyTag :value="row.difficulty" />
             </template>
           </el-table-column>
-          <el-table-column label="총 제출" prop="submission_number" />
-          <el-table-column label="정답률">
+          <el-table-column label="총 제출" prop="submission_number" min-width="80" />
+          <el-table-column label="정답률" min-width="90" class-name="nowrap-cell">
             <template #default="{ row }">{{ getACRate(row.accepted_number, row.submission_number) }}</template>
           </el-table-column>
           <el-table-column v-if="tagsVisible" label="태그" align="center">
@@ -87,13 +88,13 @@
             </template>
           </el-table-column>
         </el-table>
+        <Pagination :total="total" :page-size="query.limit" :current="query.page"
+                    @on-change="onPageChange" :show-sizer="true"
+                    @on-page-size-change="onPageSizeChange" />
       </Panel>
-      <Pagination :total="total" :page-size="query.limit" :current="query.page"
-                  @on-change="onPageChange" :show-sizer="true"
-                  @on-page-size-change="onPageSizeChange" />
     </el-col>
 
-    <el-col :span="5">
+    <el-col :span="24" :md="6" :lg="5" class="tag-column">
       <Panel :padding="10">
         <template #title>태그</template>
         <div v-loading="loadings.tag">
@@ -263,6 +264,18 @@ watch(() => [userStore.profileReady, userStore.user.id], ([ready]) => {
   // (submission/SubmissionList.vue 에 같은 설명이 있다)
   .list-column {
     min-width: 0;
+  }
+
+  // 정답률(100.00%)이 좁은 폭에서 "100.0 / 0%" 로 꺾이지 않게
+  :deep(.nowrap-cell) {
+    white-space: nowrap;
+  }
+
+  // 태그 칸이 목록 아래로 내려왔을 때 위와 띄운다(el-row 의 gutter 는 좌우만 준다)
+  @media (max-width: 991px) {
+    .tag-column {
+      margin-top: 20px;
+    }
   }
 
   .tag-btn {

@@ -37,14 +37,19 @@ const shadowMode = computed(() => (props.shadow ? 'always' : 'never'))
   .panel {
     .panel-header {
       display: flex;
+      // 태블릿 폭에서 걸러내기 줄이 길면 제목 아래로 내려간다(제목이 "문제 목 / 록" 으로
+      // 꺾이지 않게 제목은 줄을 바꾸지 않는다)
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
+      column-gap: 16px;
     }
     .panel-title {
       .section-title;
       // 좌우 여백은 카드(el-card__header)가 이미 갖고 있다. 여기서 더 주면
       // 제목만 안쪽으로 들어가 본문과 어긋난다.
       padding: 5px 0;
+      white-space: nowrap;
     }
     .panel-extra {
       line-height: 40px;

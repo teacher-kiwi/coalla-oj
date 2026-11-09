@@ -36,7 +36,7 @@ const data = ref([])
 const loading = ref(false)
 
 function timestampFormat (value) {
-  return dayjs.unix(value).format('YYYY-M-D  HH:mm:ss')
+  return dayjs.unix(value).format('YYYY-MM-DD HH:mm:ss')
 }
 
 function init () {
