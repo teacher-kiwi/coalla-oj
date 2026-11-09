@@ -8,7 +8,7 @@
         번호·닉네임·4자리 숫자만 정하고 풉니다. 문제와 언어는 만든 뒤에 바꿀 수 없습니다.
       </el-alert>
 
-      <el-form label-width="90px" class="form">
+      <el-form label-width="90px" class="form panel-inset">
         <el-form-item label="제목" required>
           <el-input v-model="form.title" maxlength="128"
                     placeholder="예: 3학년 2반 반복문 연습 (학년·반이 필요하면 여기에)" />
@@ -19,9 +19,9 @@
             <el-date-picker v-model="form.endTime" type="datetime" format="YYYY-MM-DD HH:mm"
                             :clearable="false" :disabled-date="isPast" />
             <span class="quick">
-              <el-button size="small" @click="setDeadline(40)">40분 뒤</el-button>
-              <el-button size="small" @click="setDeadline(60)">1시간 뒤</el-button>
-              <el-button size="small" @click="setDeadline(60 * 24)">내일 이 시각</el-button>
+              <el-button @click="setDeadline(40)">40분 뒤</el-button>
+              <el-button @click="setDeadline(60)">1시간 뒤</el-button>
+              <el-button @click="setDeadline(60 * 24)">내일 이 시각</el-button>
             </span>
           </div>
         </el-form-item>
@@ -57,7 +57,7 @@
         </el-form-item>
       </el-form>
 
-      <div class="submit">
+      <div class="submit panel-inset">
         <el-button type="primary" size="large" :loading="saving" @click="create">만들기</el-button>
       </div>
     </Panel>
@@ -214,13 +214,23 @@ onMounted(() => {
 
 <style lang="less" scoped>
 .form {
-  margin-top: 16px;
+  margin-top: 4px;
+}
+// 고른 언어까지 파랗게 칠하면 일곱 개가 모두 파래서 산만하다. 체크 표시만 파랗게 둔다.
+.form :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: inherit;
 }
 .deadline {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  .quick {
+    display: flex;
+    .el-button + .el-button {
+      margin-left: 8px;
+    }
+  }
 }
 .problems {
   width: 100%;
@@ -231,7 +241,8 @@ onMounted(() => {
 .submit {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  padding-top: 4px;
+  padding-bottom: 20px;
 }
 .picker-filter {
   display: flex;

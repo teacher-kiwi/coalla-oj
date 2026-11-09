@@ -1,15 +1,20 @@
 <template>
   <div class="hw-header">
-    <div class="hw-title">
-      <router-link :to="{ name: 'homework-home', params: { code: homework.code } }" class="title">
-        {{ homework.title }}
-      </router-link>
-      <el-tag v-if="homework.ended" type="info" effect="plain">종료</el-tag>
-      <el-tag v-else type="success" effect="plain">{{ remaining }}</el-tag>
-    </div>
-    <div v-if="participant" class="hw-me">
-      <span class="me">{{ participant.number }}번 {{ participant.nickname }}</span>
-      <el-button size="small" @click="leave">나가기</el-button>
+    <router-link :to="{ name: 'homework-home', params: { code: homework.code } }" class="hw-title">
+      <span class="kicker">바로 과제 · {{ homework.code }}</span>
+      <span class="title">{{ homework.title }}</span>
+    </router-link>
+
+    <div class="hw-side">
+      <!-- 학생에게 가장 중요한 정보라 크게 둔다. 10분 아래로 남으면 주황, 끝나면 회색 -->
+      <div :class="['clock', clockState]">
+        <span class="left">{{ clock.left }}</span>
+        <span v-if="clock.until" class="until">{{ clock.until }}</span>
+      </div>
+      <div v-if="participant" class="hw-me">
+        <span class="me">{{ participant.number }}번 {{ participant.nickname }}</span>
+        <el-button size="small" @click="leave">나가기</el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -31,15 +36,23 @@ let timer = null
 onMounted(() => { timer = setInterval(() => { nowMs.value = Date.now() }, 30 * 1000) })
 onBeforeUnmount(() => clearInterval(timer))
 
-const remaining = computed(() => {
-  const left = new Date(props.homework.end_time).getTime() - nowMs.value
+const minutesLeft = computed(() =>
+  Math.ceil((new Date(props.homework.end_time).getTime() - nowMs.value) / 60000))
+
+const clock = computed(() => {
+  if (props.homework.ended) return { left: '종료됨', until: '' }
   // 화면을 켜 둔 채 마감이 지났다. 제출은 서버가 막는다.
-  if (left <= 0) return '마감'
-  const minutes = Math.ceil(left / 60000)
-  const until = time.utcToLocal(props.homework.end_time, 'M/D HH:mm')
-  if (minutes < 60) return `${minutes}분 남음 (${until} 마감)`
-  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남음 (${until} 마감)`
-  return `${until} 마감`
+  if (minutesLeft.value <= 0) return { left: '마감', until: '' }
+  const minutes = minutesLeft.value
+  const until = time.utcToLocal(props.homework.end_time, minutes < 60 * 24 ? 'HH:mm 마감' : 'M/D HH:mm 마감')
+  if (minutes < 60) return { left: `${minutes}분 남음`, until }
+  if (minutes < 60 * 24) return { left: `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 남음`, until }
+  return { left: `${Math.floor(minutes / 60 / 24)}일 남음`, until }
+})
+
+const clockState = computed(() => {
+  if (props.homework.ended || minutesLeft.value <= 0) return 'over'
+  return minutesLeft.value <= 10 ? 'soon' : ''
 })
 
 function leave () {
@@ -54,26 +67,65 @@ function leave () {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: 12px 24px;
   margin-bottom: 16px;
+  padding: 14px 20px;
+  background: #fff;
+  border-radius: 8px;
+  border-top: 4px solid var(--el-color-primary);
+  box-shadow: var(--el-box-shadow-light);
 }
 .hw-title {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  .kicker {
+    font-size: 12px;
+    color: #909399;
+    letter-spacing: 0.5px;
+  }
   .title {
     font-size: 20px;
     font-weight: 600;
-    color: inherit;
-    text-decoration: none;
+    color: #303133;
     overflow-wrap: anywhere;
+  }
+}
+.hw-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+  .left {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--el-color-success);
+  }
+  .until {
+    font-size: 12px;
+    color: #909399;
+  }
+  &.soon .left {
+    color: var(--el-color-warning);
+  }
+  &.over .left {
+    color: #909399;
   }
 }
 .hw-me {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-left: 20px;
+  border-left: 1px solid #ebeef5;
   .me {
     color: #606266;
   }

@@ -1,5 +1,8 @@
 <template>
   <div>
+    <el-button link :icon="ArrowLeft" class="back" @click="router.push({ name: 'teacher-homework-report' })">
+      바로 과제 레포트
+    </el-button>
     <Panel shadow>
       <template #title>
         <span class="title">{{ homework.title || '바로 과제' }}</span>
@@ -7,82 +10,83 @@
         <el-tag v-else-if="homework.id" type="success" class="state">진행 중</el-tag>
       </template>
       <template #extra>
-        <el-button @click="router.push({ name: 'teacher-homework-report' })">레포트</el-button>
         <el-button @click="editTitle">제목 수정</el-button>
         <el-button :disabled="!homework.id" @click="download">엑셀로 내려받기</el-button>
         <el-button v-if="homework.ended" type="danger" plain @click="remove">과제 삭제</el-button>
+        <el-button v-else-if="homework.id" type="danger" plain @click="endNow">지금 종료</el-button>
       </template>
 
-      <div v-if="homework.id" class="summary">
-        <div class="code-box" @click="showCode = true">
+      <div v-if="homework.id" class="summary panel-inset">
+        <div class="code-box" title="눌러서 크게 보기" @click="showCode = true">
           <span class="code-label">입장 코드</span>
           <span class="code">{{ homework.code }}</span>
-          <span class="code-hint">눌러서 크게 보기</span>
+          <span class="code-hint"><el-icon><FullScreen /></el-icon> 크게 보기 · QR</span>
         </div>
-        <div class="facts">
-          <p>
-            <span class="label">주소</span>
-            <a :href="link" target="_blank" rel="noopener">{{ link }}</a>
+        <dl class="facts">
+          <dt>주소</dt>
+          <dd>
+            <a :href="link" target="_blank" rel="noopener" class="link-text">{{ link }}</a>
             <el-button size="small" link type="primary" @click="copyLink">복사</el-button>
-          </p>
-          <p>
-            <span class="label">{{ homework.ended ? '종료' : '마감' }}</span>
+          </dd>
+          <dt>{{ homework.ended ? '종료' : '마감' }}</dt>
+          <dd>
             {{ localtime(homework.ended_at || homework.end_time) }}
-            <span v-if="!homework.ended" class="muted">({{ remaining }})</span>
+            <span v-if="!homework.ended" class="muted">· {{ remaining }}</span>
             <el-button v-if="!homework.ended" size="small" link type="primary" @click="openDeadline">
               바꾸기
             </el-button>
-          </p>
-          <p>
-            <span class="label">언어</span>
-            {{ homework.languages.map(l => l === 'Block Coding' ? '블록 코딩' : l).join(', ') }}
-          </p>
-          <p v-if="!homework.ended" class="controls">
-            <span class="label">새 입장</span>
-            <el-switch :model-value="!homework.entry_locked" active-text="받기" inactive-text="막기"
-                       inline-prompt @change="toggleEntry" />
-            <el-button type="danger" plain size="small" class="end-button" @click="endNow">
-              지금 종료
-            </el-button>
-          </p>
-        </div>
+          </dd>
+          <dt>언어</dt>
+          <dd>{{ homework.languages.map(l => l === 'Block Coding' ? '블록 코딩' : l).join(', ') }}</dd>
+          <template v-if="!homework.ended">
+            <dt>새 입장</dt>
+            <dd>
+              <el-switch :model-value="!homework.entry_locked" @change="toggleEntry" />
+              <span class="muted">{{ homework.entry_locked ? '막음 · 이미 들어온 학생만 들어올 수 있습니다' : '받는 중' }}</span>
+            </dd>
+          </template>
+        </dl>
       </div>
 
-      <div class="board-head">
-        <span>참가 {{ participants.length }}명</span>
-        <span v-if="!homework.ended" class="muted">10초마다 저절로 바뀝니다</span>
+      <div class="board-head panel-inset">
+        <span class="count">참가 <b>{{ participants.length }}</b>명</span>
+        <span class="legend">
+          <span><b class="solved">O</b> 맞힘</span>
+          <span><b class="tried">△</b> 못 맞힘 (괄호는 낸 횟수)</span>
+          <span>칸을 누르면 낸 코드</span>
+          <span v-if="!homework.ended">· 10초마다 새로 고침</span>
+        </span>
       </div>
       <el-table v-loading="loading" :data="participants" class="full-width board" border size="small">
         <el-table-column label="번호" prop="number" width="70" fixed />
-        <el-table-column label="닉네임" prop="nickname" min-width="100" fixed />
-        <el-table-column label="4자리" prop="pin" width="70" />
-        <el-table-column label="입장" width="70">
+        <el-table-column label="닉네임" prop="nickname" width="110" fixed show-overflow-tooltip />
+        <el-table-column label="4자리" prop="pin" width="64" align="center" />
+        <el-table-column label="입장" width="64" align="center">
           <template #default="{ row }">{{ clock(row.join_time) }}</template>
         </el-table-column>
-        <el-table-column label="마지막 제출" width="90">
-          <template #default="{ row }">{{ row.last_submit_time ? clock(row.last_submit_time) : '-' }}</template>
+        <el-table-column label="마지막 제출" width="90" align="center">
+          <template #default="{ row }">{{ row.last_submit_time ? clock(row.last_submit_time) : '' }}</template>
         </el-table-column>
         <el-table-column v-for="(problem, index) in homework.problems" :key="problem.id"
-                         min-width="110" align="center">
+                         min-width="130" align="center">
           <template #header>
             <el-tooltip :content="problem.title" placement="top">
               <span class="problem-head">{{ index + 1 }}. {{ problem.title }}</span>
             </el-tooltip>
-            <div class="muted">정답 {{ problem.solved_count }}명</div>
+            <div class="problem-count">정답 {{ problem.solved_count }}명</div>
           </template>
           <template #default="{ row }">
             <button v-if="row.cells[problem.id]" type="button"
                     :class="['cell', row.cells[problem.id].solved ? 'solved' : 'tried']"
                     @click="openCell(row, problem)">
-              {{ row.cells[problem.id].solved ? '정답' : '오답' }} · {{ row.cells[problem.id].attempts }}회
+              {{ row.cells[problem.id].solved ? 'O' : `△(${row.cells[problem.id].attempts})` }}
             </button>
-            <span v-else class="muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="관리" width="90" fixed="right">
+        <el-table-column width="52" align="center" fixed="right">
           <template #default="{ row }">
             <el-dropdown trigger="click" @command="cmd => manage(cmd, row)">
-              <el-button size="small">관리</el-button>
+              <el-button size="small" link :icon="MoreFilled" aria-label="참가자 관리" />
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="nickname">닉네임 바꾸기</el-dropdown-item>
@@ -94,7 +98,7 @@
           </template>
         </el-table-column>
         <template #empty>
-          <span v-if="!loading">아직 들어온 학생이 없습니다. 코드를 크게 띄워 학생들에게 보여 주세요.</span>
+          <span v-if="!loading">아직 들어온 학생이 없습니다. 입장 코드를 크게 띄워 학생들에게 보여 주세요.</span>
         </template>
       </el-table>
     </Panel>
@@ -106,7 +110,7 @@
         <p class="big-code">{{ homework.code }}</p>
         <img v-if="qr" :src="qr" alt="입장 QR 코드" class="qr" />
         <p class="big-link">{{ link }}</p>
-        <p class="muted">oj.ssambox.com 첫 화면의 "바로 과제" 칸에 숫자를 넣어도 됩니다</p>
+        <p class="big-hint">oj.ssambox.com 첫 화면의 "바로 과제" 칸에 숫자를 넣어도 됩니다</p>
       </div>
     </el-dialog>
 
@@ -145,6 +149,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, FullScreen, MoreFilled } from '@element-plus/icons-vue'
 import api from '@oj/api'
 import time from '@/utils/time'
 import { JUDGE_STATUS } from '@/utils/constants'
@@ -311,6 +316,12 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <style lang="less" scoped>
+// 링크 버튼의 안쪽 여백을 지워 아래 카드의 왼쪽 끝과 맞춘다
+.back {
+  height: auto;
+  padding: 0;
+  margin-bottom: 10px;
+}
 .title {
   margin-right: 8px;
 }
@@ -319,57 +330,93 @@ onBeforeUnmount(() => clearInterval(timer))
 }
 .muted {
   color: #909399;
-  font-size: 12px;
 }
 .summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 16px 32px;
+  margin: 4px 0 20px;
 }
 .code-box {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12px 24px;
-  border: 1px solid #dcdfe6;
+  padding: 14px 28px;
   border-radius: 8px;
+  background: var(--el-color-primary-light-9);
+  border: 1px solid var(--el-color-primary-light-7);
   cursor: pointer;
-  .code-label, .code-hint {
+  transition: border-color .15s;
+  &:hover {
+    border-color: var(--el-color-primary);
+  }
+  .code-label {
     font-size: 12px;
-    color: #909399;
+    color: #606266;
   }
   .code {
     font-size: 36px;
     font-weight: 700;
     letter-spacing: 4px;
+    line-height: 1.2;
+    color: #303133;
+  }
+  .code-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--el-color-primary);
   }
 }
+// 항목 이름과 값을 두 칸으로 맞춘다. 줄마다 글자 크기를 같게 둔다.
 .facts {
-  flex: 1 1 300px;
+  flex: 1 1 320px;
   min-width: 0;
-  p {
-    margin: 0 0 8px;
-    overflow-wrap: anywhere;
-  }
-  .label {
-    display: inline-block;
-    width: 56px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0;
+  dt {
     color: #909399;
   }
-  .controls {
+  dd {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px 8px;
+    margin: 0;
+    min-height: 24px;
+    overflow-wrap: anywhere;
   }
 }
 .board-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  gap: 4px 16px;
+  margin-bottom: 10px;
+  .count b {
+    font-size: 18px;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-size: 12px;
+    color: #909399;
+  }
+}
+// 표시는 문제집 학습 현황·엑셀과 같다(O / △(낸 횟수) / 빈칸)
+.solved {
+  color: #19be6b;
+}
+.tried {
+  color: #e6a23c;
 }
 .problem-head {
   display: inline-block;
@@ -379,44 +426,64 @@ onBeforeUnmount(() => clearInterval(timer))
   white-space: nowrap;
   vertical-align: bottom;
 }
+.problem-count {
+  font-size: 12px;
+  font-weight: normal;
+  color: #909399;
+}
 .cell {
+  min-width: 48px;
   border: none;
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 2px 10px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
   &.solved {
     background: #f0f9eb;
-    color: #67c23a;
   }
   &.tried {
     background: #fdf6ec;
-    color: #e6a23c;
+  }
+  &:hover {
+    outline: 1px solid currentColor;
   }
 }
+// 칠판·TV 화면. 교실 뒤에서도 읽히도록 진하고 크게.
 .big {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  color: #303133;
   .big-title {
-    font-size: 28px;
+    font-size: 32px;
+    font-weight: 600;
     margin: 0;
   }
   .big-code {
-    font-size: 120px;
-    font-weight: 700;
-    letter-spacing: 12px;
-    margin: 16px 0;
+    font-size: 132px;
+    font-weight: 800;
+    letter-spacing: 14px;
+    margin: 16px 0 24px;
     line-height: 1;
+    color: #1f2d3d;
   }
   .qr {
     width: 300px;
     max-width: 80vw;
   }
   .big-link {
-    font-size: 22px;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 20px 0 6px;
     overflow-wrap: anywhere;
+  }
+  .big-hint {
+    font-size: 18px;
+    color: #606266;
+    margin: 0;
   }
 }
 .submission {

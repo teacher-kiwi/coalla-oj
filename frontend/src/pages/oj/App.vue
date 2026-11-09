@@ -1,13 +1,14 @@
 <template>
   <div>
     <NavBar v-if="!route.meta.homework" />
-    <div class="content-app">
+    <div :class="['content-app', { 'content-hw': route.meta.homework }]">
       <router-view v-slot="{ Component }">
         <transition name="fadeInUp" mode="out-in">
           <component :is="Component" />
         </transition>
       </router-view>
-      <div class="footer">
+      <!-- 바로 과제 화면은 학생이 과제만 보도록 사이트 바닥글도 감춘다 -->
+      <div v-if="!route.meta.homework" class="footer">
         <Markdown :source="appStore.website.website_footer" />
         <p>Powered by <a href="https://github.com/QingdaoU/OnlineJudge">OnlineJudge</a>
           <span v-if="version">&nbsp; Version: {{ version }}</span>
@@ -73,6 +74,13 @@ watch(() => route.fullPath, updateTitle)
   .content-app {
     margin-top: 80px;
     padding: 0 2%;
+  }
+
+  // 바로 과제 화면은 상단 메뉴가 없다. 메뉴 자리만큼 내리지 않는다.
+  .content-hw {
+    margin-top: 0;
+    padding-top: 24px;
+    padding-bottom: 40px;
   }
 
   .footer {

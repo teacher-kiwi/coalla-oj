@@ -9,22 +9,28 @@
       </template>
 
       <el-table v-loading="loading" :data="homeworks" class="full-width" @row-click="open">
-        <el-table-column label="상태" width="90">
+        <el-table-column label="상태" width="90" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.ended" type="info" effect="plain">종료</el-tag>
             <el-tag v-else type="success">진행 중</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="제목" prop="title" min-width="180" />
+        <el-table-column label="제목" min-width="200">
+          <template #default="{ row }"><span class="link-text">{{ row.title }}</span></template>
+        </el-table-column>
         <el-table-column label="코드" prop="code" width="90" />
         <el-table-column label="만든 시각" min-width="120">
           <template #default="{ row }">{{ localtime(row.create_time) }}</template>
         </el-table-column>
-        <el-table-column label="마감" min-width="120">
+        <el-table-column label="마감·종료" min-width="120">
           <template #default="{ row }">{{ localtime(row.ended_at || row.end_time) }}</template>
         </el-table-column>
-        <el-table-column label="참가" width="70" align="center" prop="participant_count" />
-        <el-table-column label="문제" width="70" align="center" prop="problem_count" />
+        <el-table-column label="참가" width="80" align="center">
+          <template #default="{ row }">{{ row.participant_count }}명</template>
+        </el-table-column>
+        <el-table-column label="문제" width="80" align="center">
+          <template #default="{ row }">{{ row.problem_count }}개</template>
+        </el-table-column>
         <template #empty>
           <span v-if="!loading">만든 바로 과제가 없습니다. "만들기"로 시작하세요.</span>
         </template>

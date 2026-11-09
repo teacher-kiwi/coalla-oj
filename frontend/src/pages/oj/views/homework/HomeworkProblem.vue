@@ -95,7 +95,7 @@
       </el-card>
 
       <el-card class="history">
-        <template #header>내 제출 ({{ submissions.length }})</template>
+        <template #header><span class="card-title">내 제출 ({{ submissions.length }})</span></template>
         <el-table :data="submissions" empty-text="아직 낸 코드가 없습니다" row-key="id">
           <el-table-column type="expand">
             <template #default="{ row }">
@@ -346,13 +346,17 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="less" scoped>
+// 바로 과제 화면은 모두 같은 폭(문제 목록과 같게)
 .hw-problem {
-  max-width: 1100px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 20px 0;
 }
+// 링크 버튼의 안쪽 여백을 지워 아래 카드의 왼쪽 끝과 맞춘다
 .back {
-  margin-bottom: 8px;
+  height: auto;
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
 }
 .statement, .editor, .notice, .history {
   margin-bottom: 16px;
@@ -422,6 +426,9 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 8px;
   }
+}
+.card-title {
+  font-weight: 600;
 }
 .submitted-code {
   padding: 0 16px 8px;
