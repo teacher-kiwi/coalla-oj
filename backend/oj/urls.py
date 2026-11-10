@@ -20,6 +20,7 @@ urlpatterns = [
     re_path(r"^api/", include("submission.urls.oj")),
     re_path(r"^api/admin/", include("submission.urls.admin")),
     re_path(r"^api/", include("utils.urls")),
+    re_path(r"^api/admin/", include("avatar.urls.admin")),
     # 바로 과제 학생. 로그인 대신 과제마다 따로 주는 출입증으로 알아본다.
     re_path(r"^api/hw/", include("homework.urls.oj")),
 ]

@@ -6,6 +6,10 @@ import {
   TeacherApplication
 } from './views'
 
+// 캐릭터 공방은 그리기 코드가 커서 들어갈 때 따로 받는다
+const ItemList = () => import('./views/character/ItemList.vue')
+const ItemEditor = () => import('./views/character/ItemEditor.vue')
+
 const router = createRouter({
   history: createWebHistory('/admin/'),
   scrollBehavior: () => ({ top: 0 }),
@@ -37,7 +41,10 @@ const router = createRouter({
         { path: '/contest', name: 'contest-list', component: ContestList },
         { path: '/contest/:contestId/edit', name: 'edit-contest', component: Contest },
         { path: '/contest/:contestId/announcement', name: 'contest-announcement', component: Announcement },
-        { path: '/contest/:contestId/problems', name: 'contest-problem-list', component: ProblemList }
+        { path: '/contest/:contestId/problems', name: 'contest-problem-list', component: ProblemList },
+        { path: '/character', name: 'avatar-item-list', component: ItemList },
+        { path: '/character/create', name: 'create-avatar-item', component: ItemEditor },
+        { path: '/character/:itemId/edit', name: 'edit-avatar-item', component: ItemEditor }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/login' }

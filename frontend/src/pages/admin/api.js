@@ -16,6 +16,22 @@ export default {
   getProfile () {
     return ajax('profile', 'get')
   },
+  // 캐릭터 아이템(최고관리자 전용)
+  getAvatarItems () {
+    return ajax('admin/avatar_item', 'get')
+  },
+  getAvatarItem (id) {
+    return ajax('admin/avatar_item', 'get', { params: { id } })
+  },
+  createAvatarItem (data) {
+    return ajax('admin/avatar_item', 'post', { data })
+  },
+  updateAvatarItem (data) {
+    return ajax('admin/avatar_item', 'put', { data })
+  },
+  deleteAvatarItem (id) {
+    return ajax('admin/avatar_item', 'delete', { params: { id } })
+  },
   getAnnouncementList (offset, limit) {
     return ajax('admin/announcement', 'get', { params: { paging: true, offset, limit } })
   },

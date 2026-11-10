@@ -38,7 +38,8 @@ const boxStyle = computed(() => ({
 }))
 
 function eqKey (eq) {
-  return Object.keys(eq).sort().map(k => `${k}:${eq[k] ? eq[k].id : ''}`).join(',')
+  // 고친 아이템이 옛 그림으로 남지 않게 고친 시각(v)도 열쇠에 넣는다
+  return Object.keys(eq).sort().map(k => `${k}:${eq[k] ? `${eq[k].id}@${eq[k].v || ''}` : ''}`).join(',')
 }
 
 function paint (ctx, frame) {

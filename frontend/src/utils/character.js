@@ -35,10 +35,88 @@ export const PART = {
 const ORDER = ['legL', 'legR', 'skirt', 'torso', 'armL', 'armR', 'head']
 
 // 머리 템플릿에서 이 줄 위가 '윗머리'. 윗머리만 덮는 모자를 쓰면 숨긴다.
-const ZONE = 16
+export const ZONE = 16
 // 다리 템플릿에서 FOOT 줄부터 발. 부츠는 BOOT 줄까지 올라온다.
-const FOOT = 11
-const BOOT = 6
+export const FOOT = 11
+export const BOOT = 6
+// 얼굴 아이템을 그릴 수 있는 네모(머리 템플릿 좌표)
+export const FACE = { x0: 8, x1: 31, y0: 17, y1: 32 }
+// 좌우 짝 부위. 대칭으로 그릴 때 쓴다.
+export const PAIR = { armL: 'armR', armR: 'armL', legL: 'legR', legR: 'legL' }
+
+/* ---------- 아이템 종류 ---------- */
+// 자리마다 고를 수 있는 종류(variant). 첫 값이 기본이다.
+//   모자 cover: full 머리카락 전부 숨김 · top 윗머리만 숨김 · none 장식(머리 그대로)
+//   하의 btype: pants 바지 · skirt 치마 / 신발 kind: low 단화 · boots 부츠
+export const SLOTS = {
+  hair: { label: '헤어', variants: [] },
+  hat: { label: '모자·장식', variants: ['top', 'full', 'none'] },
+  face: { label: '얼굴', variants: [] },
+  acc: { label: '안경·얼굴장식', variants: [] },
+  top: { label: '상의', variants: [] },
+  bottom: { label: '하의', variants: ['pants', 'skirt'] },
+  shoes: { label: '신발', variants: ['low', 'boots'] }
+}
+export const SLOT_KEYS = Object.keys(SLOTS)
+export const VARIANT_LABEL = {
+  top: '윗머리만 숨기기', full: '전부 숨기기', none: '장식만',
+  pants: '바지', skirt: '치마', low: '단화·운동화', boots: '장화·부츠'
+}
+
+// 이 자리·종류의 아이템이 그리는 부위
+export function partsFor (slot, variant) {
+  if (slot === 'bottom') return variant === 'skirt' ? ['skirt'] : ['legL', 'legR']
+  if (slot === 'top') return ['torso', 'armL', 'armR']
+  if (slot === 'shoes') return ['legL', 'legR']
+  return ['head']
+}
+
+// 이 칸에 칠할 수 있는가. 얼굴은 얼굴 네모 안, 바지는 발 위, 신발은 발(부츠는 무릎 아래)만.
+export function allowedCell (slot, variant, p, x, y) {
+  if (slot === 'face') return x >= FACE.x0 && x <= FACE.x1 && y >= FACE.y0 && y <= FACE.y1
+  if (p === 'legL' || p === 'legR') {
+    if (slot === 'bottom') return y < FOOT
+    if (slot === 'shoes') return y >= (variant === 'boots' ? BOOT : FOOT)
+  }
+  return true
+}
+
+/* ---------- 저장 형식 ---------- */
+// 부위마다 칸 하나를 글자 하나로 적은 문자열. '.' 은 빈칸, 그 뒤 64글자가 PAL 1~64 번.
+// 서버(avatar/models.py)도 같은 글자표를 쓴다.
+export const CODE = '.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/'
+
+export function encodePart (arr) {
+  let out = ''
+  for (const v of arr) out += CODE[v] || '.'
+  return out
+}
+
+export function decodePart (text, p) {
+  const n = PART[p].w * PART[p].h
+  const a = new Uint8Array(n)
+  for (let i = 0; i < n && i < text.length; i++) a[i] = Math.max(0, CODE.indexOf(text[i]))
+  return a
+}
+
+// 서버가 준 아이템 → 그리기용 아이템 { id, slot, cover|btype|kind, parts: { 부위: Uint8Array } }
+export function itemFromRecord (r) {
+  const item = { id: r.id, v: r.last_update_time, slot: r.slot, parts: {} }
+  if (r.slot === 'hat') item.cover = r.variant || 'top'
+  if (r.slot === 'bottom') item.btype = r.variant || 'pants'
+  if (r.slot === 'shoes') item.kind = r.variant || 'low'
+  for (const [p, text] of Object.entries(r.parts || {})) {
+    if (PART[p]) item.parts[p] = decodePart(text, p)
+  }
+  return item
+}
+
+export function variantOf (item) {
+  if (item.slot === 'hat') return item.cover || 'top'
+  if (item.slot === 'bottom') return item.btype || 'pants'
+  if (item.slot === 'shoes') return item.kind || 'low'
+  return ''
+}
 
 // 동작 8장. 부위를 [x, y] 칸만큼 옮긴다.
 const UP = { head: [0, 1], torso: [0, 1], armL: [0, 1], armR: [0, 1] }
@@ -62,7 +140,7 @@ const SHIRT = '#eef1f5'
 const SHIRT_D = '#c0cbdc'
 const HAIR = '#3e2731'
 const HAIR_HI = '#733e39'
-const OUT = '#181425'
+export const OUT = '#181425'
 const HEAD_IN = [6, 4, 3, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 3, 5]
 
 const blank = p => new Array(PART[p].w * PART[p].h).fill(null)
@@ -114,21 +192,26 @@ function makeBase () {
   B.skirt = blank('skirt')
   return B
 }
-const BASE = makeBase()
+// 맨몸 그림. 편집기가 '맨몸 가이드'와 채우기 범위로 쓴다. 고치지 말고 읽기만 한다.
+export const BASE = makeBase()
 
-function capPixels () {
+// 기본 머리 모양의 칸 [x, y, 밝은 결이면 1]. style: zig 지그재그 앞머리 · straight 일자 앞머리
+export function capPixels (style = 'zig') {
   const out = []
   const add = (lx, r, t = 0) => out.push([lx + 5, r + 8, t])
   for (let r = -1; r <= 6; r++) {
     const k = r < 0 ? HEAD_IN[0] + 1 : Math.max(-1, HEAD_IN[r] - 1)
     for (let x = k; x <= 29 - k; x++) add(x, r)
   }
-  // 앞머리 끝을 지그재그로
   for (let r = 7; r <= 9; r++) {
     for (let x = 0; x < 30; x++) {
-      const p = x % 6
-      const thr = [3, 1.6, 0.6][r - 7]
-      if (Math.abs(p - 2.5) <= thr) add(x, r)
+      if (style === 'zig') {
+        const p = x % 6
+        const thr = [3, 1.6, 0.6][r - 7]
+        if (Math.abs(p - 2.5) <= thr) add(x, r)
+      } else if (r === 7 ? !(x === 14 || x === 15) : (x < 4 || x > 25)) {
+        add(x, r)
+      }
     }
   }
   for (let r = 7; r <= 14; r++) {
@@ -139,7 +222,7 @@ function capPixels () {
   return out
 }
 const DEFAULT_HAIR = blank('head')
-capPixels().forEach(([x, y, t]) => { DEFAULT_HAIR[y * 40 + x] = t ? HAIR_HI : HAIR })
+capPixels('zig').forEach(([x, y, t]) => { DEFAULT_HAIR[y * 40 + x] = t ? HAIR_HI : HAIR })
 
 function drawFace (a, look) {
   const s = setter(a, 'head')
@@ -180,7 +263,9 @@ function recolor (arr, from, to) {
 /* ---------- 부위 그리기 ---------- */
 // eq: { hair, hat, face, acc, top, bottom, shoes } 각 자리에 아이템(또는 없음)
 // 아이템: { slot, parts: { 부위: 색 번호 배열 }, cover?(모자), kind?(신발), btype?(하의) }
-function buildPart (p, eq, tone, look) {
+// opts.pad: 바깥으로 1칸 넓혀 외곽선을 그린다(합성용). false 면 템플릿 크기 그대로(편집기 가이드용).
+// opts.defHair: false 면 기본 머리를 그리지 않는다.
+export function buildPart (p, eq = {}, { tone = { hair: 0, shirt: 0 }, look = 0, pad = true, defHair = true } = {}) {
   const { w, h } = PART[p]
   let a = BASE[p].slice()
   if (p === 'torso' || p === 'armL' || p === 'armR') a = recolor(a, SHIRT_TONES[0], SHIRT_TONES[tone.shirt])
@@ -190,8 +275,10 @@ function buildPart (p, eq, tone, look) {
     for (let i = 0; i < px.length; i++) if (px[i]) a[i] = PAL[px[i] - 1]
   }
   if (p === 'head') {
-    if (eq.face && eq.face.parts && eq.face.parts.head) {
-      eq.face.parts.head.forEach((v, i) => {
+    // 얼굴 아이템을 쓰면 기본 얼굴은 그리지 않는다(부위가 비어 있어도)
+    if (eq.face) {
+      const fp = (eq.face.parts && eq.face.parts.head) || []
+      fp.forEach((v, i) => {
         if (!v) return
         const x = i % w + look
         if (x < w) a[Math.floor(i / w) * w + x] = PAL[v - 1]
@@ -202,13 +289,13 @@ function buildPart (p, eq, tone, look) {
     const hat = eq.hat
     const cover = hat ? (hat.cover || 'top') : 'none'
     const hair = eq.hair
-      ? Array.from(eq.hair.parts.head, v => v ? PAL[v - 1] : null)
-      : recolor(DEFAULT_HAIR, HAIR_TONES[0], HAIR_TONES[tone.hair])
-    if (cover !== 'full') {
+      ? Array.from(eq.hair.parts.head || [], v => v ? PAL[v - 1] : null)
+      : defHair ? recolor(DEFAULT_HAIR, HAIR_TONES[0], HAIR_TONES[tone.hair]) : null
+    if (hair && cover !== 'full') {
       // 윗머리 덮기: 구역선 위의 머리 + 모자가 있는 세로줄에서 모자 아랫단보다 위의 머리를 숨긴다
       const low = new Array(w).fill(-1)
       if (cover === 'top') {
-        hat.parts.head.forEach((v, i) => {
+        ;(hat.parts.head || []).forEach((v, i) => {
           if (!v) return
           const x = i % w
           const y = Math.floor(i / w)
@@ -234,9 +321,9 @@ function buildPart (p, eq, tone, look) {
         for (let x = 0; x < w; x++) if (a[y * w + x]) a[y * w + x] = x === w - 3 ? SKIN_D : SKIN
       }
     }
-    const pants = eq.bottom && (eq.bottom.btype || 'pants') === 'pants' && eq.bottom.parts[p]
+    const pants = eq.bottom && (eq.bottom.btype || 'pants') === 'pants' && eq.bottom.parts && eq.bottom.parts[p]
     if (pants) pants.forEach((v, i) => { if (v && Math.floor(i / w) < FOOT) a[i] = PAL[v - 1] })
-    const shoe = shoes && shoes.parts[p]
+    const shoe = shoes && shoes.parts && shoes.parts[p]
     if (shoe) shoe.forEach((v, i) => { if (v && Math.floor(i / w) >= limit) a[i] = PAL[v - 1] })
   } else if (p === 'skirt') {
     if (eq.bottom && eq.bottom.btype === 'skirt') put(eq.bottom)
@@ -244,10 +331,11 @@ function buildPart (p, eq, tone, look) {
     put(eq.top)
   }
   // 외곽선은 템플릿 바깥으로 1칸 넓힌 공간에서 계산한다. 끝까지 칠해도 바깥에 외곽선이 생긴다.
-  const W = w + 2
-  const H = h + 2
+  const d = pad ? 1 : 0
+  const W = w + 2 * d
+  const H = h + 2 * d
   const b = new Array(W * H).fill(null)
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b[(y + 1) * W + x + 1] = a[y * w + x]
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b[(y + d) * W + x + d] = a[y * w + x]
   const out = b.slice()
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -271,7 +359,7 @@ export function composePixels ({ frame = 0, eq = {}, seed = '', look = 0 } = {})
   const tone = toneOf(seed)
   const px = new Array(SIZE * SIZE).fill(null)
   for (const p of ORDER) {
-    const a = buildPart(p, eq, tone, look)
+    const a = buildPart(p, eq, { tone, look })
     const w = PART[p].w + 2
     const h = PART[p].h + 2
     const [ox, oy] = PART[p].o

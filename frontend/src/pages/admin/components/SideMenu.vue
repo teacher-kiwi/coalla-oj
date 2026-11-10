@@ -30,6 +30,14 @@
       <el-menu-item index="/problem/publish-review">문제 공개 신청</el-menu-item>
       <el-menu-item index="/problem/batch_ops">문제 내보내기/가져오기</el-menu-item>
     </el-sub-menu>
+    <el-sub-menu v-if="userStore.isSuperAdmin" index="character">
+      <template #title>
+        <el-icon><User /></el-icon>
+        캐릭터
+      </template>
+      <el-menu-item index="/character">아이템 목록</el-menu-item>
+      <el-menu-item index="/character/create">아이템 만들기</el-menu-item>
+    </el-sub-menu>
     <el-sub-menu index="contest">
       <template #title>
         <el-icon><Trophy /></el-icon>
