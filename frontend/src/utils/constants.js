@@ -202,9 +202,7 @@ export const STORAGE_KEY = {
   languages: 'languages'
 }
 
-export function buildProblemCodeKey (problemID, contestID = null) {
-  if (contestID) {
-    return `${STORAGE_KEY.PROBLEM_CODE}_${contestID}_${problemID}`
-  }
-  return `${STORAGE_KEY.PROBLEM_CODE}_NaN_${problemID}`
+// 풀던 코드의 임시 저장 자리. 한 기기를 여러 학생이 쓰기도 해서 사용자마다 따로 둔다.
+export function buildProblemCodeKey (problemID, contestID = null, userID = null) {
+  return `${STORAGE_KEY.PROBLEM_CODE}_${userID || 'guest'}_${contestID || 'NaN'}_${problemID}`
 }

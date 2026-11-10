@@ -37,10 +37,8 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { Document, Delete } from '@element-plus/icons-vue'
 import * as Blockly from 'blockly'
-import 'blockly/blocks'
-import * as Ko from 'blockly/msg/ko'
 import { pythonGenerator } from 'blockly/python'
-import './blockly/blocks'
+import './blockly/setup'
 import { toolboxConfig, IO_VARIABLE_CATEGORY, ioVariableFlyout } from './blockly/toolbox'
 
 const props = defineProps({
@@ -82,14 +80,11 @@ function onLangChange (newLang) {
 }
 
 function initBlockly () {
-  Blockly.setLocale(Ko)
-  Blockly.Msg['TEXT_JOIN_TITLE_CREATEWITH'] = '텍스트 합치기'
-  Blockly.Msg['TEXT_CREATE_JOIN_TITLE_JOIN'] = '합치기'
-  Blockly.Msg['LOGIC_NEGATE_TITLE'] = '%1이(가) 아닙니다.'
-
   workspace = Blockly.inject(blocklyDiv.value, {
     toolbox: toolboxConfig,
     grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+    // 휠(터치패드 두 손가락)은 작업 공간을 움직이고, Ctrl+휠·핀치는 확대한다.
+    // 휠을 확대에만 두면 크롬북에서 스크롤하려다 블록이 커졌다 작아졌다 한다.
     zoom: {
       controls: true,
       wheel: true,
@@ -98,6 +93,7 @@ function initBlockly () {
       minScale: 0.3,
       scaleSpeed: 1.2
     },
+    move: { scrollbars: true, drag: true, wheel: true },
     trashcan: true,
     renderer: 'thrasos'
   })

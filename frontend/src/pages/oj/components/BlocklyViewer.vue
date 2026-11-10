@@ -12,9 +12,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Box } from '@element-plus/icons-vue'
 import * as Blockly from 'blockly'
-import 'blockly/blocks'
-import * as Ko from 'blockly/msg/ko'
-import './blockly/blocks'
+import './blockly/setup'
 
 const props = defineProps({
   blocks: { type: String, default: '' }
@@ -24,17 +22,14 @@ const blocklyDiv = ref(null)
 let workspace = null
 
 function initBlockly () {
-  Blockly.setLocale(Ko)
-  Blockly.Msg['TEXT_JOIN_TITLE_CREATEWITH'] = '텍스트 합치기'
-  Blockly.Msg['TEXT_CREATE_JOIN_TITLE_JOIN'] = '합치기'
-  Blockly.Msg['LOGIC_NEGATE_TITLE'] = '%1이(가) 아닙니다.'
-
   workspace = Blockly.inject(blocklyDiv.value, {
     readOnly: true,
-    scrollbars: true,
+    // 보기 화면은 제출 목록 사이사이에 끼어 있다. 휠을 가로채면 페이지가 내려가지 않으니
+    // 휠은 페이지에 넘기고, 블록은 끌거나 스크롤바·확대 단추로 본다.
+    move: { scrollbars: true, drag: true, wheel: false },
     zoom: {
       controls: true,
-      wheel: true,
+      wheel: false,
       startScale: 0.9,
       maxScale: 3,
       minScale: 0.3,

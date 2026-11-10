@@ -53,7 +53,7 @@
           :initial-blocks="blocklyState"
           :languages="textLanguages"
           @changeLang="changeLang"
-          @input="code = $event"
+          @input="blockCode = $event"
           @update:blocks="blocklyState = $event"
         />
 
@@ -160,12 +160,17 @@ const problem = ref(null)
 const submissions = ref([])
 
 const language = ref('')
+// 글 편집기의 코드. 블록이 만든 코드는 blockCode 에 따로 둔다.
+// 하나로 쓰면 블록 편집기가 열리는 순간 쓰던 파이썬 코드를 덮어쓴다.
 const code = ref('')
+const blockCode = ref('')
 const blocklyState = ref('')
 // 블록 편집기는 처음 띄울 때만 블록을 읽는다. 불러오기를 하면 새로 띄운다.
 const blocklyKey = ref(0)
 const theme = ref('solarized')
 
+// 실행·제출할 코드
+const editorCode = computed(() => language.value === 'Block Coding' ? blockCode.value : code.value)
 const ended = computed(() => !homework.value || homework.value.ended)
 const allowBlock = computed(() => problem.value.languages.includes('Block Coding'))
 const textLanguages = computed(() => problem.value.languages.filter(l => l !== 'Block Coding'))
@@ -208,14 +213,29 @@ function startEditor () {
 
 function loadIntoEditor (submission, notify = true) {
   language.value = submission.language
-  code.value = submission.code
-  blocklyState.value = submission.blockly_state || ''
-  blocklyKey.value++
+  if (submission.language === 'Block Coding') {
+    // 블록 코드는 블록 편집기가 블록에서 다시 만든다. 글 편집기의 코드는 건드리지 않는다.
+    blocklyState.value = submission.blockly_state || ''
+    blocklyKey.value++
+  } else {
+    code.value = submission.code
+  }
   if (notify) ElMessage.success('편집기로 불러왔습니다')
 }
 
+// 손대지 않은 코드: 비었거나 어느 언어의 템플릿 그대로.
+function isUntouched (text) {
+  return !text.trim() || Object.values(problem.value.template || {}).includes(text)
+}
+
 function changeLang (lang) {
-  if (lang !== 'Block Coding' && code.value.trim() === '') code.value = template(lang)
+  if (lang !== 'Block Coding' && isUntouched(code.value)) {
+    // 블록에서 파이썬으로 넘어가면 블록이 만든 코드로 이어서 쓸 수 있게 한다.
+    // 이미 쓰던 파이썬 코드가 있으면 그대로 둔다.
+    code.value = language.value === 'Block Coding' && lang === 'Python3' && blockCode.value.trim()
+      ? blockCode.value
+      : template(lang)
+  }
   language.value = lang
 }
 
@@ -262,7 +282,7 @@ const runNotice = computed(() => {
 })
 
 function runCode () {
-  if (code.value.trim() === '') {
+  if (editorCode.value.trim() === '') {
     ElMessage.error('코드가 비어있습니다')
     return
   }
@@ -270,7 +290,7 @@ function runCode () {
   running.value = true
   runResult.value = null
   api.runHomework(hwCode, {
-    problem_id: problemId, language: language.value, code: code.value, input: runInput.value
+    problem_id: problemId, language: language.value, code: editorCode.value, input: runInput.value
   }).then(res => pollRun(res.data.data.token), () => { running.value = false })
 }
 
@@ -293,7 +313,7 @@ const lastResult = ref(null)
 let submitTimer = null
 
 function submitCode () {
-  if (code.value.trim() === '') {
+  if (editorCode.value.trim() === '') {
     ElMessage.error('코드가 비어있습니다')
     return
   }
@@ -302,7 +322,7 @@ function submitCode () {
   api.submitHomework(hwCode, {
     problem_id: problemId,
     language: language.value,
-    code: code.value,
+    code: editorCode.value,
     blockly_state: language.value === 'Block Coding' ? blocklyState.value : ''
   }).then(res => {
     loadSubmissions()

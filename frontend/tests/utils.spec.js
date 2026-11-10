@@ -57,8 +57,13 @@ describe('breakLongWords', () => {
 
 describe('문제 코드 저장 키', () => {
   it('대회 문제와 일반 문제를 다른 키로 저장한다', () => {
-    expect(buildProblemCodeKey('1000')).toBe('problemCode_NaN_1000')
-    expect(buildProblemCodeKey('1000', 7)).toBe('problemCode_7_1000')
+    expect(buildProblemCodeKey('1000')).toBe('problemCode_guest_NaN_1000')
+    expect(buildProblemCodeKey('1000', 7)).toBe('problemCode_guest_7_1000')
+  })
+
+  it('한 기기를 쓰는 학생끼리 서로의 코드를 보지 않게 사용자마다 나눈다', () => {
+    expect(buildProblemCodeKey('1000', null, 5)).toBe('problemCode_5_NaN_1000')
+    expect(buildProblemCodeKey('1000', null, 6)).not.toBe(buildProblemCodeKey('1000', null, 5))
   })
 })
 

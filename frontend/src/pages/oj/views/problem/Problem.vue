@@ -67,6 +67,7 @@
 
         <BlocklyEditor
           v-else
+          :key="blocklyKey"
           :initial-blocks="blocklyWorkspace"
           :languages="problem.languages"
           @changeLang="onChangeLang"
@@ -276,12 +277,19 @@ const submissionExists = ref(false)
 const contestID = ref('')
 const problemID = ref('')
 const submitting = ref(false)
+// 글 편집기의 코드. 블록이 만든 코드는 blockCode 에 따로 둔다.
+// 하나로 쓰면 블록 편집기가 열리는 순간 쓰던 파이썬 코드를 덮어쓴다.
 const code = ref('')
+const blockCode = ref('')
 const language = ref('C++')
 const theme = ref('solarized')
 const submissionId = ref('')
 const submitted = ref(false)
 const blocklyWorkspace = ref('')
+// 블록 편집기는 처음 열 때만 블록을 읽는다. 다른 문제로 넘어가면 이 값을 올려 새로 연다.
+const blocklyKey = ref(0)
+// 실행·제출할 코드
+const editorCode = computed(() => language.value === 'Block Coding' ? blockCode.value : code.value)
 const result = ref({ result: 9 })
 const problemLoaded = ref(false)
 const problem = ref({
@@ -339,7 +347,68 @@ function copyToClipboard (text) {
   })
 }
 
+// 아직 내지 않은 코드의 임시 저장. 새로고침·탭 닫기에도 남도록 바뀔 때마다 저장한다.
+// 한 기기를 여러 학생이 쓰기도 해서 사용자마다 따로 둔다.
+let draftKey = null
+let draftTimer = null
+
+function saveDraft () {
+  clearTimeout(draftTimer)
+  draftTimer = null
+  if (!draftKey) return
+  try {
+    storage.set(draftKey, {
+      code: code.value,
+      language: language.value,
+      theme: theme.value,
+      blocklyState: blocklyWorkspace.value
+    })
+  } catch (e) {
+    // 저장 공간이 가득 찼거나 막힌 브라우저. 풀이는 계속할 수 있다.
+  }
+}
+
+function scheduleDraft () {
+  if (!draftKey) return
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(saveDraft, 800)
+}
+
+function saveDraftWhenHidden () {
+  if (document.visibilityState === 'hidden') saveDraft()
+}
+
+function readDraft (key) {
+  try {
+    return storage.get(key)
+  } catch (e) {
+    return null
+  }
+}
+
+// 이 문제의 편집기를 채운다. 앞 문제의 코드·블록이 남지 않게 모두 새로 정한다.
+function restoreDraft (prob) {
+  const key = buildProblemCodeKey(problemID.value, contestID.value, userStore.user.id)
+  const saved = readDraft(key)
+  const template = prob.template || {}
+  if (saved && saved.language) {
+    language.value = saved.language
+    code.value = saved.code || ''
+    if (saved.theme) theme.value = saved.theme
+  } else {
+    language.value = prob.languages.includes('Python3') ? 'Block Coding' : prob.languages[0]
+    code.value = template[language.value] || ''
+  }
+  blocklyWorkspace.value = (saved && saved.blocklyState) || ''
+  blockCode.value = ''
+  blocklyKey.value++
+  draftKey = key
+}
+
 function init () {
+  // 앞 문제의 것을 마저 저장하고, 새 문제를 다 불러오기 전에는 저장하지 않는다
+  saveDraft()
+  draftKey = null
   contestStore.changeContestItemVisible({ menu: false })
   contestID.value = route.params.contestID || ''
   problemID.value = route.params.problemID || ''
@@ -357,27 +426,8 @@ function init () {
     if (prob.statistic_info) changePie(prob)
     problemLoaded.value = true
 
-    // 저장해둔 코드가 있으면 불러온다
-    const savedCode = storage.get(buildProblemCodeKey(route.params.problemID, route.params.contestID))
-    if (savedCode) {
-      language.value = savedCode.language
-      code.value = savedCode.code
-      theme.value = savedCode.theme
-      if (savedCode.blocklyState) blocklyWorkspace.value = savedCode.blocklyState
-      return
-    }
-
-    if (code.value !== '') return
-
-    if (prob.languages.includes('Python3')) {
-      language.value = 'Block Coding'
-    } else {
-      language.value = prob.languages[0]
-    }
-    const template = prob.template
-    if (template && template[language.value]) {
-      code.value = template[language.value]
-    }
+    // 저장해둔 코드는 누구의 것인지 알아야 고를 수 있다
+    return userStore.ensureProfile().then(() => restoreDraft(prob))
   }, () => {})
 }
 
@@ -416,10 +466,19 @@ function handleRoute (routeObj) {
   router.push(routeObj)
 }
 
+// 손대지 않은 코드: 비었거나 어느 언어의 템플릿 그대로.
+function isUntouched (text) {
+  return !text.trim() || Object.values(problem.value.template || {}).includes(text)
+}
+
 function onChangeLang (newLang) {
-  if (problem.value.template[newLang]) {
-    if (code.value.trim() === '') {
-      code.value = problem.value.template[newLang]
+  if (newLang !== 'Block Coding' && isUntouched(code.value)) {
+    // 블록에서 파이썬으로 넘어가면 블록이 만든 코드로 이어서 쓸 수 있게 한다.
+    // 이미 쓰던 파이썬 코드가 있으면 그대로 둔다.
+    if (language.value === 'Block Coding' && newLang === 'Python3' && blockCode.value.trim()) {
+      code.value = blockCode.value
+    } else {
+      code.value = (problem.value.template || {})[newLang] || ''
     }
   }
   language.value = newLang
@@ -441,7 +500,7 @@ function onResetToTemplate () {
 }
 
 function onCodeGenerated (newCode) {
-  code.value = newCode
+  blockCode.value = newCode
 }
 
 function onWorkspaceChanged (workspaceJson) {
@@ -534,7 +593,7 @@ const runNotice = computed(() => {
 })
 
 function runCode () {
-  if (code.value.trim() === '') {
+  if (editorCode.value.trim() === '') {
     ElMessage.error('코드가 비어있습니다')
     return
   }
@@ -545,7 +604,7 @@ function runCode () {
   const data = {
     problem_id: problem.value.id,
     language: language.value,
-    code: code.value,
+    code: editorCode.value,
     input: runInput.value
   }
   if (contestID.value) data.contest_id = contestID.value
@@ -574,7 +633,7 @@ function pollRun (token) {
 onBeforeUnmount(() => clearTimeout(runTimer))
 
 function submitCode () {
-  if (code.value.trim() === '') {
+  if (editorCode.value.trim() === '') {
     ElMessage.error('코드가 비어있습니다')
     return
   }
@@ -585,7 +644,7 @@ function submitCode () {
   const data = {
     problem_id: problem.value.id,
     language: language.value,
-    code: code.value,
+    code: editorCode.value,
     blockly_state: language.value === 'Block Coding' ? blocklyWorkspace.value : ''
   }
   // 대회 문제가 아니면 키 자체를 넣지 않는다. 빈 문자열을 보내면
@@ -629,22 +688,25 @@ function submitCode () {
 
 onMounted(() => {
   init()
+  // 탭을 닫거나 새로고침하거나 크롬북 덮개를 닫을 때 기다리던 저장을 바로 한다
+  window.addEventListener('pagehide', saveDraft)
+  document.addEventListener('visibilitychange', saveDraftWhenHidden)
 })
 
-onBeforeRouteLeave((to, from) => {
+onBeforeRouteLeave(() => {
   clearTimeout(refreshStatus)
   contestStore.changeContestItemVisible({ menu: true })
-  storage.set(buildProblemCodeKey(problem.value.display_id, from.params.contestID), {
-    code: code.value,
-    language: language.value,
-    theme: theme.value,
-    blocklyState: language.value === 'Block Coding' ? blocklyWorkspace.value : ''
-  })
+  saveDraft()
 })
 
 onBeforeUnmount(() => {
   clearTimeout(refreshStatus)
+  saveDraft()
+  window.removeEventListener('pagehide', saveDraft)
+  document.removeEventListener('visibilitychange', saveDraftWhenHidden)
 })
+
+watch([code, language, theme, blocklyWorkspace], scheduleDraft)
 
 watch(() => route.fullPath, () => {
   init()

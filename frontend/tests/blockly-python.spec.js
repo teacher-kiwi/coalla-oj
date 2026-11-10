@@ -182,3 +182,30 @@ describe('등록 상태', () => {
     }
   })
 })
+
+describe('변수 이름', () => {
+  function codeWithVariable (name) {
+    const variable = workspace.createVariable(name)
+    const set = workspace.newBlock('variables_set')
+    set.setFieldValue(variable.getId(), 'VAR')
+    connect(set, 'VALUE', number(1))
+    return pythonGenerator.workspaceToCode(workspace)
+  }
+
+  it('한글 이름을 그대로 쓴다', () => {
+    // 예전에는 _EC_88_AB... 로 바뀌어 학생이 코드 보기·오류에서 자기 변수를 못 알아봤다
+    expect(codeWithVariable('숫자들')).toContain('숫자들 = 1')
+  })
+
+  it('파이썬 이름에 못 쓰는 글자는 _ 로 바꾼다', () => {
+    expect(codeWithVariable('내 점수!')).toContain('내_점수_ = 1')
+  })
+
+  it('숫자로 시작하면 앞에 붙여 문법 오류를 막는다', () => {
+    expect(codeWithVariable('1등')).toContain('my_1등 = 1')
+  })
+
+  it('파이썬 예약어·내장 함수와 겹치면 피해 간다', () => {
+    expect(codeWithVariable('print')).not.toMatch(/^print = 1/m)
+  })
+})
