@@ -43,15 +43,12 @@ from .admin import get_existing_problem_tags, TestCaseZipProcessor
 def owned_problem_set(user, problem_set_id, queryset=None):
     """내가 만든 문제집만 돌려준다. 아니면 None.
 
-    최고관리자는 운영·점검을 위해 통과시킨다(`owned_class` 와 같은 규칙).
     상세 화면처럼 딸린 항목까지 필요하면 prefetch 를 건 queryset 을 넘긴다.
     """
     problem_set_id = int_or_none(problem_set_id)
     if problem_set_id is None:
         return None
     qs = ProblemSet.objects.all() if queryset is None else queryset
-    if user.is_super_admin():
-        return qs.filter(id=problem_set_id).first()
     return qs.filter(id=problem_set_id, created_by=user).first()
 
 
@@ -71,8 +68,7 @@ class ProblemSetAPI(APIView):
         problem_sets = ProblemSet.objects.annotate(
             problem_count=Count("items", distinct=True),
             assignment_count=Count("assignments", distinct=True))
-        if not request.user.is_super_admin():
-            problem_sets = problem_sets.filter(created_by=request.user)
+        problem_sets = problem_sets.filter(created_by=request.user)
         return self.success(ProblemSetSerializer(problem_sets, many=True).data)
 
     @validate_serializer(CreateProblemSetSerializer)

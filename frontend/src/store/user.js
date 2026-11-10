@@ -27,8 +27,16 @@ export const useUserStore = defineStore('user', {
     isSuperAdmin () {
       return this.user.admin_type === USER_TYPE.SUPER_ADMIN
     },
+    // 교사 기능(수업·바로 과제 메뉴). 교사, 또는 교사 권한을 받은 관리자. 서버가 정해 준다.
     isTeacher () {
-      return this.user.admin_type === USER_TYPE.TEACHER
+      return !!this.user.is_teacher
+    },
+    // 관리자 페이지의 대회·캐릭터 메뉴. 최고관리자, 또는 그 권한을 받은 관리자.
+    canManageContest () {
+      return !!this.user.can_manage_contest
+    },
+    canManageAvatar () {
+      return !!this.user.can_manage_avatar
     },
     hasProblemPermission () {
       return this.user.problem_permission !== PROBLEM_PERMISSION.NONE

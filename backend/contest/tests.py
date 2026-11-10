@@ -160,3 +160,20 @@ class ContestRankAPITest(APITestCase):
     def get_contest_rank(self):
         resp = self.client.get(self.url + "?contest_id=" + self.acm_contest.id)
         self.assertSuccess(resp)
+
+
+class ContestRankMembersTest(APITestCase):
+    """대회 순위에는 개최자만 빠진다. 관리자·교사도 참가자일 수 있다(2026-11)."""
+    def test_only_the_host_is_excluded(self):
+        from .models import ACMContestRank
+        from .views.oj import ContestRankAPI
+        host = self.create_admin("host", login=False)
+        contest = Contest.objects.create(created_by=host, **DEFAULT_CONTEST_DATA)
+        others = [self.create_super_admin("root", login=False), self.create_admin("admin2", login=False),
+                  self.create_teacher("teacher1", login=False), self.create_user("student1", "pw1234", login=False)]
+        for user in [host, *others]:
+            ACMContestRank.objects.create(user=user, contest=contest, accepted_number=1)
+        view = ContestRankAPI()
+        view.contest = contest
+        names = {r.user.username for r in view.get_rank()}
+        self.assertEqual(names, {"root", "admin2", "teacher1", "student1"})

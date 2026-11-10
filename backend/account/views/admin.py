@@ -62,17 +62,24 @@ class UserAdminAPI(APIView):
         # 자기 자신을 내리거나 막으면 관리자 페이지에 다시 들어올 수 없다
         if user.id == request.user.id and (data["admin_type"] != user.admin_type or data["is_disabled"]):
             return self.error("자기 계정의 유형을 바꾸거나 비활성화할 수 없습니다")
-        # 교사에서 내리면 학급과 학생을 아무도 관리할 수 없게 된다.
+        # 권한은 관리자(Admin)에게만 준다. 최고관리자는 대회·캐릭터를 늘 갖고 수업은 하지 않으며,
+        # 교사·일반 사용자에게는 의미가 없다.
+        is_admin = data["admin_type"] == AdminType.ADMIN
+        teacher_permission = is_admin and data["teacher_permission"]
+        # 교사 기능을 잃으면 학급과 학생을 아무도 관리할 수 없게 된다.
         # 조용히 무력화하지 말고, 정리 기능으로 먼저 비우게 한다.
-        if user.is_teacher() and data["admin_type"] != AdminType.TEACHER \
-                and has_teaching_data(user):
-            return self.error("담당 학급이나 문제가 남아 있어 유형을 바꿀 수 없습니다. "
+        stays_teacher = data["admin_type"] == AdminType.TEACHER or teacher_permission
+        if user.is_teacher() and not stays_teacher and has_teaching_data(user):
+            return self.error("담당 학급이나 문제가 남아 있어 교사 기능을 회수할 수 없습니다. "
                               "교육 데이터 정리를 먼저 진행하세요")
 
         user.username = username
         user.email = email
         user.admin_type = data["admin_type"]
         user.is_disabled = data["is_disabled"]
+        user.teacher_permission = teacher_permission
+        user.contest_permission = is_admin and data["contest_permission"]
+        user.avatar_permission = is_admin and data["avatar_permission"]
 
         if data["admin_type"] == AdminType.ADMIN:
             user.problem_permission = data["problem_permission"]
@@ -117,8 +124,9 @@ class UserAdminAPI(APIView):
         ids = id.split(",")
         if str(request.user.id) in ids:
             return self.error("현재 로그인한 사용자는 삭제할 수 없습니다")
-        # 교사를 그냥 지우면 학급과 학생이 주인 없이 남는다. 삭제 전에 정리하게 한다.
-        blocked = [u.username for u in User.objects.filter(id__in=ids, admin_type=AdminType.TEACHER)
+        # 교사(교사 권한 받은 관리자 포함)를 그냥 지우면 학급과 학생이 주인 없이 남는다.
+        # 삭제 전에 정리하게 한다. 권한을 회수한 뒤에도 데이터가 남을 수 있어 유형으로 거르지 않는다.
+        blocked = [u.username for u in User.objects.filter(id__in=ids).exclude(admin_type=AdminType.GUEST)
                    if has_teaching_data(u)]
         if blocked:
             names = ", ".join(blocked)

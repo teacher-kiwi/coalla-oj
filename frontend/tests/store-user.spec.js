@@ -84,13 +84,27 @@ describe('user 스토어', () => {
   })
 
   it('역할 판별이 admin_type 을 따른다', async () => {
-    getUserInfo.mockResolvedValue(profileResponse({ id: 2, username: '김선생', admin_type: 'Teacher' }))
+    getUserInfo.mockResolvedValue(profileResponse({ id: 2, username: '김선생', admin_type: 'Teacher', is_teacher: true }))
     const store = useUserStore()
     await store.getProfile()
 
     expect(store.isTeacher).toBe(true)
     expect(store.isAdminRole).toBe(false)
     expect(store.isSuperAdmin).toBe(false)
+  })
+
+  it('교사·대회·캐릭터 메뉴는 서버가 알려준 대로 연다', async () => {
+    // 교사 권한과 캐릭터 권한만 받은 관리자
+    getUserInfo.mockResolvedValue(profileResponse({
+      id: 3, username: '박관리', admin_type: 'Admin', is_teacher: true, can_manage_contest: false, can_manage_avatar: true
+    }))
+    const store = useUserStore()
+    await store.getProfile()
+
+    expect(store.isAdminRole).toBe(true)
+    expect(store.isTeacher).toBe(true)
+    expect(store.canManageContest).toBe(false)
+    expect(store.canManageAvatar).toBe(true)
   })
 
   it('코인 잔액을 들고 있다가 정답 코인만큼 늘린다', async () => {

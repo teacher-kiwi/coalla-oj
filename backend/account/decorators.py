@@ -51,10 +51,17 @@ class admin_role_required(BasePermissionDecorator):
 
 
 class teacher_required(BasePermissionDecorator):
-    """교사 전용. 최고관리자는 운영·점검을 위해 함께 통과시킨다."""
+    """교사 전용(교사, 교사 권한을 받은 관리자). 최고관리자는 수업을 하지 않아 통과시키지 않는다."""
     def check_permission(self):
         user = self.request.user
-        return user.is_authenticated and (user.is_teacher() or user.is_super_admin())
+        return user.is_authenticated and user.is_teacher()
+
+
+class avatar_manager_required(BasePermissionDecorator):
+    """캐릭터 아이템 관리. 최고관리자, 또는 캐릭터 권한을 받은 관리자."""
+    def check_permission(self):
+        user = self.request.user
+        return user.is_authenticated and user.can_manage_avatar()
 
 
 class problem_permission_required(admin_role_required):

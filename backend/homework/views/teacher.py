@@ -1,6 +1,6 @@
 """바로 과제 교사 API (/api/teacher/hw...).
 
-교사는 자기가 만든 과제만 본다. 최고관리자는 운영·점검을 위해 전부 본다
+교사는 자기가 만든 과제만 본다(최고관리자는 수업을 하지 않는다)
 (수업 기능의 owned_class·owned_problem_set 과 같은 규칙).
 """
 import io
@@ -34,8 +34,7 @@ def owned_homework(user, homework_id):
     homeworks = Homework.objects.annotate(
         participant_count=Count("participants", distinct=True),
         problem_count=Count("items", distinct=True))
-    if not user.is_super_admin():
-        homeworks = homeworks.filter(created_by=user)
+    homeworks = homeworks.filter(created_by=user)
     return homeworks.filter(id=homework_id).first()
 
 
@@ -60,8 +59,7 @@ class TeacherHomeworkAPI(APIView):
         homeworks = Homework.objects.annotate(
             participant_count=Count("participants", distinct=True),
             problem_count=Count("items", distinct=True))
-        if not request.user.is_super_admin():
-            homeworks = homeworks.filter(created_by=request.user)
+        homeworks = homeworks.filter(created_by=request.user)
         return self.success(TeacherHomeworkSerializer(homeworks.order_by("-create_time"),
                                                       many=True).data)
 

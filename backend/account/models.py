@@ -17,10 +17,9 @@ class AdminType(object):
 
 # 순위(공개 순위·대회 순위)에 이름이 오르는 계정.
 #
-# 관리자는 운영자라 뺀다. 교사는 학생과 함께 문제를 푸는 사용자이므로 넣는다.
-# 상위 OJ 에는 교사 유형이 없어 "일반 사용자"만 담았고, 교사를 추가한 뒤로
-# 교사가 문제를 풀어도 어느 순위에도 나오지 않았다.
-RANKED_ADMIN_TYPES = (AdminType.REGULAR_USER, AdminType.TEACHER)
+# 순위표에 나오는 유형. 관리자도 연구회 선생님들이라 함께 넣는다(2026-11).
+# 바로 과제 임시 계정(GUEST)만 뺀다. 대회 순위표는 여기에 더해 개최자를 뺀다.
+RANKED_ADMIN_TYPES = (AdminType.REGULAR_USER, AdminType.TEACHER, AdminType.ADMIN, AdminType.SUPER_ADMIN)
 
 
 class TeacherApplicationStatus(object):
@@ -49,6 +48,13 @@ class User(AbstractBaseUser):
     # AdminType 중 하나
     admin_type = models.TextField(default=AdminType.REGULAR_USER)
     problem_permission = models.TextField(default=ProblemPermission.NONE)
+    # 관리자(Admin)에게 따로 주는 권한. 최고관리자는 대회·캐릭터를 늘 가지고, 교사 권한은 없다.
+    # 교사 권한: 교사 화면(학급·학생·문제집·학급 대회·바로 과제)을 자기 것으로 쓴다
+    teacher_permission = models.BooleanField(default=False)
+    # 대회 권한: 관리자 페이지의 대회 메뉴(공개 대회 만들기·관리)
+    contest_permission = models.BooleanField(default=False)
+    # 캐릭터 권한: 관리자 페이지의 캐릭터 메뉴(아이템 만들기, 샵에 올리기)
+    avatar_permission = models.BooleanField(default=False)
     # SSO 인증 토큰
     auth_token = models.TextField(null=True)
     session_keys = JSONField(default=list)
@@ -76,7 +82,20 @@ class User(AbstractBaseUser):
         return self.admin_type in [AdminType.ADMIN, AdminType.SUPER_ADMIN]
 
     def is_teacher(self):
-        return self.admin_type == AdminType.TEACHER
+        """교사 기능을 쓰는가. 교사, 또는 교사 권한을 받은 관리자.
+
+        최고관리자는 수업을 하지 않는다(2026-11 결정). 전체 수업은 관리자 페이지에서 본다.
+        """
+        return self.admin_type == AdminType.TEACHER or \
+            (self.admin_type == AdminType.ADMIN and self.teacher_permission)
+
+    def can_manage_contest(self):
+        return self.admin_type == AdminType.SUPER_ADMIN or \
+            (self.admin_type == AdminType.ADMIN and self.contest_permission)
+
+    def can_manage_avatar(self):
+        return self.admin_type == AdminType.SUPER_ADMIN or \
+            (self.admin_type == AdminType.ADMIN and self.avatar_permission)
 
     def can_mgmt_all_problem(self):
         return self.problem_permission == ProblemPermission.ALL

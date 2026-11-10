@@ -1,6 +1,6 @@
 from django.utils.timezone import now
 
-from account.decorators import super_admin_required
+from account.decorators import avatar_manager_required
 from account.models import AdminType
 from utils.api import APIView, validate_serializer
 
@@ -19,9 +19,9 @@ def drop_admin_copies(item):
 
 
 class AvatarItemAdminAPI(APIView):
-    """캐릭터 아이템 관리. 사이트 관리자(최고관리자)만 쓴다."""
+    """캐릭터 아이템 관리. 최고관리자, 또는 캐릭터 권한을 받은 관리자가 쓴다."""
 
-    @super_admin_required
+    @avatar_manager_required
     def get(self, request):
         item_id = request.GET.get("id")
         if item_id:
@@ -33,7 +33,7 @@ class AvatarItemAdminAPI(APIView):
         return self.success(AvatarItemSerializer(AvatarItem.objects.all(), many=True).data)
 
     @validate_serializer(EditAvatarItemSerializer)
-    @super_admin_required
+    @avatar_manager_required
     def post(self, request):
         data = request.data
         data.pop("id", None)
@@ -42,7 +42,7 @@ class AvatarItemAdminAPI(APIView):
         return self.success(AvatarItemSerializer(item).data)
 
     @validate_serializer(EditAvatarItemSerializer)
-    @super_admin_required
+    @avatar_manager_required
     def put(self, request):
         data = request.data
         try:
@@ -61,7 +61,7 @@ class AvatarItemAdminAPI(APIView):
         item.save()
         return self.success(AvatarItemSerializer(item).data)
 
-    @super_admin_required
+    @avatar_manager_required
     def delete(self, request):
         try:
             item = AvatarItem.objects.get(id=request.GET.get("id") or 0)

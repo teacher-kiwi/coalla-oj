@@ -130,15 +130,18 @@ class ContestAccessAPI(APIView):
 
 class ContestRankAPI(APIView):
     def get_rank(self):
+        # 개최자만 뺀다. 관리자·교사도 참가자일 수 있다(교사 대상 대회 등, 2026-11).
         if self.contest.rule_type == ContestRuleType.ACM:
             return ACMContestRank.objects.filter(contest=self.contest,
                                                  user__admin_type__in=RANKED_ADMIN_TYPES,
                                                  user__is_disabled=False).\
+                exclude(user_id=self.contest.created_by_id).\
                 select_related("user").order_by("-accepted_number", "total_time")
         else:
             return OIContestRank.objects.filter(contest=self.contest,
                                                 user__admin_type__in=RANKED_ADMIN_TYPES,
                                                 user__is_disabled=False). \
+                exclude(user_id=self.contest.created_by_id). \
                 select_related("user").order_by("-total_score")
 
     def column_string(self, n):

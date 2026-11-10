@@ -58,6 +58,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "admin_type", "problem_permission",
+                  "teacher_permission", "contest_permission", "avatar_permission",
                   "create_time", "last_login", "is_disabled"]
 
 
@@ -65,15 +66,28 @@ class UserSerializer(serializers.ModelSerializer):
     # 구글로 가입했는지만 알려준다. sub 자체는 내부 식별자라 내보내지 않는다.
     # 화면에서 "회원 탈퇴"를 보여줄지 판단하는 데 쓴다.
     is_google_account = serializers.SerializerMethodField()
+    # 화면이 메뉴를 고를 때 쓴다. 규칙(교사 권한 받은 관리자 등)은 서버 한곳에만 둔다.
+    is_teacher = serializers.SerializerMethodField()
+    can_manage_contest = serializers.SerializerMethodField()
+    can_manage_avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id", "username", "email", "admin_type", "problem_permission",
                   "create_time", "last_login", "is_disabled", "created_by",
-                  "is_google_account"]
+                  "is_google_account", "is_teacher", "can_manage_contest", "can_manage_avatar"]
 
     def get_is_google_account(self, obj):
         return bool(obj.google_sub)
+
+    def get_is_teacher(self, obj):
+        return obj.is_teacher()
+
+    def get_can_manage_contest(self, obj):
+        return obj.can_manage_contest()
+
+    def get_can_manage_avatar(self, obj):
+        return obj.can_manage_avatar()
 
 
 # 남이 볼 수 있는 프로필에 실리는 사용자 필드. 화면이 쓰는 것만 남긴다.
@@ -135,6 +149,10 @@ class EditUserSerializer(serializers.Serializer):
     problem_permission = serializers.ChoiceField(choices=(ProblemPermission.NONE, ProblemPermission.OWN,
                                                           ProblemPermission.ALL))
     is_disabled = serializers.BooleanField()
+    # 관리자(Admin)일 때만 쓴다. 다른 유형이면 서버가 꺼 둔다.
+    teacher_permission = serializers.BooleanField(required=False, default=False)
+    contest_permission = serializers.BooleanField(required=False, default=False)
+    avatar_permission = serializers.BooleanField(required=False, default=False)
 
 
 class SSOSerializer(serializers.Serializer):

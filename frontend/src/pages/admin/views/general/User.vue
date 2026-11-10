@@ -23,8 +23,15 @@
           <template #default="{ row }">{{ localtime(row.last_login) }}</template>
         </el-table-column>
         <el-table-column prop="email" label="이메일" />
-        <el-table-column prop="admin_type" label="사용자 유형">
-          <template #default="{ row }">{{ USER_TYPE_LABEL[row.admin_type] || row.admin_type }}</template>
+        <el-table-column prop="admin_type" label="사용자 유형" min-width="150">
+          <template #default="{ row }">
+            {{ USER_TYPE_LABEL[row.admin_type] || row.admin_type }}
+            <!-- 관리자에게 따로 준 권한과 비활성 여부를 한눈에 -->
+            <span class="perm-tags">
+              <el-tag v-for="p in permissionTags(row)" :key="p" size="small" type="info">{{ p }}</el-tag>
+              <el-tag v-if="row.is_disabled" size="small" type="danger">비활성</el-tag>
+            </span>
+          </template>
         </el-table-column>
         <el-table-column fixed="right" label="옵션" width="200">
           <template #default="{ row }">
@@ -156,13 +163,21 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-          </el-col>
-          <el-col :span="8">
-          </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="비활성화"><el-switch v-model="editingUser.is_disabled" /></el-form-item>
           </el-col>
+          <template v-if="editingUser.admin_type === 'Admin'">
+            <el-col :span="24"><p class="perm-help">관리자에게 맡길 일을 고릅니다. 최고 관리자는 대회·캐릭터를 늘 관리하고, 수업은 하지 않습니다.</p></el-col>
+            <el-col :span="8">
+              <el-form-item label="교사 권한"><el-switch v-model="editingUser.teacher_permission" /></el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="대회 권한"><el-switch v-model="editingUser.contest_permission" /></el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="캐릭터 권한"><el-switch v-model="editingUser.avatar_permission" /></el-form-item>
+            </el-col>
+          </template>
         </el-row>
       </el-form>
       <template #footer>
@@ -207,6 +222,19 @@ const formGenerateUser = reactive({ prefix: '', suffix: '', number_from: 0, numb
 const selectedUserIDs = computed(() => selectedUsers.value.map(u => u.id))
 
 function localtime (val) { return time.utcToLocal(val) }
+
+// 관리자에게 따로 준 권한. 다른 유형에서는 서버가 꺼 둔다.
+function permissionTags (row) {
+  if (row.admin_type !== 'Admin') return []
+  const tags = []
+  if (row.teacher_permission) tags.push('교사')
+  if (row.contest_permission) tags.push('대회')
+  if (row.avatar_permission) tags.push('캐릭터')
+  if (row.problem_permission && row.problem_permission !== 'None') {
+    tags.push(`문제: ${PROBLEM_PERMISSION_LABEL[row.problem_permission]}`)
+  }
+  return tags
+}
 
 function currentChange (page) { currentPage.value = page; getUserList(page) }
 
@@ -319,6 +347,18 @@ watch(uploadUsersCurrentPage, (page) => {
   .userPreview { padding-left: 10px; }
   .full-width { width: 100%; }
   .help-icon { margin-left: 4px; }
+  .perm-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .perm-help {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: #909399;
+  }
 
 .cleanup-list {
   // 들여쓰기는 padding 으로 적는다. margin 으로만 주면 목록 기본값인

@@ -47,8 +47,6 @@ def owned_class(user, class_id):
     if class_id is None:
         return None
     qs = SchoolClass.objects.select_related("school", "teacher")
-    if user.is_super_admin():
-        return qs.filter(id=class_id).first()
     return qs.filter(id=class_id, teacher=user).first()
 
 
@@ -73,9 +71,7 @@ class SchoolClassAPI(APIView):
                 return self.error("학급이 존재하지 않습니다")
             return self.success(SchoolClassSerializer(school_class).data)
 
-        classes = SchoolClass.objects.select_related("school", "teacher")
-        if not request.user.is_super_admin():
-            classes = classes.filter(teacher=request.user)
+        classes = SchoolClass.objects.select_related("school", "teacher").filter(teacher=request.user)
         if request.GET.get("archived") != "true":
             classes = classes.filter(is_archived=False)
         # 교사가 정한 차례로 준다. 이 응답이 대회·문제집의 배포 학급 표에도 그대로 쓰여,

@@ -6,7 +6,7 @@ from django.contrib import auth
 from utils.api.tests import APITestCase
 from options.options import SysOptions
 
-from .models import (AdminType, ProblemPermission, TeacherApplication,
+from .models import (AdminType, ProblemPermission, School, SchoolClass, TeacherApplication,
                      TeacherApplicationStatus, User, UserProfile)
 from .views.google import verify_google_token
 from utils.constants import ContestRuleType
@@ -228,18 +228,20 @@ class UserRankAPITest(APITestCase):
         names = [row["user"]["username"] for row in resp.data["data"]["results"]]
         self.assertIn("코딩선생", names)
 
-    def test_admin_is_excluded(self):
-        """관리자는 운영자라 순위에 넣지 않는다."""
-        admin = self.create_super_admin(username="root", login=False)
-        profile = admin.userprofile
-        profile.submission_number = 99
-        profile.accepted_number = 99
-        profile.save()
+    def test_admins_are_ranked(self):
+        """관리자도 연구회 선생님들이라 순위에 넣는다(2026-11)."""
+        for make in (lambda: self.create_super_admin(username="root", login=False),
+                     lambda: self.create_admin(username="admin1", login=False)):
+            profile = make().userprofile
+            profile.submission_number = 99
+            profile.accepted_number = 99
+            profile.save()
 
         resp = self.client.get(self.url, data={"rule": ContestRuleType.ACM})
         self.assertSuccess(resp)
         names = [row["user"]["username"] for row in resp.data["data"]["results"]]
-        self.assertNotIn("root", names)
+        self.assertIn("root", names)
+        self.assertIn("admin1", names)
 
     def test_get_acm_rank(self):
         resp = self.client.get(self.url, data={"rule": ContestRuleType.ACM})
@@ -703,3 +705,90 @@ class TeacherRoleTest(APITestCase):
         self.assertTrue(teacher.is_teacher())
         # 최고관리자 전용 API 접근 차단 확인
         self.assertFailed(self.client.get(self.reverse("user_admin_api")))
+
+
+class AdminPermissionTest(APITestCase):
+    """관리자에게 따로 주는 교사·대회·캐릭터 권한(2026-11). 최고관리자는 수업을 하지 않는다."""
+
+    def setUp(self):
+        self.root = self.create_super_admin(login=False)
+
+    def as_(self, user, password):
+        self.client.logout()
+        self.client.login(username=user.username, password=password)
+
+    def test_teacher_pages(self):
+        url = self.reverse("teacher_class_api")
+        plain = self.create_admin("plain", "plain1", login=False, contest_permission=False)
+        teaching = self.create_admin("teaching", "teach1", login=False, teacher_permission=True)
+        self.assertFalse(plain.is_teacher())
+        self.assertTrue(teaching.is_teacher())
+        self.assertFalse(self.root.is_teacher())
+        self.as_(teaching, "teach1")
+        self.assertSuccess(self.client.get(url))
+        for user, pw in ((plain, "plain1"), (self.root, "root")):
+            self.as_(user, pw)
+            self.assertFailed(self.client.get(url))
+
+    def test_contest_and_avatar_menus(self):
+        contest_url = self.reverse("contest_admin_api")
+        avatar_url = self.reverse("avatar_item_admin_api")
+        nothing = self.create_admin("nothing", "nothing1", login=False, contest_permission=False)
+        designer = self.create_admin("designer", "design1", login=False, contest_permission=False,
+                                     avatar_permission=True)
+        host = self.create_admin("host", "host1", login=False)
+        self.as_(nothing, "nothing1")
+        self.assertFailed(self.client.get(contest_url))
+        self.assertFailed(self.client.get(avatar_url))
+        self.as_(designer, "design1")
+        self.assertFailed(self.client.get(contest_url))
+        self.assertSuccess(self.client.get(avatar_url))
+        self.as_(host, "host1")
+        self.assertSuccess(self.client.get(contest_url))
+        self.assertFailed(self.client.get(avatar_url))
+        self.as_(self.root, "root")
+        self.assertSuccess(self.client.get(contest_url))
+        self.assertSuccess(self.client.get(avatar_url))
+
+    def test_profile_tells_the_menus(self):
+        teaching = self.create_admin("teaching", "teach1", login=False, teacher_permission=True)
+        self.as_(teaching, "teach1")
+        user = self.client.get(self.reverse("user_profile_api")).data["data"]["user"]
+        self.assertEqual((user["is_teacher"], user["can_manage_contest"], user["can_manage_avatar"]),
+                         (True, True, False))
+        # 남의 프로필에는 실리지 않는다
+        other = self.client.get(self.reverse("user_profile_api") + "?username=root").data["data"]["user"]
+        self.assertNotIn("is_teacher", other)
+
+    def edit(self, user, **changes):
+        data = {"id": user.id, "username": user.username, "email": "", "admin_type": user.admin_type,
+                "problem_permission": ProblemPermission.NONE, "is_disabled": False,
+                "teacher_permission": user.teacher_permission, "contest_permission": user.contest_permission,
+                "avatar_permission": user.avatar_permission, **changes}
+        return self.client.put(self.reverse("user_admin_api"), data=data)
+
+    def test_edit_permissions(self):
+        self.as_(self.root, "root")
+        admin = self.create_admin("admin1", login=False, contest_permission=False)
+        self.assertSuccess(self.edit(admin, teacher_permission=True, avatar_permission=True))
+        admin.refresh_from_db()
+        self.assertEqual((admin.teacher_permission, admin.contest_permission, admin.avatar_permission),
+                         (True, False, True))
+        # 관리자가 아닌 유형으로 바꾸면 권한은 꺼진다
+        self.assertSuccess(self.edit(admin, admin_type=AdminType.TEACHER))
+        admin.refresh_from_db()
+        self.assertEqual((admin.teacher_permission, admin.avatar_permission), (False, False))
+        self.assertTrue(admin.is_teacher())
+
+    def test_cannot_take_teaching_away_while_classes_remain(self):
+        self.as_(self.root, "root")
+        admin = self.create_admin("admin1", login=False, teacher_permission=True)
+        school = School.objects.create(name="코알라초", code="T1")
+        SchoolClass.objects.create(teacher=admin, school=school, year=2026, grade=3, class_no=1)
+        self.assertFailed(self.edit(admin, teacher_permission=False))
+        self.assertFailed(self.edit(admin, admin_type=AdminType.REGULAR_USER))
+        # 교사로 바꾸는 것은 교사 기능이 이어지므로 된다
+        self.assertSuccess(self.edit(admin, admin_type=AdminType.TEACHER))
+        # 지울 때도 막는다
+        resp = self.client.delete(self.reverse("user_admin_api") + f"?id={admin.id}")
+        self.assertFailed(resp)

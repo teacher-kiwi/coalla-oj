@@ -23,10 +23,16 @@ class APITestCase(TestCase):
                                 admin_type=AdminType.TEACHER,
                                 problem_permission=ProblemPermission.OWN)
 
-    def create_admin(self, username="admin", password="admin", login=True):
-        return self.create_user(username=username, password=password, admin_type=AdminType.ADMIN,
+    def create_admin(self, username="admin", password="admin", login=True, **permissions):
+        """관리자. 대회 권한은 기본으로 켠다(예전 관리자는 누구나 대회를 열 수 있었다).
+        permissions 로 teacher_permission·contest_permission·avatar_permission 을 바꾼다."""
+        user = self.create_user(username=username, password=password, admin_type=AdminType.ADMIN,
                                 problem_permission=ProblemPermission.OWN,
                                 login=login)
+        for k, v in {"contest_permission": True, **permissions}.items():
+            setattr(user, k, v)
+        user.save()
+        return user
 
     def create_super_admin(self, username="root", password="root", login=True):
         return self.create_user(username=username, password=password, admin_type=AdminType.SUPER_ADMIN,
