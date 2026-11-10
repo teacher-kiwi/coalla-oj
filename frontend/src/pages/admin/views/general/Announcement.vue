@@ -140,11 +140,8 @@ function deleteAnnouncement (announcementId) {
   }).then(() => {
     loading.value = true
     const funcName = contestID.value ? 'deleteContestAnnouncement' : 'deleteAnnouncement'
-    api[funcName](announcementId).then(() => {
-      loading.value = true
-      init()
-    })
-  }).catch(() => { loading.value = false })
+    api[funcName](announcementId).then(() => init(), () => { loading.value = false })
+  }).catch(() => {})
 }
 
 function openAnnouncementDialog (id) {

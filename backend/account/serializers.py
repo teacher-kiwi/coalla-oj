@@ -44,7 +44,8 @@ class GenerateUserSerializer(serializers.Serializer):
 
 class ImportUserSeralizer(serializers.Serializer):
     users = serializers.ListField(
-        child=serializers.ListField(child=serializers.CharField(max_length=64)))
+        # 이메일(셋째 칸)은 비워도 된다
+        child=serializers.ListField(child=serializers.CharField(max_length=64, allow_blank=True)))
 
     def validate_users(self, value):
         for row in value:
@@ -121,9 +122,12 @@ def _own_nickname(user):
 
 class EditUserSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    username = serializers.CharField(max_length=32, validators=[reject_reserved_username])
+    # '학생' 으로 시작하는 아이디는 새로 정할 때만 막는다(뷰에서). 학생 계정은 원래 그 아이디라
+    # 여기서 막으면 학생 계정을 아예 저장할 수 없다.
+    username = serializers.CharField(max_length=32)
     password = serializers.CharField(min_length=6, allow_blank=True, required=False, default=None)
-    email = serializers.EmailField(max_length=64)
+    # 학생 계정과 아이디로 만든 계정은 이메일이 없다
+    email = serializers.EmailField(max_length=64, allow_blank=True, allow_null=True, required=False, default="")
     # Teacher 가 빠져 있으면 교사 계정을 저장만 해도 강등된다(선택지에 값이 없어서
     # 화면이 아무거나 보내게 된다).
     admin_type = serializers.ChoiceField(choices=(AdminType.REGULAR_USER, AdminType.TEACHER,

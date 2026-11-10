@@ -77,7 +77,7 @@ import api from '../../api.js'
 const route = useRoute()
 const router = useRouter()
 
-const title = ref('Create Contest')
+const title = ref('대회 만들기')
 const disableRuleType = ref(false)
 const contest = reactive({
   title: '',

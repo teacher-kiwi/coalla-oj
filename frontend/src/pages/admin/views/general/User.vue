@@ -36,7 +36,7 @@
         </el-table-column>
       </el-table>
       <div class="panel-options">
-        <el-pagination class="page" layout="prev, pager, next"
+        <el-pagination class="page" layout="prev, pager, next" :current-page="currentPage"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
       </div>
     </Panel>
@@ -46,7 +46,7 @@
         사용자 가져오기
         <el-popover placement="right" trigger="hover">
           <template #reference><el-icon class="help-icon"><QuestionFilled /></el-icon></template>
-          <p>헤더 없는 csv 파일만 지원합니다</p>
+          <p>헤더 없는 csv 파일만 지원합니다. 한 줄에 사용자명,비밀번호,이메일 순서이고 이메일은 비워도 됩니다.</p>
         </el-popover>
       </template>
       <el-upload v-if="!uploadUsers.length" action="" :show-file-list="false" accept=".csv" :before-upload="handleUsersCSV">
@@ -100,7 +100,7 @@
           <el-button type="primary" @click="generateUser" :loading="loadingGenerate">생성 및 내보내기</el-button>
           <span class="userPreview" v-if="formGenerateUser.number_from && formGenerateUser.number_to &&
                                           formGenerateUser.number_from <= formGenerateUser.number_to">
-            The usernames will be {{ formGenerateUser.prefix + formGenerateUser.number_from + formGenerateUser.suffix }},
+            만들어질 사용자명: {{ formGenerateUser.prefix + formGenerateUser.number_from + formGenerateUser.suffix }},
             <span v-if="formGenerateUser.number_from + 1 < formGenerateUser.number_to">
               {{ formGenerateUser.prefix + (formGenerateUser.number_from + 1) + formGenerateUser.suffix + '...' }}
             </span>
@@ -138,7 +138,7 @@
       <el-form :model="editingUser" label-width="120px" label-position="left">
         <el-row :gutter="20">
           <el-col :span="12"><el-form-item label="사용자명" required><el-input v-model="editingUser.username" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="이메일" required><el-input v-model="editingUser.email" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="이메일"><el-input v-model="editingUser.email" placeholder="없으면 비워 두세요" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="새 비밀번호"><el-input v-model="editingUser.password" /></el-form-item></el-col>
           <el-col :span="12">
             <el-form-item label="사용자 유형">
@@ -199,7 +199,7 @@ const showCleanupDialog = ref(false)
 const loadingCleanup = ref(false)
 const cleanup = ref({})
 const cleanupUserId = ref(null)
-const currentPage = ref(0)
+const currentPage = ref(1)
 const selectedUsers = ref([])
 const formGenerateUserRef = ref(null)
 const formGenerateUser = reactive({ prefix: '', suffix: '', number_from: 0, number_to: 0, password_length: 8 })
@@ -282,7 +282,8 @@ function generateUser () {
 function handleUsersCSV (file) {
   papa.parse(file, {
     complete: (results) => {
-      const data = results.data.filter(user => user[0] && user[1] && user[2])
+      // 이메일(셋째 칸)은 비워도 된다
+      const data = results.data.filter(user => user[0] && user[1]).map(user => [user[0], user[1], user[2] || ''])
       const delta = results.data.length - data.length
       if (delta > 0) ElNotification.warning({ title: '경고', message: delta + '명이 빈 값으로 인해 제외되었습니다' })
       uploadUsersCurrentPage.value = 1

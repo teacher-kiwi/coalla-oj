@@ -39,7 +39,7 @@
           <el-tag :type="forceHttps ? 'success' : 'danger'" size="small">{{ forceHttps ? 'Enabled' : 'Disabled' }}</el-tag>
         </p>
         <p>CDN 호스트:
-          <el-tag :type="cdn ? 'success' : 'warning'" size="small">{{ cdn ? cdn : 'Not Use' }}</el-tag>
+          <el-tag :type="cdn ? 'success' : 'warning'" size="small">{{ cdn ? cdn : '사용 안 함' }}</el-tag>
         </p>
       </Panel>
     </el-col>

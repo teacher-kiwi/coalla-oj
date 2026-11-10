@@ -123,7 +123,8 @@ function downloadSubmissions () {
 function goEdit (contestId) { router.push({ name: 'edit-contest', params: { contestId } }) }
 function goContestAnnouncement (contestId) { router.push({ name: 'contest-announcement', params: { contestId } }) }
 function goContestProblemList (contestId) { router.push({ name: 'contest-problem-list', params: { contestId } }) }
-function handleVisibleSwitch (row) { api.editContest(row) }
+// 실패하면 스위치를 되돌린다
+function handleVisibleSwitch (row) { api.editContest(row).catch(() => { row.visible = !row.visible }) }
 
 onMounted(() => { getContestList(1) })
 watch(keyword, () => { currentChange(1) })

@@ -12,7 +12,8 @@ from utils.shortcuts import int_or_none, rand_str
 from ..teaching import has_teaching_data, purge_teaching_data, teaching_data_summary
 
 from ..decorators import super_admin_required
-from ..models import AdminType, ProblemPermission, User, UserProfile
+from ..models import (AdminType, ProblemPermission, RESERVED_USERNAME_PREFIX_MESSAGE, User, UserProfile,
+                      is_reserved_username)
 from ..serializers import EditUserSerializer, UserAdminSerializer, GenerateUserSerializer
 from ..serializers import ImportUserSeralizer
 
@@ -25,9 +26,10 @@ class UserAdminAPI(APIView):
 
         user_list = []
         for user_data in data:
-            if len(user_data) != 3 or len(user_data[0]) > 32:
+            if len(user_data) != 3 or not user_data[0].strip() or len(user_data[0]) > 32 or not user_data[1]:
                 return self.error(f"데이터 처리 중 오류가 발생했습니다: '{user_data}'")
-            user_list.append(User(username=user_data[0], password=make_password(user_data[1]), email=user_data[2]))
+            user_list.append(User(username=user_data[0].strip(), password=make_password(user_data[1]),
+                                  email=user_data[2].strip().lower() or None))
 
         try:
             with transaction.atomic():
@@ -47,10 +49,19 @@ class UserAdminAPI(APIView):
             user = User.objects.get(id=data["id"])
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
-        if User.objects.filter(username=data["username"].lower()).exclude(id=user.id).exists():
+        username = data["username"].strip().lower()
+        email = (data["email"] or "").strip().lower() or None
+        if not username:
+            return self.error("사용자명을 적어주세요")
+        if username != user.username and is_reserved_username(username):
+            return self.error(RESERVED_USERNAME_PREFIX_MESSAGE)
+        if User.objects.filter(username=username).exclude(id=user.id).exists():
             return self.error("이미 사용 중인 사용자명입니다")
-        if User.objects.filter(email=data["email"].lower()).exclude(id=user.id).exists():
+        if email and User.objects.filter(email=email).exclude(id=user.id).exists():
             return self.error("이미 사용 중인 이메일입니다")
+        # 자기 자신을 내리거나 막으면 관리자 페이지에 다시 들어올 수 없다
+        if user.id == request.user.id and (data["admin_type"] != user.admin_type or data["is_disabled"]):
+            return self.error("자기 계정의 유형을 바꾸거나 비활성화할 수 없습니다")
         # 교사에서 내리면 학급과 학생을 아무도 관리할 수 없게 된다.
         # 조용히 무력화하지 말고, 정리 기능으로 먼저 비우게 한다.
         if user.is_teacher() and data["admin_type"] != AdminType.TEACHER \
@@ -58,8 +69,8 @@ class UserAdminAPI(APIView):
             return self.error("담당 학급이나 문제가 남아 있어 유형을 바꿀 수 없습니다. "
                               "교육 데이터 정리를 먼저 진행하세요")
 
-        user.username = data["username"].lower()
-        user.email = data["email"].lower()
+        user.username = username
+        user.email = email
         user.admin_type = data["admin_type"]
         user.is_disabled = data["is_disabled"]
 

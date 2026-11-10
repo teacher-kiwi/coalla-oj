@@ -307,6 +307,31 @@ class AdminUserTest(APITestCase):
         self.assertFalse(user.check_password(self.password))
         self.assertTrue(user.check_password(new_password))
 
+    def test_edit_user_without_email(self):
+        # 학생·아이디 계정은 이메일이 없다. 비워 둔 채 저장할 수 있어야 한다.
+        for blank in ("", None):
+            resp = self.client.put(self.url, data={**self.data, "email": blank, "is_disabled": True})
+            self.assertSuccess(resp)
+            self.assertIsNone(User.objects.get(id=self.regular_user.id).email)
+        # 이메일이 없는 사람이 여럿이어도 '이미 사용 중'이 되지 않는다
+        other = self.create_user("other", "other1", login=False)
+        resp = self.client.put(self.url, data={**self.data, "id": other.id, "username": "other", "email": ""})
+        self.assertSuccess(resp)
+
+    def test_edit_student_account_keeps_reserved_name(self):
+        student = self.create_user("학생12345678", "pass123", login=False)
+        resp = self.client.put(self.url, data={**self.data, "id": student.id, "username": "학생12345678", "email": ""})
+        self.assertSuccess(resp)
+        # 다른 계정을 '학생...' 으로 바꾸는 것은 여전히 막는다
+        self.assertFailed(self.client.put(self.url, data={**self.data, "username": "학생99999999"}))
+
+    def test_cannot_lock_out_self(self):
+        me = {**self.data, "id": self.user.id, "username": self.user.username, "email": "",
+              "admin_type": AdminType.SUPER_ADMIN}
+        self.assertFailed(self.client.put(self.url, data={**me, "admin_type": AdminType.REGULAR_USER}))
+        self.assertFailed(self.client.put(self.url, data={**me, "is_disabled": True}))
+        self.assertSuccess(self.client.put(self.url, data={**me, "password": "newpass1"}))
+
     def test_import_users(self):
         data = {"users": [["user1", "pass1", "eami1@e.com"],
                           ["user2", "pass3", "eamil3@e.com"]]
@@ -314,6 +339,11 @@ class AdminUserTest(APITestCase):
         resp = self.client.post(self.url, data)
         self.assertSuccess(resp)
         self.assertEqual(User.objects.all().count(), 4)
+
+    def test_import_users_without_email(self):
+        resp = self.client.post(self.url, {"users": [["user3", "pass3", ""]]})
+        self.assertSuccess(resp)
+        self.assertIsNone(User.objects.get(username="user3").email)
 
     def test_import_duplicate_user(self):
         data = {"users": [["user1", "pass1", "eami1@e.com"],

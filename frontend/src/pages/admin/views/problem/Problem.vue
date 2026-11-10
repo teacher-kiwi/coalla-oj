@@ -551,7 +551,7 @@ watch(() => problem.value.spj_language, () => {
 function switchSpj () {
   if (testCaseUploaded.value) {
     ElMessageBox.confirm('채점 방식을 바꾸면 테스트 케이스를 다시 업로드해야 합니다', '경고', {
-      confirmButtonText: 'Yes', cancelButtonText: '취소', type: 'warning'
+      confirmButtonText: '바꾸기', cancelButtonText: '취소', type: 'warning'
     }).then(() => {
       problem.value.spj = !problem.value.spj
       resetTestCase()
@@ -634,13 +634,13 @@ async function submit () {
   for (const sample of problem.value.samples) {
     if (!sample.input || !sample.output) { ElMessage.error('예제 입력과 출력을 모두 입력하세요'); return }
   }
-  if (!problem.value.tags.length) { error.tags = 'Please add at least one tag'; ElMessage.error(error.tags); return }
+  if (!problem.value.tags.length) { error.tags = '태그를 하나 이상 넣어주세요'; ElMessage.error(error.tags); return }
   if (problem.value.spj) {
-    if (!problem.value.spj_code) { error.spj = 'Spj code is required' }
-    else if (!problem.value.spj_compile_ok) { error.spj = 'SPJ code has not been successfully compiled' }
+    if (!problem.value.spj_code) { error.spj = '스페셜 저지 코드를 입력하세요' }
+    else if (!problem.value.spj_compile_ok) { error.spj = '스페셜 저지 코드를 먼저 컴파일해 성공해야 합니다' }
     if (error.spj) { ElMessage.error(error.spj); return }
   }
-  if (!problem.value.languages.length) { error.languages = 'Please choose at least one language for problem'; ElMessage.error(error.languages); return }
+  if (!problem.value.languages.length) { error.languages = '언어를 하나 이상 고르세요'; ElMessage.error(error.languages); return }
   const { cases: payloadCases, keep_from: keepFrom } = casePayload()
   if (!payloadCases.length) { error.testCase = '테스트 케이스를 넣어주세요'; ElMessage.error(error.testCase); return }
   if (typedCount.value > MAX_CASES) {

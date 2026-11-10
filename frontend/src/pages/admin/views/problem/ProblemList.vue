@@ -51,7 +51,7 @@
                    @click="goCreateProblem" :icon="Plus">생성</el-button>
         <el-button v-else type="primary" size="small" :icon="Plus"
                    @click="addProblemDialogVisible = true">문제 담기</el-button>
-        <el-pagination class="page" layout="prev, pager, next"
+        <el-pagination class="page" layout="prev, pager, next" :current-page="currentPage"
                        @current-change="currentChange" :page-size="pageSize" :total="total" />
       </div>
     </Panel>
@@ -144,7 +144,9 @@ function deleteProblem (id) {
   ElMessageBox.confirm('이 문제를 삭제하시겠습니까? 관련 제출 기록도 함께 삭제됩니다.', '문제 삭제', {
     type: 'warning'
   }).then(() => {
-    api.deleteProblem(id).then(() => getProblemList(currentPage.value - 1)).catch(() => {})
+    // 지운 뒤 지금 쪽을 다시 읽는다. 마지막 하나를 지워 쪽이 비면 앞쪽으로 간다
+    const page = problemList.value.length === 1 && currentPage.value > 1 ? currentPage.value - 1 : currentPage.value
+    api.deleteProblem(id).then(() => currentChange(page)).catch(() => {})
   }, () => {})
 }
 
