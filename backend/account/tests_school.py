@@ -916,3 +916,194 @@ class TeacherDataCleanupTest(SchoolClassTestBase):
 
         self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
         self.assertTrue(Submission.objects.filter(id=mine.id).exists())
+
+
+def _private_problem(owner, title="t"):
+    return Problem.objects.create(
+        title=title, description="d", input_description="i", output_description="o",
+        samples=[], test_case_id="x", test_case_score=[], hint="", languages=["Python3"],
+        template={}, time_limit=1000, memory_limit=256, spj=False, rule_type="ACM",
+        visible=True, difficulty="L1", source="", created_by=owner, visibility="private")
+
+
+class TeacherDataTransferTest(SchoolClassTestBase):
+    """교사 기능을 회수할 때 기본은 다른 교사에게 넘기기다. 학생과 기록은 그대로 남는다."""
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 2)
+        self.client.logout()
+        self.other = self.create_teacher(username="이선생", login=False)
+        self.admin = self.create_super_admin()
+        self.data_url = self.reverse("teacher_data_api")
+        self.user_url = self.reverse("user_admin_api")
+
+    def _transfer(self, to):
+        return self.client.post(self.data_url, data={"id": self.teacher.id, "to": to})
+
+    def test_summary_offers_other_active_teachers(self):
+        self.create_admin(username="교사관리자", login=False, teacher_permission=True)
+        self.create_admin(username="그냥관리자", login=False)
+        gone = self.create_teacher(username="떠난선생", login=False)
+        gone.is_disabled = True
+        gone.save()
+        data = self.client.get(self.data_url + f"?id={self.teacher.id}").data["data"]
+        self.assertEqual(sorted(t["username"] for t in data["teachers"]), ["교사관리자", "이선생"])
+        self.assertEqual(data["homework_count"], 0)
+
+    def test_transfer_moves_everything_and_keeps_students(self):
+        from contest.models import Contest, ContestAnnouncement, ClassContestAssignment
+        from homework.models import Homework
+        from problem.models import ProblemSet, ProblemSetAssignment
+        school_class = SchoolClass.objects.get(id=self.class_id)
+        own = SchoolClass.objects.create(school=self.school, teacher=self.other, year=2026,
+                                         grade=1, class_no=1, order=5)
+        problem = _private_problem(self.teacher)
+        problem_set = ProblemSet.objects.create(title="1주차", created_by=self.teacher)
+        ProblemSetAssignment.objects.create(problem_set=problem_set, school_class=school_class)
+        contest = Contest.objects.create(
+            title="우리반 대회", description="d", rule_type="ACM", real_time_rank=True,
+            start_time=now(), end_time=now() + timedelta(days=1),
+            created_by=self.teacher, is_class_contest=True)
+        ClassContestAssignment.objects.create(contest=contest, school_class=school_class)
+        notice = ContestAnnouncement.objects.create(contest=contest, title="공지", content="c",
+                                                    created_by=self.teacher)
+        homework = Homework.objects.create(code="123456", title="숙제", created_by=self.teacher,
+                                           end_time=now() + timedelta(days=1))
+        student_ids = set(ClassMembership.objects.values_list("student_id", flat=True))
+
+        resp = self._transfer(self.other.id)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["class_count"], 1)
+
+        school_class.refresh_from_db()
+        self.assertEqual(school_class.teacher, self.other)
+        self.assertEqual(school_class.order, own.order + 1)   # 넘겨받은 교사의 학급 뒤에 붙는다
+        self.assertEqual(set(ClassMembership.objects.filter(school_class=school_class)
+                             .values_list("student_id", flat=True)), student_ids)
+        for obj in (problem, problem_set, contest, notice, homework):
+            obj.refresh_from_db()
+            self.assertEqual(obj.created_by_id, self.other.id, obj)
+        self.assertTrue(ProblemSetAssignment.objects.filter(problem_set=problem_set).exists())
+
+        # 다 넘긴 뒤에는 일반 사용자로 내릴 수 있다
+        resp = self.client.put(self.user_url, data={
+            "id": self.teacher.id, "username": self.teacher.username, "email": "",
+            "admin_type": "Regular User", "problem_permission": "None", "is_disabled": False})
+        self.assertSuccess(resp)
+
+    def test_transfer_keeps_public_problem_author(self):
+        problem = _private_problem(self.teacher)
+        problem.visibility = "public"
+        problem.save()
+        self.assertSuccess(self._transfer(self.other.id))
+        problem.refresh_from_db()
+        self.assertEqual(problem.created_by, self.teacher)
+
+    def test_transfer_blocked_by_same_class(self):
+        SchoolClass.objects.create(school=self.school, teacher=self.other, year=2026, grade=3, class_no=2)
+        resp = self._transfer(self.other.id)
+        self.assertFailed(resp)
+        self.assertIn("2026학년도 3학년 2반", resp.data["data"])
+        self.assertTrue(SchoolClass.objects.filter(id=self.class_id, teacher=self.teacher).exists())
+
+    def test_transfer_needs_an_active_teacher(self):
+        regular = self.create_user("일반", "pass", login=False)
+        self.assertFailed(self._transfer(regular.id), "넘겨받는 사람이 교사가 아닙니다")
+        self.assertFailed(self._transfer(self.teacher.id), "같은 사람에게 넘길 수 없습니다")
+        self.other.is_disabled = True
+        self.other.save()
+        self.assertFailed(self._transfer(self.other.id), "넘겨받는 사람이 교사가 아닙니다")
+
+    def test_only_super_admin(self):
+        self.client.logout()
+        self.create_admin(username="교사관리자", teacher_permission=True)
+        self.assertFailed(self._transfer(self.other.id))
+        self.assertFailed(self.client.get(self.data_url + f"?id={self.teacher.id}"))
+
+    def test_purge_removes_homework_and_guests(self):
+        from homework.models import Homework, HomeworkParticipant
+        homework = Homework.objects.create(code="654321", title="숙제", created_by=self.teacher,
+                                           end_time=now() + timedelta(days=1))
+        guest = HomeworkParticipant.join(homework, 1, "철수", "1234").user
+        self.assertEqual(self.client.get(self.data_url + f"?id={self.teacher.id}").data["data"]["homework_count"], 1)
+        self.assertSuccess(self.client.delete(self.data_url + f"?id={self.teacher.id}"))
+        self.assertFalse(Homework.objects.filter(id=homework.id).exists())
+        self.assertFalse(User.objects.filter(id=guest.id).exists())
+
+    def test_homework_alone_blocks_demote(self):
+        from homework.models import Homework
+        self.client.delete(self.data_url + f"?id={self.teacher.id}")
+        Homework.objects.create(code="111111", title="숙제", created_by=self.teacher,
+                                end_time=now() + timedelta(days=1))
+        resp = self.client.put(self.user_url, data={
+            "id": self.teacher.id, "username": self.teacher.username, "email": "",
+            "admin_type": "Regular User", "problem_permission": "None", "is_disabled": False})
+        self.assertFailed(resp)
+
+
+class SchoolClassAdminTest(SchoolClassTestBase):
+    """최고관리자 '수업' 탭. 모든 교사의 학급을 보고 고치고 지운다."""
+    def setUp(self):
+        super().setUp()
+        self.class_id = self._create_class().data["data"]["id"]
+        self._create_students(self.class_id, 1, 3)
+        self.client.logout()
+        self.other = self.create_teacher(username="이선생", login=False)
+        self.other_class = SchoolClass.objects.create(school=self.school, teacher=self.other,
+                                                      year=2025, grade=5, class_no=1, is_archived=True)
+        self.admin = self.create_super_admin()
+        self.url = self.reverse("school_class_admin_api")
+
+    def test_lists_every_teachers_classes(self):
+        data = self.client.get(self.url).data["data"]
+        self.assertEqual(data["total"], 2)
+        row = next(r for r in data["results"] if r["id"] == self.class_id)
+        self.assertEqual((row["teacher_name"], row["student_count"], row["school_name"]),
+                         ("김선생", 3, "코알라초등학교"))
+        self.assertEqual({t["username"]: t["class_count"] for t in data["teachers"]},
+                         {"김선생": 1, "이선생": 1})
+
+    def test_filters(self):
+        def ids(query):
+            return [r["id"] for r in self.client.get(self.url + query).data["data"]["results"]]
+        self.assertEqual(ids(f"?teacher_id={self.other.id}"), [self.other_class.id])
+        self.assertEqual(ids("?archived=false"), [self.class_id])
+        self.assertEqual(ids("?keyword=김선"), [self.class_id])
+        self.assertEqual(ids("?keyword=없는학교"), [])
+
+    def test_detail_has_students(self):
+        data = self.client.get(self.url + f"?id={self.class_id}").data["data"]
+        self.assertEqual([s["number"] for s in data["students"]], [1, 2, 3])
+        self.assertEqual(data["students"][0]["submission_count"], 0)
+        self.assertEqual(data["problem_set_count"], 0)
+
+    def test_edit_and_archive(self):
+        resp = self.client.put(self.url, data={"id": self.class_id, "class_no": 7, "is_archived": True})
+        self.assertSuccess(resp)
+        school_class = SchoolClass.objects.get(id=self.class_id)
+        self.assertEqual((school_class.class_no, school_class.is_archived), (7, True))
+        self.assertEqual(school_class.teacher, self.teacher)
+
+    def test_edit_rejects_duplicate(self):
+        SchoolClass.objects.create(school=self.school, teacher=self.teacher, year=2026, grade=3, class_no=9)
+        self.assertFailed(self.client.put(self.url, data={"id": self.class_id, "class_no": 9}),
+                          "그 선생님에게 같은 학급이 이미 있습니다")
+
+    def test_delete_removes_students(self):
+        student_ids = list(ClassMembership.objects.filter(school_class_id=self.class_id)
+                           .values_list("student_id", flat=True))
+        resp = self.client.delete(self.url + f"?id={self.class_id}")
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["deleted_students"], 3)
+        self.assertFalse(User.objects.filter(id__in=student_ids).exists())
+
+    def test_teachers_and_admins_denied(self):
+        self.client.logout()
+        self.create_admin(username="교사관리자", teacher_permission=True)
+        self.assertFailed(self.client.get(self.url))
+        self.client.logout()
+        self.client.login(username="김선생", password="teacher")
+        self.assertFailed(self.client.get(self.url))
+        self.assertFailed(self.client.delete(self.url + f"?id={self.class_id}"))
+        self.assertTrue(SchoolClass.objects.filter(id=self.class_id).exists())

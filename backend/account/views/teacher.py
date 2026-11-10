@@ -14,13 +14,13 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 
 from options.options import SysOptions
-from judge.recompute import preserve_statistics
 from submission.models import Submission
 from submission.serializers import TeacherStudentSubmissionSerializer
 from utils.api import APIView, validate_serializer
 from utils.shortcuts import int_or_none, rand_str
 from ..decorators import teacher_required
 from ..login_throttle import clear_login_failures
+from ..teaching import delete_school_class
 from ..models import (AdminType, ClassMembership, School, SchoolClass, User,
                       UserProfile, generate_student_usernames)
 from ..serializers import (ClassMembershipSerializer, CreateSchoolClassSerializer,
@@ -135,17 +135,8 @@ class SchoolClassAPI(APIView):
         if not school_class:
             return self.error("학급이 존재하지 않습니다")
 
-        with transaction.atomic():
-            student_ids = list(school_class.memberships.values_list("student_id", flat=True))
-            school_class.delete()
-            # 다른 학급에도 속한 학생은 남긴다(현재 정책상 드물지만 안전하게).
-            # 그래서 소속 수가 아니라 실제로 지운 계정 수를 돌려준다.
-            orphans = User.objects.filter(id__in=student_ids, class_memberships__isnull=True)
-            deleted_students = orphans.count()
-            # 제출이 사라지기 전에 정답률 몫을 문제로 옮긴다
-            preserve_statistics(Submission.objects.filter(user_id__in=orphans))
-            orphans.delete()
-        return self.success({"deleted_students": deleted_students})
+        # 다른 학급에도 속한 학생은 남긴다. 그래서 소속 수가 아니라 실제로 지운 계정 수를 돌려준다.
+        return self.success({"deleted_students": delete_school_class(school_class)})
 
 
 class SchoolClassOrderAPI(APIView):

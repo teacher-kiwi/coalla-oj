@@ -5,8 +5,8 @@ import ko from 'element-plus/es/locale/lang/ko'
 // 아이콘은 1000개 전부가 아니라 전역 해석이 필요한 것만 등록한다.
 // (템플릿에서 태그로 쓰거나, IconBtn/InfoCard 에 문자열 이름으로 넘기는 것들)
 import {
-  CaretTop, Delete, Document, Download, Edit, InfoFilled,
-  List, Menu, Odometer, Plus, Remove, Trophy, User
+  CaretTop, Delete, Document, Download, Edit, Files, InfoFilled,
+  List, Menu, Odometer, Plus, Remove, Trophy, User, View
 } from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 
@@ -31,8 +31,8 @@ app.use(router)
 app.use(ElementPlus, { locale: ko })
 
 for (const [key, component] of Object.entries({
-  CaretTop, Delete, Document, Download, Edit, InfoFilled,
-  List, Menu, Odometer, Plus, Remove, Trophy, User
+  CaretTop, Delete, Document, Download, Edit, Files, InfoFilled,
+  List, Menu, Odometer, Plus, Remove, Trophy, User, View
 })) {
   app.component(key, component)
 }

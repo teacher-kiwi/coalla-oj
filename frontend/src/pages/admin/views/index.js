@@ -14,10 +14,11 @@ import Login from './general/Login.vue'
 import Home from './Home.vue'
 import ProblemImportOrExport from './problem/ImportAndExport.vue'
 import TeacherApplication from './general/TeacherApplication.vue'
+import SchoolClasses from './general/SchoolClasses.vue'
 
 export {
   Announcement, User, Conf, JudgeServer, Problem, ProblemList, ProblemTags,
   ProblemPublishReview, Contest,
   ContestList, Login, Home, PruneTestCase, Dashboard, ProblemImportOrExport,
-  TeacherApplication
+  TeacherApplication, SchoolClasses
 }

@@ -3,19 +3,22 @@ import re
 import xlsxwriter
 
 from django.db import transaction, IntegrityError
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.contrib.auth.hashers import make_password
 
 from utils.api import APIView, validate_serializer
 from utils.shortcuts import int_or_none, rand_str
-from ..teaching import has_teaching_data, purge_teaching_data, teaching_data_summary
+from ..teaching import (delete_school_class, has_teaching_data, purge_teaching_data, teacher_accounts,
+                        teaching_data_summary, transfer_conflicts, transfer_teaching_data)
 
 from ..decorators import super_admin_required
-from ..models import (AdminType, ProblemPermission, RESERVED_USERNAME_PREFIX_MESSAGE, User, UserProfile,
+from ..models import (AdminType, ProblemPermission, RESERVED_USERNAME_PREFIX_MESSAGE, SchoolClass, User, UserProfile,
                       is_reserved_username)
 from ..serializers import EditUserSerializer, UserAdminSerializer, GenerateUserSerializer
 from ..serializers import ImportUserSeralizer
+from ..serializers import (AdminClassStudentSerializer, AdminSchoolClassSerializer, EditSchoolClassSerializer,
+                           TransferTeachingDataSerializer)
 
 
 class UserAdminAPI(APIView):
@@ -71,7 +74,7 @@ class UserAdminAPI(APIView):
         stays_teacher = data["admin_type"] == AdminType.TEACHER or teacher_permission
         if user.is_teacher() and not stays_teacher and has_teaching_data(user):
             return self.error("담당 학급이나 문제가 남아 있어 교사 기능을 회수할 수 없습니다. "
-                              "교육 데이터 정리를 먼저 진행하세요")
+                              "교육 데이터 정리(넘기기·지우기)를 먼저 진행하세요")
 
         user.username = username
         user.email = email
@@ -131,23 +134,46 @@ class UserAdminAPI(APIView):
         if blocked:
             names = ", ".join(blocked)
             return self.error(f"교육 데이터가 남아 있는 교사가 있습니다: {names}. "
-                              f"교육 데이터 정리를 먼저 진행하세요")
+                              f"교육 데이터 정리(넘기기·지우기)를 먼저 진행하세요")
         User.objects.filter(id__in=ids).delete()
         return self.success()
 
 
 class TeacherDataAPI(APIView):
-    """교사에게 딸린 교육용 데이터 정리.
+    """교사에게 딸린 교육용 데이터 정리: 다른 교사에게 넘기기(기본) 또는 지우기.
 
-    되돌릴 수 없어서 GET 으로 먼저 무엇이 지워지는지 보여준다.
-    계정 자체는 남기므로, 지운 뒤에 유형을 바꾸거나 계정을 지울 수 있다.
+    교사 기능을 회수하거나 계정을 지우기 전에 쓴다. 계정 자체는 남기므로,
+    정리한 뒤에 유형을 바꾸거나 계정을 지울 수 있다.
+    지우기는 되돌릴 수 없어서 GET 으로 먼저 무엇이 있는지 보여준다.
     """
     @super_admin_required
     def get(self, request):
         user = self._teacher(request.GET.get("id"))
         if user is None:
             return self.error("사용자가 존재하지 않습니다")
-        return self.success({"username": user.username, **teaching_data_summary(user)})
+        # 넘겨받을 수 있는 교사. 비활성 계정에 넘기면 아무도 관리하지 못한다.
+        targets = teacher_accounts().exclude(id=user.id).filter(is_disabled=False).order_by("username")
+        return self.success({"username": user.username, **teaching_data_summary(user),
+                             "teachers": [{"id": t.id, "username": t.username} for t in targets]})
+
+    @validate_serializer(TransferTeachingDataSerializer)
+    @super_admin_required
+    def post(self, request):
+        """다른 교사에게 넘긴다. 학생 계정과 기록은 그대로 남는다."""
+        user = self._teacher(request.data["id"])
+        target = self._teacher(request.data["to"])
+        if user is None or target is None:
+            return self.error("사용자가 존재하지 않습니다")
+        if user.id == target.id:
+            return self.error("같은 사람에게 넘길 수 없습니다")
+        if not target.is_teacher() or target.is_disabled:
+            return self.error("넘겨받는 사람이 교사가 아닙니다")
+        conflicts = transfer_conflicts(user, target)
+        if conflicts:
+            names = ", ".join(conflicts)
+            return self.error(f"{target.username} 선생님에게 같은 학급이 이미 있습니다: {names}. "
+                              f"한쪽 학급을 먼저 정리하세요")
+        return self.success(transfer_teaching_data(user, target))
 
     @super_admin_required
     def delete(self, request):
@@ -224,3 +250,81 @@ class GenerateUserAPI(APIView):
             # 원본은 DB 예외 메시지(DETAIL: Key (username)=(root11) already exists.)를
             # 그대로 돌려줬다. 읽히지도 않고 DB 내부 구조만 드러난다.
             return self.error("이미 사용 중인 사용자명이 있습니다")
+
+
+class SchoolClassAdminAPI(APIView):
+    """최고관리자 '수업' 탭: 모든 교사의 학급을 보고 고치고 지운다.
+
+    최고관리자는 수업을 하지 않으므로 교사 화면 대신 여기서 살핀다.
+    담당 교사를 바꾸는 길은 두지 않는다. 그 교사의 문제집·대회 배포가 학급을
+    가리키고 있어서, 바꾸려면 교사 단위로 넘긴다(TeacherDataAPI.post).
+    """
+    @super_admin_required
+    def get(self, request):
+        class_id = request.GET.get("id")
+        if class_id:
+            school_class = self._class(class_id)
+            if school_class is None:
+                return self.error("학급이 존재하지 않습니다")
+            # 집계(GROUP BY)가 붙으면 Meta 의 기본 정렬이 빠지므로 번호순을 직접 적는다
+            students = school_class.memberships.select_related("student") \
+                .annotate(submission_count=Count("student__submissions")).order_by("number")
+            data = AdminSchoolClassSerializer(self._classes().get(id=school_class.id)).data
+            data["problem_set_count"] = school_class.assignments.count()
+            data["contest_count"] = school_class.contest_assignments.count()
+            data["students"] = AdminClassStudentSerializer(students, many=True).data
+            return self.success(data)
+
+        classes = self._classes()
+        teacher_id = int_or_none(request.GET.get("teacher_id"))
+        if teacher_id:
+            classes = classes.filter(teacher_id=teacher_id)
+        archived = request.GET.get("archived")
+        if archived in ("true", "false"):
+            classes = classes.filter(is_archived=archived == "true")
+        keyword = (request.GET.get("keyword") or "").strip()
+        if keyword:
+            classes = classes.filter(Q(school__name__icontains=keyword) | Q(teacher__username__icontains=keyword))
+        classes = classes.order_by("-year", "school__name", "grade", "class_no", "teacher__username")
+        data = self.paginate_data(request, classes, AdminSchoolClassSerializer)
+        # 교사 고르기 칸. 학급이 있는 사람만이 아니라 지금 교사인 사람을 모두 보여준다.
+        teachers = teacher_accounts().annotate(class_count=Count("classes")).order_by("username")
+        data["teachers"] = [{"id": t.id, "username": t.username, "class_count": t.class_count}
+                            for t in teachers]
+        return self.success(data)
+
+    @validate_serializer(EditSchoolClassSerializer)
+    @super_admin_required
+    def put(self, request):
+        data = request.data
+        school_class = self._class(data["id"])
+        if school_class is None:
+            return self.error("학급이 존재하지 않습니다")
+        for field in ("year", "grade", "class_no", "is_archived"):
+            if field in data:
+                setattr(school_class, field, data[field])
+        try:
+            school_class.save()
+        except IntegrityError:
+            return self.error("그 선생님에게 같은 학급이 이미 있습니다")
+        return self.success(AdminSchoolClassSerializer(self._classes().get(id=school_class.id)).data)
+
+    @super_admin_required
+    def delete(self, request):
+        """학급과 소속 학생 계정을 지운다. 교사 화면의 학급 삭제와 같다."""
+        school_class = self._class(request.GET.get("id"))
+        if school_class is None:
+            return self.error("학급이 존재하지 않습니다")
+        return self.success({"deleted_students": delete_school_class(school_class)})
+
+    @staticmethod
+    def _classes():
+        return SchoolClass.objects.select_related("school", "teacher") \
+            .annotate(student_count=Count("memberships"))
+
+    @staticmethod
+    def _class(class_id):
+        class_id = int_or_none(class_id)
+        if class_id is None:
+            return None
+        return SchoolClass.objects.filter(id=class_id).first()

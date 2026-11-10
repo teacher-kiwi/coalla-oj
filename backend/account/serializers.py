@@ -291,3 +291,29 @@ class StudentLoginSerializer(serializers.Serializer):
 class StudentChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.RegexField(r"^\d{4}$")
     new_password = serializers.RegexField(r"^\d{4}$")
+
+
+class AdminSchoolClassSerializer(serializers.ModelSerializer):
+    """최고관리자 '수업' 탭의 학급 목록. student_count 는 쿼리에서 annotate 한 값이다."""
+    school_name = serializers.CharField(source="school.name", read_only=True)
+    teacher_id = serializers.IntegerField(read_only=True)
+    teacher_name = serializers.CharField(source="teacher.username", read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    student_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = SchoolClass
+        fields = ["id", "school_name", "teacher_id", "teacher_name", "year", "grade", "class_no",
+                  "display_name", "student_count", "is_archived", "created_at"]
+
+
+class AdminClassStudentSerializer(ClassMembershipSerializer):
+    submission_count = serializers.IntegerField(read_only=True)
+
+    class Meta(ClassMembershipSerializer.Meta):
+        fields = ClassMembershipSerializer.Meta.fields + ["submission_count"]
+
+
+class TransferTeachingDataSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    to = serializers.IntegerField()

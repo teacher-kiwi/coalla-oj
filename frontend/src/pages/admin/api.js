@@ -50,6 +50,21 @@ export default {
   purgeTeacherData (id) {
     return ajax('admin/teacher_data', 'delete', { params: { id } })
   },
+  transferTeacherData (id, to) {
+    return ajax('admin/teacher_data', 'post', { data: { id, to } })
+  },
+  getSchoolClassList (params) {
+    return ajax('admin/school_class', 'get', { params: { paging: true, ...params } })
+  },
+  getSchoolClass (id) {
+    return ajax('admin/school_class', 'get', { params: { id } })
+  },
+  editSchoolClass (data) {
+    return ajax('admin/school_class', 'put', { data })
+  },
+  deleteSchoolClass (id) {
+    return ajax('admin/school_class', 'delete', { params: { id } })
+  },
   getUserList (offset, limit, keyword) {
     let params = { paging: true, offset, limit }
     if (keyword) params.keyword = keyword

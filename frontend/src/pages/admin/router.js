@@ -3,7 +3,7 @@ import {
   Announcement, Conf, Contest, ContestList, Home, JudgeServer, Login,
   Problem, ProblemList, ProblemTags, ProblemPublishReview, User, PruneTestCase, Dashboard,
   ProblemImportOrExport,
-  TeacherApplication
+  TeacherApplication, SchoolClasses
 } from './views'
 
 // 캐릭터 공방은 그리기 코드가 커서 들어갈 때 따로 받는다
@@ -27,6 +27,7 @@ const router = createRouter({
         { path: '/announcement', name: 'announcement', component: Announcement },
         { path: '/user', name: 'user', component: User },
         { path: '/teacher-application', name: 'teacher-application', component: TeacherApplication },
+        { path: '/classes', name: 'school-classes', component: SchoolClasses },
         { path: '/conf', name: 'conf', component: Conf },
         { path: '/judge-server', name: 'judge-server', component: JudgeServer },
         { path: '/prune-test-case', name: 'prune-test-case', component: PruneTestCase },

@@ -36,9 +36,9 @@
         <el-table-column fixed="right" label="옵션" width="200">
           <template #default="{ row }">
             <icon-btn name="수정" icon="Edit" @click="openUserDialog(row.id)" />
-            <icon-btn v-if="row.admin_type === 'Teacher'" name="교육 데이터 정리"
-                      icon="Delete" @click="openTeacherCleanup(row)" />
-            <icon-btn name="삭제" icon="Delete" @click="deleteUsers([row.id])" />
+            <icon-btn v-if="isTeacherRow(row)" name="교육 데이터 정리"
+                      icon="Files" @click="openTeacherCleanup(row)" />
+            <icon-btn name="삭제" icon="Delete" @click="deleteUsers([row.id], row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -119,25 +119,48 @@
       </el-form>
     </Panel>
 
-    <el-dialog title="교육 데이터 정리" v-model="showCleanupDialog" width="520px"
-               :close-on-click-modal="false">
-      <el-alert type="error" :closable="false" show-icon>
-        <p><b>{{ cleanup.username }}</b> 선생님의 다음 데이터를 삭제합니다.
-          <b>되돌릴 수 없습니다.</b></p>
-        <ul class="cleanup-list">
-          <li>학급 {{ cleanup.class_count }}개</li>
-          <li>학생 계정 {{ cleanup.student_count }}개</li>
-          <li>학생 제출 기록 {{ cleanup.student_submission_count }}건</li>
-          <li>문제집 {{ cleanup.problem_set_count }}개</li>
-          <li>학급 문제 {{ cleanup.private_problem_count }}개</li>
-        </ul>
-        <p>공개 문제와 선생님 본인의 제출 기록은 남습니다.</p>
-      </el-alert>
+    <el-dialog title="교육 데이터 정리" v-model="showCleanupDialog" width="560px"
+               :close-on-click-modal="false" @closed="pendingAction = null">
+      <p class="cleanup-why">
+        <b>{{ cleanup.username }}</b> 선생님이 맡은 수업 자료입니다.
+        <template v-if="pendingAction">
+          먼저 정리해야 {{ pendingAction.label }}할 수 있고, 정리하면 이어서 {{ pendingAction.label }}합니다.
+        </template>
+      </p>
+      <ul class="cleanup-list">
+        <li>학급 {{ cleanup.class_count }}개 (학생 {{ cleanup.student_count }}명)</li>
+        <li>문제집 {{ cleanup.problem_set_count }}개</li>
+        <li>학급 대회 {{ cleanup.contest_count }}개</li>
+        <li>비공개 문제 {{ cleanup.private_problem_count }}개</li>
+        <li>바로 과제 {{ cleanup.homework_count }}개</li>
+      </ul>
+      <el-radio-group v-model="cleanupMode" class="cleanup-mode">
+        <el-radio value="transfer">다른 선생님에게 넘기기</el-radio>
+        <el-radio value="purge">모두 지우기</el-radio>
+      </el-radio-group>
+      <div v-if="cleanupMode === 'transfer'" class="cleanup-body">
+        <el-select v-model="transferTo" placeholder="넘겨받을 선생님" filterable class="full-width"
+                   :no-data-text="'넘겨받을 수 있는 선생님이 없습니다'">
+          <el-option v-for="t in cleanup.teachers || []" :key="t.id" :label="t.username" :value="t.id" />
+        </el-select>
+        <p class="cleanup-note">학생 계정과 제출 기록, 배포는 그대로 두고 담당만 바뀝니다.
+          공개 문제의 출제자는 그대로 남습니다.</p>
+      </div>
+      <div v-else class="cleanup-body">
+        <el-alert type="error" :closable="false" show-icon>
+          <p>위 자료와 학생 계정, 학생 제출 기록 {{ cleanup.student_submission_count }}건,
+            바로 과제 참가 기록을 지웁니다. <b>되돌릴 수 없습니다.</b></p>
+          <p>공개 문제와 선생님 본인의 제출 기록은 남습니다.</p>
+        </el-alert>
+        <el-input v-model="purgeConfirm" class="cleanup-confirm"
+                  :placeholder="`확인을 위해 ${cleanup.username} 을(를) 입력하세요`" />
+      </div>
       <template #footer>
         <el-button @click="showCleanupDialog = false">취소</el-button>
-        <el-button type="danger" :loading="loadingCleanup" @click="runTeacherCleanup">
-          삭제
-        </el-button>
+        <el-button v-if="cleanupMode === 'transfer'" type="primary" :loading="loadingCleanup"
+                   :disabled="!transferTo" @click="runTeacherCleanup">넘기기</el-button>
+        <el-button v-else type="danger" :loading="loadingCleanup"
+                   :disabled="purgeConfirm.trim() !== cleanup.username" @click="runTeacherCleanup">지우기</el-button>
       </template>
     </el-dialog>
 
@@ -214,6 +237,13 @@ const showCleanupDialog = ref(false)
 const loadingCleanup = ref(false)
 const cleanup = ref({})
 const cleanupUserId = ref(null)
+const cleanupMode = ref('transfer')
+const transferTo = ref(null)
+const purgeConfirm = ref('')
+// 정리를 마치면 이어서 할 일(저장·삭제). 사용자가 직접 연 정리면 null.
+const pendingAction = ref(null)
+// 수정 창을 열 때의 사용자. 저장이 교사 기능을 없애는지 견줄 때 쓴다.
+const originalUser = ref({})
 const currentPage = ref(1)
 const selectedUsers = ref([])
 const formGenerateUserRef = ref(null)
@@ -238,11 +268,38 @@ function permissionTags (row) {
 
 function currentChange (page) { currentPage.value = page; getUserList(page) }
 
+// 교사 기능이 있는지. 서버의 User.is_teacher() 와 같은 기준이다.
+function isTeacherRow (u) {
+  return u.admin_type === 'Teacher' || (u.admin_type === 'Admin' && !!u.teacher_permission)
+}
+
+function hasTeachingData (summary) {
+  return ['class_count', 'student_count', 'problem_set_count', 'contest_count',
+    'private_problem_count', 'homework_count', 'student_submission_count'].some(k => summary[k] > 0)
+}
+
+// 교사 기능을 잃는 변경(저장·삭제) 전에 남은 자료를 본다. 있으면 정리 창을 띄우고
+// 정리가 끝나면 그 변경을 이어서 한다. 없으면 바로 한다.
+function guardTeachingData (user, label, action) {
+  api.getTeacherData(user.id).then(res => {
+    if (hasTeachingData(res.data.data)) {
+      showCleanup(user.id, res.data.data, { label, run: action })
+    } else {
+      action()
+    }
+  }, () => {})
+}
+
 function saveUser () {
-  api.editUser(editingUser.value).then(() => {
+  const save = () => api.editUser(editingUser.value).then(() => {
     getUserList(currentPage.value)
     showUserDialog.value = false
   }).catch(() => {})
+  if (isTeacherRow(originalUser.value) && !isTeacherRow(editingUser.value)) {
+    guardTeachingData(originalUser.value, '저장', save)
+  } else {
+    save()
+  }
 }
 
 function openUserDialog (id) {
@@ -250,6 +307,7 @@ function openUserDialog (id) {
   api.getUser(id).then(res => {
     editingUser.value = res.data.data
     editingUser.value.password = ''
+    originalUser.value = { ...res.data.data }
   })
 }
 
@@ -262,31 +320,46 @@ function getUserList (page) {
   }, () => { loadingTable.value = false })
 }
 
-function deleteUsers (ids) {
+function deleteUsers (ids, row) {
   ElMessageBox.confirm('사용자를 삭제하시겠습니까? 관련 데이터도 함께 삭제됩니다.', '확인', { type: 'warning' }).then(() => {
-    api.deleteUsers(ids.join(',')).then(() => getUserList(currentPage.value)).catch(() => getUserList(currentPage.value))
+    const remove = () => api.deleteUsers(ids.join(','))
+      .then(() => getUserList(currentPage.value)).catch(() => getUserList(currentPage.value))
+    // 한 사람을 지울 때는 남은 수업 자료를 먼저 정리하게 돕는다.
+    // 여럿을 한꺼번에 지울 때는 서버가 막고 누구인지 알려 준다.
+    if (row && isTeacherRow(row)) guardTeachingData(row, '삭제', remove)
+    else remove()
   }, () => {})
 }
 
 function handleSelectionChange (val) { selectedUsers.value = val }
 
-// 교사를 지우거나 유형을 바꾸려면 딸린 교육 데이터를 먼저 비워야 한다.
-// 되돌릴 수 없어서 무엇이 지워지는지 보여주고 확인받는다.
+// 교사를 지우거나 교사 기능을 없애려면 딸린 교육 데이터를 먼저 비워야 한다.
+// 기본은 다른 선생님에게 넘기기, 지우기는 되돌릴 수 없어 아이디를 직접 쳐야 한다.
 function openTeacherCleanup (row) {
-  api.getTeacherData(row.id).then(res => {
-    cleanup.value = res.data.data
-    cleanupUserId.value = row.id
-    showCleanupDialog.value = true
-  }, () => {})
+  api.getTeacherData(row.id).then(res => showCleanup(row.id, res.data.data, null), () => {})
+}
+
+function showCleanup (userId, summary, action) {
+  cleanup.value = summary
+  cleanupUserId.value = userId
+  pendingAction.value = action
+  cleanupMode.value = (summary.teachers || []).length ? 'transfer' : 'purge'
+  transferTo.value = null
+  purgeConfirm.value = ''
+  showCleanupDialog.value = true
 }
 
 function runTeacherCleanup () {
   loadingCleanup.value = true
-  api.purgeTeacherData(cleanupUserId.value).then(() => {
+  const request = cleanupMode.value === 'transfer'
+    ? api.transferTeacherData(cleanupUserId.value, transferTo.value)
+    : api.purgeTeacherData(cleanupUserId.value)
+  const action = pendingAction.value
+  request.then(() => {
     loadingCleanup.value = false
     showCleanupDialog.value = false
-    ElMessage.success('교육 데이터를 정리했습니다')
     getUserList(currentPage.value)
+    if (action) action.run()
   }, () => {
     loadingCleanup.value = false
   })
@@ -360,6 +433,17 @@ watch(uploadUsersCurrentPage, (page) => {
     color: #909399;
   }
 
+.cleanup-why {
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+.cleanup-mode { margin: 4px 0 12px; }
+.cleanup-body p { margin: 4px 0; }
+.cleanup-note {
+  font-size: 12px;
+  color: #909399;
+}
+.cleanup-confirm { margin-top: 10px; }
 .cleanup-list {
   // 들여쓰기는 padding 으로 적는다. margin 으로만 주면 목록 기본값인
   // 왼쪽 padding 40px 이 그 아래 그대로 깔려 실제로는 58px 이 된다.
