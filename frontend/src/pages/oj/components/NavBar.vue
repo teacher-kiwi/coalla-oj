@@ -77,6 +77,9 @@
           <el-dropdown-menu>
             <el-dropdown-item command="/user-home">프로필</el-dropdown-item>
             <el-dropdown-item command="/status?myself=1">내 채점</el-dropdown-item>
+            <el-dropdown-item command="/coins">
+              내 코인 <b class="coin-count">{{ userStore.coins }}</b>
+            </el-dropdown-item>
             <el-dropdown-item command="/setting">설정</el-dropdown-item>
             <el-dropdown-item v-if="userStore.isAdminRole" command="/admin">관리자 페이지</el-dropdown-item>
             <el-dropdown-item divided command="/logout">로그아웃</el-dropdown-item>
@@ -258,5 +261,11 @@ function openLogin () {
   .modal-title {
     font-size: 18px;
     font-weight: 600;
+  }
+
+  // 사용자 메뉴의 코인 수. 샵 가격과 같은 금색
+  .coin-count {
+    margin-left: 6px;
+    color: #b57b07;
   }
 </style>

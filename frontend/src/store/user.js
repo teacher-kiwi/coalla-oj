@@ -15,6 +15,8 @@ export const useUserStore = defineStore('user', {
   }),
   getters: {
     user: (state) => state.profile.user || {},
+    // 내 코인 잔액. 프로필을 받을 때 함께 온다(남의 프로필에는 없다).
+    coins: (state) => state.profile.coins || 0,
     isAuthenticated () {
       return !!this.user.id
     },
@@ -47,7 +49,13 @@ export const useUserStore = defineStore('user', {
       const { default: api } = await import('@oj/api')
       try {
         const res = await api.getUserInfo()
-        this.changeProfile(res.data.data || {})
+        const profile = res.data.data || {}
+        this.changeProfile(profile)
+        // 그날 처음 들어와 출석 코인을 받았다
+        if (profile.coin_notice > 0) {
+          const { ElMessage } = await import('element-plus')
+          ElMessage.success({ message: `오늘 출석 +${profile.coin_notice} 코인`, duration: 4000 })
+        }
       } finally {
         // 실패해도 "확정됐다"고 본다. 화면이 영영 비어 있는 것보다 낫다.
         this.profileReady = true
@@ -58,6 +66,9 @@ export const useUserStore = defineStore('user', {
     ensureProfile () {
       if (!profileRequest) profileRequest = this.getProfile().catch(() => {})
       return profileRequest
+    },
+    addCoins (amount) {
+      if (this.profile.user) this.profile = { ...this.profile, coins: (this.profile.coins || 0) + amount }
     },
     changeProfile (profile) {
       this.profile = profile

@@ -5,6 +5,7 @@ from django.contrib import auth
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
+from avatar.coins import balance as coin_balance, grant_attendance
 from utils.constants import ContestRuleType
 from utils.api import APIView, validate_serializer, CSRFExemptAPIView
 from utils.shortcuts import rand_str, datetime2str
@@ -37,7 +38,13 @@ class UserProfileAPI(APIView):
                 show_private = True
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
-        return self.success(UserProfileSerializer(user.userprofile, show_private=show_private).data)
+        data = UserProfileSerializer(user.userprofile, show_private=show_private).data
+        if show_private:
+            # 화면을 열 때마다 부르는 요청이라 출석 코인을 여기서 준다(그날 처음 한 번).
+            # 로그인이 며칠씩 유지되어 로그인 시점에 주면 출석이 빠진다.
+            data["coin_notice"] = grant_attendance(user)
+            data["coins"] = coin_balance(user.id)
+        return self.success(data)
 
 
 class UserLoginAPI(APIView):

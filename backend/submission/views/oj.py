@@ -16,6 +16,7 @@ from utils.api import APIView, validate_serializer
 from utils.cache import cache
 from utils.throttling import TokenBucket
 from account.models import AdminType, my_student_ids
+from avatar.models import CoinLog, CoinReason
 from ..models import Submission
 from ..serializers import CreateSubmissionSerializer, RunCodeSerializer, SubmissionModelSerializer
 from ..serializers import SubmissionSafeModelSerializer, SubmissionListSerializer
@@ -128,6 +129,10 @@ class SubmissionAPI(APIView):
             submission_data = SubmissionModelSerializer(submission).data
         else:
             submission_data = SubmissionSafeModelSerializer(submission).data
+        if submission.user_id == request.user.id:
+            # 이 제출로 받은 정답 코인. 채점 결과 화면이 "+10 코인"을 띄운다.
+            log = CoinLog.objects.filter(submission_id=submission.id, reason=CoinReason.SOLVE).first()
+            submission_data["coins"] = log.amount if log else 0
         return self.success(submission_data)
 
 

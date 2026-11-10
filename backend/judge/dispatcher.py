@@ -8,6 +8,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import F
 
 from account.models import User
+from avatar.coins import grant_solve
 from conf.models import JudgeServer
 from contest.models import ContestRuleType, ACMContestRank, OIContestRank, ContestStatus
 from options.options import SysOptions
@@ -208,6 +209,11 @@ class JudgeDispatcher(DispatcherBase):
                 self.submission.result = error_test_case[0]["result"]
             else:
                 self.submission.result = JudgeStatus.PARTIALLY_ACCEPTED
+        if self.submission.result == JudgeStatus.ACCEPTED:
+            # 결과를 저장하기 전에 준다. 화면은 결과가 보이자마자 이 제출을 다시 읽어
+            # "+10 코인"을 띄우는데, 저장 뒤에 주면 그 사이에 읽혀 놓칠 수 있다.
+            # 대회 제출·임시 계정은 grant_solve 가 거른다. 이미 받은 문제면 아무 일도 없다.
+            grant_solve(self.submission, User.objects.get(id=self.submission.user_id))
         self.submission.save()
 
         if not update_stats:

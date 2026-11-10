@@ -92,4 +92,19 @@ describe('user 스토어', () => {
     expect(store.isAdminRole).toBe(false)
     expect(store.isSuperAdmin).toBe(false)
   })
+
+  it('코인 잔액을 들고 있다가 정답 코인만큼 늘린다', async () => {
+    getUserInfo.mockResolvedValue({ data: { data: { user: { id: 1, username: 'a' }, coins: 15, coin_notice: 0 } } })
+    const store = useUserStore()
+    await store.getProfile()
+    expect(store.coins).toBe(15)
+    store.addCoins(10)
+    expect(store.coins).toBe(25)
+  })
+
+  it('로그인 전에는 코인을 늘리지 않는다', () => {
+    const store = useUserStore()
+    store.addCoins(10)
+    expect(store.coins).toBe(0)
+  })
 })

@@ -74,3 +74,31 @@ class AvatarItem(models.Model):
     class Meta:
         db_table = "avatar_item"
         ordering = ("-id",)
+
+
+class CoinReason:
+    SOLVE = "solve"      # 연습 문제를 처음 맞힘. ref = 문제 id
+    ATTEND = "attend"    # 그날 첫 접속. ref = 한국 날짜(YYYY-MM-DD)
+    BUY = "buy"          # 샵에서 아이템을 삼(4단계). ref = 아이템 id
+
+
+class CoinLog(models.Model):
+    """코인 원장. 잔액은 따로 두지 않고 이 표의 합으로 센다.
+
+    (사용자, 이유, 대상)이 겹치지 않아서 같은 문제·같은 날에 두 번 받을 수 없다.
+    재채점이나 동시에 들어온 채점이 같은 정답을 두 번 처리해도 한 번만 들어간다.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="coin_logs")
+    amount = models.IntegerField()
+    reason = models.CharField(max_length=10)
+    ref = models.CharField(max_length=64)
+    # 정답 코인을 준 제출. 채점 결과 화면이 "+10 코인"을 띄울 때 찾는다.
+    submission_id = models.CharField(max_length=32, blank=True, default="", db_index=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "coin_log"
+        ordering = ("-id",)
+        constraints = [
+            models.UniqueConstraint(fields=["user", "reason", "ref"], name="coin_log_once"),
+        ]

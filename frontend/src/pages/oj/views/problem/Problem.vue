@@ -455,6 +455,11 @@ function checkSubmissionStatus () {
     api.getSubmission(id).then(res => {
       result.value = res.data.data
       if (Object.keys(res.data.data.statistic_info).length !== 0) {
+        // 이 문제를 처음 맞혀 받은 코인. 같은 문제를 다시 맞히면 0 이라 뜨지 않는다.
+        if (res.data.data.coins > 0) {
+          ElMessage.success({ message: `정답! +${res.data.data.coins} 코인`, duration: 4000 })
+          userStore.addCoins(res.data.data.coins)
+        }
         submitting.value = false
         submitted.value = false
         clearTimeout(refreshStatus)

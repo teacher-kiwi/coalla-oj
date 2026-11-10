@@ -3,6 +3,7 @@ import NotFound from '@oj/views/general/404.vue'
 import Announcements from '@oj/views/general/Announcements.vue'
 import Logout from '@oj/views/user/Logout.vue'
 import UserHome from '@oj/views/user/UserHome.vue'
+const Coins = () => import('@oj/views/user/Coins.vue')
 import About from '@oj/views/help/About.vue'
 import FAQ from '@oj/views/help/FAQ.vue'
 import ProblemList from '@oj/views/problem/ProblemList.vue'
@@ -135,6 +136,12 @@ export default [
     path: '/oi-rank',
     meta: { title: 'OI 순위' },
     component: OIRank
+  },
+  {
+    name: 'coins',
+    path: '/coins',
+    component: Coins,
+    meta: { requiresAuth: true, title: '내 코인' }
   },
   {
     name: 'user-home',

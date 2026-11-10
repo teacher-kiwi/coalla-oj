@@ -38,7 +38,8 @@ class EditAvatarItemSerializer(serializers.Serializer):
         allowed = parts_for(slot, variant)
         parts = data["parts"]
         if set(parts) != set(allowed):
-            raise serializers.ValidationError(f"부위가 맞지 않습니다. 필요한 부위: {', '.join(allowed)}")
+            needed = ", ".join(allowed)
+            raise serializers.ValidationError(f"부위가 맞지 않습니다. 필요한 부위: {needed}")
         painted = False
         for name, text in parts.items():
             w, h = PART_SIZE[name]

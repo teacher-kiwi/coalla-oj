@@ -223,6 +223,9 @@ export default {
   getUserInfo (username = undefined) {
     return ajax('profile', 'get', { params: { username } })
   },
+  getCoinLog (offset, limit) {
+    return ajax('coin_log', 'get', { params: { offset, limit } })
+  },
   getSessions () {
     return ajax('sessions', 'get')
   },
