@@ -34,7 +34,8 @@ pythonGenerator.forBlock["text_to_number"] = function (block, generator) {
   return [code, Order.FUNCTION_CALL];
 };
 
-// 사칙연산
+// 사칙연산. 표시 옆 괄호는 파이썬 연산자다. 나중에 글로 짤 때 이어지도록 함께 보여준다.
+// 저장되는 값은 연산자 그대로라 표시를 바꿔도 이미 쌓은 블록은 그대로 열린다.
 Blockly.Blocks["calc_basic"] = {
   init: function () {
     this.jsonInit({
@@ -47,8 +48,8 @@ Blockly.Blocks["calc_basic"] = {
           options: [
             ["+", "+"],
             ["-", "-"],
-            ["×", "*"],
-            ["÷", "/"],
+            ["× (*)", "*"],
+            ["÷ (/)", "/"],
           ],
         },
         { type: "input_value", name: "B", check: "Number" },
@@ -85,8 +86,8 @@ Blockly.Blocks["calc_division"] = {
           type: "field_dropdown",
           name: "MODE",
           options: [
-            ["몫", "//"],
-            ["나머지", "%"],
+            ["몫 (//)", "//"],
+            ["나머지 (%)", "%"],
           ],
         },
       ],

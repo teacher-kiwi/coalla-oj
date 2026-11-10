@@ -21,3 +21,24 @@ pythonGenerator.forBlock["input_readline"] = function (block, generator) {
   const code = "input().strip()";
   return [code, Order.FUNCTION_CALL];
 };
+
+// 리스트를 띄어서 한 줄로 출력: print(*리스트)
+// [3, 5, 7] 이 "3 5 7" 로 나온다. 채점 문제의 "공백으로 구분해 출력" 에 맞춘 블록이다.
+Blockly.Blocks["print_list_spaced"] = {
+  init: function () {
+    this.jsonInit({
+      message0: "리스트 %1 을(를) 띄어서 출력",
+      args0: [{ type: "input_value", name: "LIST", check: "Array" }],
+      inputsInline: true,
+      previousStatement: null,
+      nextStatement: null,
+      style: "text_blocks",
+      tooltip: "리스트의 값들을 한 칸씩 띄어서 한 줄에 출력합니다.",
+      helpUrl: "",
+    });
+  },
+};
+pythonGenerator.forBlock["print_list_spaced"] = function (block, generator) {
+  const list = generator.valueToCode(block, "LIST", Order.NONE) || "[]";
+  return `print(*${list})\n`;
+};

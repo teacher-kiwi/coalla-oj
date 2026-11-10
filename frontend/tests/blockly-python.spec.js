@@ -175,7 +175,8 @@ describe('등록 상태', () => {
     // 생성기가 없으면 학생 화면에서 코드가 빈 채로 제출된다
     const custom = ['text_to_number', 'calc_basic', 'calc_division', 'list_stats',
       'list_map_number', 'list_get_nth', 'list_append', 'list_pop', 'list_sort',
-      'text_split', 'text_get_nth', 'input_readline']
+      'text_split', 'text_get_nth', 'input_readline', 'loop_range', 'loop_each',
+      'print_list_spaced']
     for (const type of custom) {
       expect(Blockly.Blocks[type], `${type} 블록 정의`).toBeDefined()
       expect(pythonGenerator.forBlock[type], `${type} 생성기`).toBeTypeOf('function')
@@ -185,7 +186,7 @@ describe('등록 상태', () => {
 
 describe('변수 이름', () => {
   function codeWithVariable (name) {
-    const variable = workspace.createVariable(name)
+    const variable = workspace.getVariableMap().createVariable(name)
     const set = workspace.newBlock('variables_set')
     set.setFieldValue(variable.getId(), 'VAR')
     connect(set, 'VALUE', number(1))
@@ -207,5 +208,111 @@ describe('변수 이름', () => {
 
   it('파이썬 예약어·내장 함수와 겹치면 피해 간다', () => {
     expect(codeWithVariable('print')).not.toMatch(/^print = 1/m)
+  })
+})
+
+describe('연산자 표시', () => {
+  function labels (type, field) {
+    return workspace.newBlock(type).getField(field).getOptions().map(([label]) => label)
+  }
+
+  it('블록 옆에 파이썬 연산자를 함께 보여준다', () => {
+    expect(labels('calc_basic', 'OP')).toEqual(['+', '-', '× (*)', '÷ (/)'])
+    expect(labels('calc_division', 'MODE')).toEqual(['몫 (//)', '나머지 (%)'])
+  })
+})
+
+/** 변수 값 블록 */
+function variable (name) {
+  const v = workspace.getVariableMap().getVariable(name) || workspace.getVariableMap().createVariable(name)
+  const block = workspace.newBlock('variables_get')
+  block.setFieldValue(v.getId(), 'VAR')
+  return block
+}
+
+/** 문장 블록을 parent 의 DO 안에 넣는다 */
+function putInside (parent, child) {
+  parent.getInput('DO').connection.connect(child.previousConnection)
+}
+
+function printOf (valueBlock) {
+  const print = workspace.newBlock('text_print')
+  connect(print, 'TEXT', valueBlock)
+  return print
+}
+
+// 블록이 생기거나 이름이 바뀌었다는 알림은 잠깐 뒤에 한꺼번에 전달된다
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
+
+describe('범위 반복 (loop_range)', () => {
+  it('파이썬 range 그대로 끝값은 넣지 않는다', () => {
+    const loop = makeBlock('loop_range')
+    connect(loop, 'FROM', number(0))
+    connect(loop, 'TO', variable('n'))
+    putInside(loop, printOf(variable('i')))
+    expect(pythonGenerator.blockToCode(loop)).toBe('for i in range(0, n):\n  print(i)\n')
+  })
+
+  it('안이 비면 pass 로 채워 문법 오류를 막는다', () => {
+    const loop = makeBlock('loop_range')
+    connect(loop, 'FROM', number(1))
+    connect(loop, 'TO', number(5))
+    expect(pythonGenerator.blockToCode(loop)).toBe('for i in range(1, 5):\n  pass\n')
+  })
+
+  it('이름 칸에 쓴 이름이 변수로 생겨 변수 칸에서 꺼내 쓸 수 있다', async () => {
+    const loop = makeBlock('loop_range')
+    await settle()
+    expect(workspace.getVariableMap().getVariable('i')).not.toBeNull()
+
+    loop.setFieldValue('번호', 'VAR')
+    await settle()
+    expect(workspace.getVariableMap().getVariable('번호')).not.toBeNull()
+  })
+
+  it('이름을 비우면 받지 않는다', () => {
+    const loop = makeBlock('loop_range')
+    loop.setFieldValue('   ', 'VAR')
+    expect(loop.getFieldValue('VAR')).toBe('i')
+  })
+
+  it('변수 칸에서 이름을 바꾸면 반복 블록도 따라 바뀐다', async () => {
+    const loop = makeBlock('loop_range')
+    await settle()
+    const variables = workspace.getVariableMap()
+    variables.renameVariable(variables.getVariable('i'), 'k')
+    await settle()
+    expect(loop.getFieldValue('VAR')).toBe('k')
+  })
+
+  it('반복 멈추기 블록을 안에 넣을 수 있다', async () => {
+    const { loops } = await import('blockly/blocks')
+    expect(loops.loopTypes.has('loop_range')).toBe(true)
+    expect(loops.loopTypes.has('loop_each')).toBe(true)
+  })
+})
+
+describe('각 요소 반복 (loop_each)', () => {
+  it('리스트의 값을 하나씩 변수에 넣는다', () => {
+    const loop = makeBlock('loop_each')
+    connect(loop, 'LIST', variable('점수들'))
+    putInside(loop, printOf(variable('값')))
+    expect(pythonGenerator.blockToCode(loop)).toBe('for 값 in 점수들:\n  print(값)\n')
+  })
+})
+
+describe('리스트 띄어서 출력 (print_list_spaced)', () => {
+  it('print(*리스트) 로 한 칸씩 띄어 출력한다', () => {
+    const block = makeBlock('print_list_spaced')
+    connect(block, 'LIST', variable('L'))
+    expect(pythonGenerator.blockToCode(block)).toBe('print(*L)\n')
+  })
+
+  it('입력을 나눈 리스트를 바로 받을 수 있다', () => {
+    const split = makeBlock('text_split')
+    connect(split, 'TXT', makeBlock('input_readline'))
+    const block = makeBlock('print_list_spaced')
+    connect(block, 'LIST', split)
+    expect(pythonGenerator.blockToCode(block)).toBe('print(*input().strip().split())\n')
   })
 })

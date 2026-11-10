@@ -32,6 +32,15 @@ const ioBlocks = [
       },
     },
   },
+
+  // 리스트를 띄어서 출력 (print(*리스트))
+  {
+    kind: "block",
+    type: "print_list_spaced",
+    inputs: {
+      LIST: { shadow: { type: "lists_create_with", extraState: { itemCount: 0 } } },
+    },
+  },
 ];
 
 // 입출력 블록 뒤에 Blockly 기본 변수 목록('변수 만들기' 버튼 포함)을 붙인다
