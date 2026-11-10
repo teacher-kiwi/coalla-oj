@@ -226,6 +226,15 @@ export default {
   getCoinLog (offset, limit) {
     return ajax('coin_log', 'get', { params: { offset, limit } })
   },
+  getShop () {
+    return ajax('avatar/shop', 'get')
+  },
+  buyAvatarItem (itemId) {
+    return ajax('avatar/buy', 'post', { data: { item_id: itemId } })
+  },
+  equipAvatar (equip) {
+    return ajax('avatar/equip', 'put', { data: { equip } })
+  },
   getSessions () {
     return ajax('sessions', 'get')
   },

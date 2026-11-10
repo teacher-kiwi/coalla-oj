@@ -4,6 +4,7 @@ import Announcements from '@oj/views/general/Announcements.vue'
 import Logout from '@oj/views/user/Logout.vue'
 import UserHome from '@oj/views/user/UserHome.vue'
 const Coins = () => import('@oj/views/user/Coins.vue')
+const Shop = () => import('@oj/views/user/Shop.vue')
 import About from '@oj/views/help/About.vue'
 import FAQ from '@oj/views/help/FAQ.vue'
 import ProblemList from '@oj/views/problem/ProblemList.vue'
@@ -142,6 +143,12 @@ export default [
     path: '/coins',
     component: Coins,
     meta: { requiresAuth: true, title: '내 코인' }
+  },
+  {
+    name: 'shop',
+    path: '/shop',
+    component: Shop,
+    meta: { requiresAuth: true, title: '캐릭터 샵' }
   },
   {
     name: 'user-home',

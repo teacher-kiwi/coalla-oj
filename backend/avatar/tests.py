@@ -102,7 +102,7 @@ from submission.models import JudgeStatus, Submission  # noqa: E402
 from utils.constants import ContestRuleType  # noqa: E402
 
 from . import coins  # noqa: E402
-from .models import CoinLog, CoinReason  # noqa: E402
+from .models import CoinLog, CoinReason, OwnedItem  # noqa: E402
 
 
 class CoinTestBase(APITestCase):
@@ -248,3 +248,146 @@ class PastSolveCoinCommandTest(CoinTestBase):
         call_command("grant_past_solve_coins", "--apply", stdout=mock.MagicMock())
         call_command("grant_past_solve_coins", "--apply", stdout=mock.MagicMock())
         self.assertEqual(list(CoinLog.objects.values_list("ref", "amount")), [(str(self.problem.id), 10)])
+
+
+# ---------- 샵 ----------
+class ShopTestBase(CoinTestBase):
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="student", password="pass123")
+        self.hat = self.item("빨간 비니", "hat", "top", {"head": painted(40, 36)}, 30)
+        self.hair = self.item("단발", "hair", "", {"head": painted(40, 36, "b")}, 20)
+
+    def item(self, name, slot, variant, parts, price, visible=True):
+        return AvatarItem.objects.create(name=name, slot=slot, variant=variant, parts=parts,
+                                         price=price, visible=visible)
+
+    def give(self, amount, ref="x"):
+        CoinLog.objects.create(user=self.user, amount=amount, reason="test", ref=ref)
+
+    def buy(self, item):
+        return self.client.post(self.reverse("avatar_buy_api"), data={"item_id": item.id})
+
+
+class BuyTest(ShopTestBase):
+    def test_buy_spends_and_wears(self):
+        self.give(50)
+        resp = self.buy(self.hat)
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"], {"balance": 20, "equipped": {"hat": self.hat.id}})
+        log = CoinLog.objects.get(reason=CoinReason.BUY)
+        self.assertEqual((log.amount, log.ref), (-30, str(self.hat.id)))
+        # 두 번 살 수 없다
+        self.assertFailed(self.buy(self.hat))
+        self.assertEqual(coins.balance(self.user.id), 20)
+
+    def test_not_enough_coins(self):
+        self.give(29)
+        self.assertFailed(self.buy(self.hat))
+        self.assertFalse(OwnedItem.objects.exists())
+        self.assertEqual(coins.balance(self.user.id), 29)
+
+    def test_hidden_item_cannot_be_bought(self):
+        self.give(100)
+        secret = self.item("비밀", "acc", "", {"head": painted(40, 36)}, 0, visible=False)
+        self.assertFailed(self.buy(secret))
+
+    def test_new_item_replaces_same_slot(self):
+        self.give(100)
+        other = self.item("파란 비니", "hat", "full", {"head": painted(40, 36, "c")}, 10)
+        self.buy(self.hat)
+        self.buy(self.hair)
+        resp = self.buy(other)
+        self.assertEqual(resp.data["data"]["equipped"], {"hat": other.id, "hair": self.hair.id})
+
+    def test_guest_cannot_buy(self):
+        guest = User.objects.create(username="바로과제1", admin_type=AdminType.GUEST)
+        guest.set_password("pw1234")
+        guest.save()
+        UserProfile.objects.create(user=guest)
+        CoinLog.objects.create(user=guest, amount=100, reason="test", ref="x")
+        self.client.login(username="바로과제1", password="pw1234")
+        self.assertFailed(self.buy(self.hat))
+
+    def test_login_required(self):
+        self.client.logout()
+        self.assertFailed(self.buy(self.hat))
+
+
+class ShopListTest(ShopTestBase):
+    def test_list_shows_visible_and_owned(self):
+        self.give(100)
+        self.buy(self.hat)
+        self.item("숨김", "acc", "", {"head": painted(40, 36)}, 0, visible=False)
+        # 산 뒤에 샵에서 내려도 내 목록에는 남는다
+        AvatarItem.objects.filter(id=self.hat.id).update(visible=False)
+        data = self.client.get(self.reverse("avatar_shop_api")).data["data"]
+        self.assertEqual(sorted(i["name"] for i in data["items"]), ["단발", "빨간 비니"])
+        self.assertEqual(data["owned"], [self.hat.id])
+        self.assertEqual(data["equipped"], {"hat": self.hat.id})
+        self.assertEqual(data["balance"], 70)
+        self.assertNotIn("visible", data["items"][0])
+
+
+class EquipTest(ShopTestBase):
+    def equip(self, equip):
+        return self.client.put(self.reverse("avatar_equip_api"), data={"equip": equip})
+
+    def test_equip_whole_outfit(self):
+        self.give(100)
+        self.buy(self.hat)
+        self.buy(self.hair)
+        resp = self.equip({"hat": None, "hair": self.hair.id})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["equipped"], {"hair": self.hair.id})
+        self.assertEqual(self.equip({}).data["data"]["equipped"], {})
+
+    def test_cannot_wear_unowned_or_wrong_slot(self):
+        self.give(100)
+        self.buy(self.hat)
+        self.assertFailed(self.equip({"hair": self.hair.id}))
+        self.assertFailed(self.equip({"hair": self.hat.id}))
+        self.assertFailed(self.equip({"wings": self.hat.id}))
+        # 실패하면 입은 옷은 그대로
+        self.assertEqual(OwnedItem.objects.get().equipped, True)
+
+
+class LooksTest(ShopTestBase):
+    def test_public_looks(self):
+        self.give(100)
+        self.buy(self.hat)
+        self.create_user("plain", "pass123", login=False)
+        self.client.logout()
+        resp = self.client.get(self.reverse("avatar_looks_api") + "?usernames=student,plain,nobody")
+        self.assertSuccess(resp)
+        data = resp.data["data"]
+        self.assertEqual(data["looks"], {"student": {"hat": self.hat.id}})
+        self.assertEqual(list(data["items"]), [self.hat.id])
+        self.assertEqual(data["items"][self.hat.id]["parts"]["head"][0], "i")
+
+
+class CoinLogBuyTitleTest(ShopTestBase):
+    def test_buy_row_has_item_name(self):
+        self.give(100)
+        self.buy(self.hat)
+        rows = self.client.get(self.reverse("coin_log_api")).data["data"]["results"]
+        self.assertEqual(rows[0]["title"], "빨간 비니")
+        self.assertEqual(rows[0]["amount"], -30)
+
+
+class AdminDeleteOwnedTest(ShopTestBase):
+    def test_owned_item_is_hidden_not_deleted(self):
+        self.give(100)
+        self.buy(self.hat)
+        self.create_super_admin()
+        url = self.reverse("avatar_item_admin_api")
+        resp = self.client.delete(url + f"?id={self.hat.id}")
+        self.assertEqual(resp.data["data"], {"hidden": True})
+        self.hat.refresh_from_db()
+        self.assertFalse(self.hat.visible)
+        # 산 사람이 있으면 종류를 바꿀 수 없다
+        resp = self.client.put(url, data={**hat_data(variant="full"), "id": self.hat.id})
+        self.assertFailed(resp)
+        # 아무도 안 산 아이템은 지워진다
+        self.assertEqual(self.client.delete(url + f"?id={self.hair.id}").data["data"], {"hidden": False})
+        self.assertFalse(AvatarItem.objects.filter(id=self.hair.id).exists())

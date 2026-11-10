@@ -76,10 +76,26 @@ class AvatarItem(models.Model):
         ordering = ("-id",)
 
 
+class OwnedItem(models.Model):
+    """학생이 산 아이템. equipped 면 지금 입고 있다(자리마다 하나)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="avatar_items")
+    # 산 사람이 있는 아이템은 지우지 않고 샵에서 내린다(관리자 삭제 참고)
+    item = models.ForeignKey(AvatarItem, on_delete=models.PROTECT, related_name="owners")
+    equipped = models.BooleanField(default=False)
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "avatar_owned_item"
+        ordering = ("-id",)
+        constraints = [
+            models.UniqueConstraint(fields=["user", "item"], name="avatar_owned_once"),
+        ]
+
+
 class CoinReason:
     SOLVE = "solve"      # 연습 문제를 처음 맞힘. ref = 문제 id
     ATTEND = "attend"    # 그날 첫 접속. ref = 한국 날짜(YYYY-MM-DD)
-    BUY = "buy"          # 샵에서 아이템을 삼(4단계). ref = 아이템 id
+    BUY = "buy"          # 샵에서 아이템을 삼(금액은 음수). ref = 아이템 id
 
 
 class CoinLog(models.Model):

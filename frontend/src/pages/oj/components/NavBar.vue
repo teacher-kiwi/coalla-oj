@@ -80,6 +80,7 @@
             <el-dropdown-item command="/coins">
               내 코인 <b class="coin-count">{{ userStore.coins }}</b>
             </el-dropdown-item>
+            <el-dropdown-item command="/shop">캐릭터 샵</el-dropdown-item>
             <el-dropdown-item command="/setting">설정</el-dropdown-item>
             <el-dropdown-item v-if="userStore.isAdminRole" command="/admin">관리자 페이지</el-dropdown-item>
             <el-dropdown-item divided command="/logout">로그아웃</el-dropdown-item>

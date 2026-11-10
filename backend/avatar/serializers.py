@@ -10,6 +10,22 @@ class AvatarItemSerializer(serializers.ModelSerializer):
                   "create_time", "last_update_time")
 
 
+class ShopItemSerializer(serializers.ModelSerializer):
+    """학생 화면용. 샵 공개 여부·만든 사람은 싣지 않는다."""
+    class Meta:
+        model = AvatarItem
+        fields = ("id", "name", "slot", "variant", "parts", "price", "designer", "last_update_time")
+
+
+class BuySerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+
+
+class EquipSerializer(serializers.Serializer):
+    # {자리: 아이템 id 또는 null}. 빠진 자리는 벗는다.
+    equip = serializers.DictField(child=serializers.IntegerField(allow_null=True))
+
+
 class EditAvatarItemSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=False)
     name = serializers.CharField(max_length=30, error_messages={

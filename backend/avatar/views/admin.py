@@ -35,6 +35,9 @@ class AvatarItemAdminAPI(APIView):
             item = AvatarItem.objects.get(id=data.pop("id", None))
         except (AvatarItem.DoesNotExist, TypeError, ValueError):
             return self.error("아이템이 없습니다")
+        # 산 사람이 입고 있는 자리가 꼬이지 않게, 산 사람이 있으면 자리·종류는 그대로 둔다
+        if (data["slot"], data["variant"]) != (item.slot, item.variant) and item.owners.exists():
+            return self.error("산 사람이 있는 아이템은 종류를 바꿀 수 없습니다")
         for k, v in data.items():
             setattr(item, k, v)
         item.save()
@@ -42,6 +45,14 @@ class AvatarItemAdminAPI(APIView):
 
     @super_admin_required
     def delete(self, request):
-        # 4단계(샵)에서 산 사람이 생기면, 산 아이템은 지우지 말고 샵에서 내리게 바꾼다
-        AvatarItem.objects.filter(id=request.GET.get("id") or 0).delete()
-        return self.success()
+        try:
+            item = AvatarItem.objects.get(id=request.GET.get("id") or 0)
+        except (AvatarItem.DoesNotExist, ValueError):
+            return self.error("아이템이 없습니다")
+        # 산 사람이 있으면 지우지 않고 샵에서 내린다. 산 사람은 계속 입을 수 있다.
+        if item.owners.exists():
+            item.visible = False
+            item.save(update_fields=["visible", "last_update_time"])
+            return self.success({"hidden": True})
+        item.delete()
+        return self.success({"hidden": False})

@@ -7,6 +7,7 @@
             <div class="me">
               <CharacterAvatar v-if="userStore.user.username" :username="userStore.user.username"
                                mode="full" :size="128" />
+              <router-link class="link-text shop-link" :to="{ name: 'shop' }">캐릭터 꾸미기</router-link>
             </div>
 
             <el-menu-item v-if="isStudent" index="/setting/password">비밀번호 변경</el-menu-item>
@@ -79,8 +80,13 @@ function goRoute (path) {
       // 프로필 사진 대신 캐릭터. 사진 올리기는 캐릭터로 바꾸면서 없앴다.
       .me {
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
         padding: 20px 0 12px;
+        .shop-link {
+          font-size: 13px;
+        }
       }
     }
     .panel {

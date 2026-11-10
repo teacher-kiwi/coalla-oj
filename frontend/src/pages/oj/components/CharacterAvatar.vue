@@ -11,12 +11,14 @@
 // 수십 명이 나와도 실제로 그리는 횟수는 서로 다른 모습의 수만큼이다.
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { composePixels, crop, toneOf, ANIM, BUST, FULL, SIZE } from '@/utils/character'
+import { lookOf } from '@/utils/looks'
 
 const props = defineProps({
   // 아이디. 아이템이 없을 때 머리색·옷색을 고르는 데 쓴다.
   username: { type: String, default: '' },
-  // 입은 아이템 { 자리: 아이템 }. 샵이 생기기 전에는 비어 있다.
-  eq: { type: Object, default: () => ({}) },
+  // 입은 아이템 { 자리: 아이템 }. 주지 않으면 아이디로 그 사람이 입은 아이템을 찾아 그린다.
+  // 샵의 입어보기·관리자 미리보기처럼 정해진 모습을 그릴 때만 넘긴다.
+  eq: { type: Object, default: null },
   // 화면에 보이는 한 변 길이(px)
   size: { type: Number, default: 32 },
   mode: { type: String, default: 'bust', validator: v => ['bust', 'full'].includes(v) },
@@ -24,6 +26,7 @@ const props = defineProps({
   animate: { type: Boolean, default: false }
 })
 
+const wear = computed(() => props.eq || lookOf(props.username))
 const rect = computed(() => props.mode === 'full' ? FULL : BUST)
 const label = computed(() => props.username ? `${props.username}의 캐릭터` : '캐릭터')
 const reduceMotion = typeof window !== 'undefined' && window.matchMedia &&
@@ -44,7 +47,7 @@ function eqKey (eq) {
 
 function paint (ctx, frame) {
   const r = rect.value
-  const px = crop(composePixels({ frame, eq: props.eq, seed: props.username }), r)
+  const px = crop(composePixels({ frame, eq: wear.value, seed: props.username }), r)
   const img = ctx.createImageData(r.w, r.h)
   px.forEach((c, i) => {
     if (!c) return
@@ -60,7 +63,7 @@ function paint (ctx, frame) {
 const src = computed(() => {
   if (animated.value) return ''
   const t = toneOf(props.username)
-  const key = `${props.mode}|${t.hair}.${t.shirt}|${eqKey(props.eq)}`
+  const key = `${props.mode}|${t.hair}.${t.shirt}|${eqKey(wear.value)}`
   if (!cache.has(key)) {
     const r = rect.value
     const c = document.createElement('canvas')
@@ -98,7 +101,7 @@ function stop () {
 }
 onMounted(start)
 onBeforeUnmount(stop)
-watch(() => [props.username, eqKey(props.eq), props.mode, animated.value], () => {
+watch(() => [props.username, eqKey(wear.value), props.mode, animated.value], () => {
   // canvas 가 새로 생기는 경우를 위해 다음 틱에 시작
   setTimeout(start)
 })

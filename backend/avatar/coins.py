@@ -6,9 +6,9 @@ from zoneinfo import ZoneInfo
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
 
-from account.models import AdminType
+from account.models import AdminType, User
 
-from .models import CoinLog, CoinReason
+from .models import CoinLog, CoinReason, OwnedItem
 
 logger = logging.getLogger(__name__)
 
@@ -57,3 +57,28 @@ def grant_attendance(user):
     if not _earns(user):
         return 0
     return _grant(user.id, CoinReason.ATTEND, today(), ATTEND_COINS)
+
+
+class BuyError(Exception):
+    pass
+
+
+def buy(user, item):
+    """아이템을 사고 바로 입는다. 잔액이 모자라거나 이미 가졌으면 BuyError.
+
+    같은 사람이 동시에 두 번 눌러도 잔액보다 많이 쓰지 않게 사용자 행을 잠근다.
+    """
+    if not _earns(user):
+        raise BuyError("이 계정으로는 살 수 없습니다")
+    if not item.visible:
+        raise BuyError("샵에 없는 아이템입니다")
+    with transaction.atomic():
+        User.objects.select_for_update().only("id").get(id=user.id)
+        if OwnedItem.objects.filter(user_id=user.id, item=item).exists():
+            raise BuyError("이미 가진 아이템입니다")
+        if balance(user.id) < item.price:
+            raise BuyError("코인이 모자랍니다")
+        CoinLog.objects.create(user_id=user.id, reason=CoinReason.BUY, ref=str(item.id), amount=-item.price)
+        OwnedItem.objects.filter(user_id=user.id, equipped=True, item__slot=item.slot).update(equipped=False)
+        OwnedItem.objects.create(user_id=user.id, item=item, equipped=True)
+    return balance(user.id)

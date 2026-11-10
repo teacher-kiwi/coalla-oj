@@ -14,7 +14,7 @@
           <el-button type="primary" size="small" :icon="Plus"
                      @click="router.push({ name: 'create-avatar-item' })">아이템 만들기</el-button>
           <el-button size="small" :loading="importing" @click="importExamples">예시 아이템 가져오기</el-button>
-          <span class="hint">샵에 올린 아이템만 학생에게 보입니다. 샵은 4단계에서 열립니다.</span>
+          <span class="hint">샵에 올린 아이템만 학생에게 보입니다. 산 사람이 있는 아이템은 지우면 샵에서만 내려가고, 산 사람은 계속 입습니다.</span>
         </div>
         <p v-if="!loading && !shown.length" class="empty">
           아직 아이템이 없습니다. '아이템 만들기'로 그리거나, '예시 아이템 가져오기'로 15개를 먼저 넣어 보세요.
@@ -80,8 +80,12 @@ function toggle (r) {
 }
 
 function remove (r) {
-  ElMessageBox.confirm(`'${r.name}'을(를) 지웁니다. 되돌릴 수 없습니다.`, '아이템 삭제', { type: 'warning' })
-    .then(() => api.deleteAvatarItem(r.id)).then(load).catch(() => {})
+  ElMessageBox.confirm(`'${r.name}'을(를) 지웁니다. 산 사람이 있으면 샵에서만 내립니다.`, '아이템 삭제', { type: 'warning' })
+    .then(() => api.deleteAvatarItem(r.id))
+    .then(res => {
+      if (res.data.data && res.data.data.hidden) ElMessage.info(`'${r.name}'은(는) 산 사람이 있어 샵에서 내리기만 했습니다`)
+      return load()
+    }).catch(() => {})
 }
 
 // 프로토타입의 예시 15개를 '샵에 안 올림'으로 넣는다. 이름이 같은 아이템은 건너뛴다.

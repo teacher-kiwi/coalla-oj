@@ -67,6 +67,9 @@ export const useUserStore = defineStore('user', {
       if (!profileRequest) profileRequest = this.getProfile().catch(() => {})
       return profileRequest
     },
+    setCoins (coins) {
+      if (this.profile.user) this.profile = { ...this.profile, coins }
+    },
     addCoins (amount) {
       if (this.profile.user) this.profile = { ...this.profile, coins: (this.profile.coins || 0) + amount }
     },

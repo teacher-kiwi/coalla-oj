@@ -10,7 +10,7 @@
         <ul class="ways">
           <li>연습 문제를 <b>처음 맞히면 +10</b></li>
           <li>하루 <b>첫 접속(출석) +5</b></li>
-          <li>모은 코인은 곧 열리는 샵에서 캐릭터 꾸미기에 써요</li>
+          <li>모은 코인은 <router-link class="link-text" :to="{ name: 'shop' }">캐릭터 샵</router-link>에서 꾸미기에 써요</li>
         </ul>
       </div>
       <el-table v-loading="loading" :data="logs" empty-text="아직 받은 코인이 없습니다">
@@ -24,7 +24,7 @@
               <a class="link-text" @click="goProblem(row.ref)">{{ row.title || `${row.ref}번 문제` }}</a>
             </template>
             <template v-else-if="row.reason === 'attend'">출석</template>
-            <template v-else-if="row.reason === 'buy'">아이템 구매</template>
+            <template v-else-if="row.reason === 'buy'">아이템 구매<template v-if="row.title"> · {{ row.title }}</template></template>
             <template v-else>{{ row.reason }}</template>
           </template>
         </el-table-column>
