@@ -391,3 +391,37 @@ class AdminDeleteOwnedTest(ShopTestBase):
         # 아무도 안 산 아이템은 지워진다
         self.assertEqual(self.client.delete(url + f"?id={self.hair.id}").data["data"], {"hidden": False})
         self.assertFalse(AvatarItem.objects.filter(id=self.hair.id).exists())
+
+
+class SuperAdminWearAllTest(ShopTestBase):
+    def setUp(self):
+        super().setUp()
+        self.client.logout()
+        self.root = self.create_super_admin()
+        self.secret = self.item("비밀 모자", "hat", "full", {"head": painted(40, 36, "c")}, 999, visible=False)
+
+    def test_sees_and_wears_everything_free(self):
+        data = self.client.get(self.reverse("avatar_shop_api")).data["data"]
+        self.assertTrue(data["wear_all"])
+        self.assertFalse(data["can_buy"])
+        self.assertEqual(sorted(data["owned"]), sorted([self.hat.id, self.hair.id, self.secret.id]))
+        self.assertEqual(data["hidden"], [self.secret.id])
+        resp = self.client.put(self.reverse("avatar_equip_api"), data={"equip": {"hat": self.secret.id, "hair": self.hair.id}})
+        self.assertSuccess(resp)
+        self.assertEqual(resp.data["data"]["equipped"], {"hat": self.secret.id, "hair": self.hair.id})
+        # 코인은 오가지 않고, 사기는 막는다
+        self.assertFalse(CoinLog.objects.filter(user=self.root).exists())
+        CoinLog.objects.create(user=self.root, amount=100, reason="test", ref="x")
+        self.assertFailed(self.buy(self.hat))
+        # 슬롯이 맞지 않으면 관리자도 안 된다
+        self.assertFailed(self.client.put(self.reverse("avatar_equip_api"), data={"equip": {"hair": self.hat.id}}))
+
+    def test_admin_wearing_does_not_block_delete(self):
+        self.client.put(self.reverse("avatar_equip_api"), data={"equip": {"hat": self.secret.id}})
+        url = self.reverse("avatar_item_admin_api")
+        resp = self.client.put(url, data={**hat_data(name="비밀 모자", variant="top"), "id": self.secret.id})
+        self.assertSuccess(resp)
+        self.assertFalse(OwnedItem.objects.filter(item=self.secret).exists())
+        self.client.put(self.reverse("avatar_equip_api"), data={"equip": {"hat": self.secret.id}})
+        self.assertEqual(self.client.delete(url + f"?id={self.secret.id}").data["data"], {"hidden": False})
+        self.assertFalse(AvatarItem.objects.filter(id=self.secret.id).exists())

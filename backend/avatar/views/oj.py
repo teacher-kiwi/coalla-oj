@@ -44,19 +44,35 @@ class CoinLogAPI(APIView):
 
 
 class ShopAPI(APIView):
-    """샵 목록. 샵에 올린 아이템과, 샵에서 내렸어도 내가 가진 아이템."""
+    """샵 목록. 샵에 올린 아이템과, 샵에서 내렸어도 내가 가진 아이템.
+
+    최고관리자는 샵에 안 올린 것까지 모든 아이템을 사지 않고 입는다(wear_all).
+    """
 
     @login_required
     def get(self, request):
         user = request.user
+        if user.is_super_admin():
+            items = AvatarItem.objects.all()
+            return self.success({
+                "items": ShopItemSerializer(items, many=True).data,
+                "owned": [i.id for i in items],
+                "hidden": [i.id for i in items if not i.visible],
+                "equipped": equipped_of(user.id),
+                "balance": balance(user.id),
+                "can_buy": False,
+                "wear_all": True,
+            })
         owned = list(OwnedItem.objects.filter(user=user).values_list("item_id", flat=True))
         items = AvatarItem.objects.filter(Q(visible=True) | Q(id__in=owned))
         return self.success({
             "items": ShopItemSerializer(items, many=True).data,
             "owned": owned,
+            "hidden": [],
             "equipped": equipped_of(user.id),
             "balance": balance(user.id),
             "can_buy": user.admin_type != AdminType.GUEST,
+            "wear_all": False,
         })
 
 
@@ -85,6 +101,12 @@ class EquipAPI(APIView):
         want = {slot: item_id for slot, item_id in request.data["equip"].items() if item_id}
         if any(slot not in SLOT_VARIANTS for slot in want):
             return self.error("아이템 자리가 올바르지 않습니다")
+        if user.is_super_admin():
+            # 최고관리자는 사지 않고 입는다. 입을 때 코인 없이 '가진 아이템'으로 넣어 둔다.
+            have = set(OwnedItem.objects.filter(user=user).values_list("item_id", flat=True))
+            OwnedItem.objects.bulk_create(
+                [OwnedItem(user=user, item=item) for item in AvatarItem.objects.filter(id__in=want.values())
+                 if item.id not in have], ignore_conflicts=True)
         owned = {o.item_id: o for o in OwnedItem.objects.filter(user=user, item_id__in=want.values())
                  .select_related("item")}
         for slot, item_id in want.items():

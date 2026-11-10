@@ -37,9 +37,13 @@
               <el-radio-button value="">전체</el-radio-button>
               <el-radio-button v-for="k in slotsWithItems" :key="k" :value="k">{{ SLOTS[k].label }}</el-radio-button>
             </el-radio-group>
-            <el-checkbox v-model="mineOnly" size="small">내 아이템만</el-checkbox>
+            <el-checkbox v-if="!wearAll" v-model="mineOnly" size="small">내 아이템만</el-checkbox>
           </div>
-          <p v-if="!canBuy" class="hint warn">이 계정으로는 아이템을 살 수 없어요.</p>
+          <p v-if="wearAll" class="hint">
+            최고관리자는 샵에 안 올린 것까지 모든 아이템을 사지 않고 입을 수 있습니다.
+            입은 모습은 순위표 등에서 다른 사람에게도 보입니다.
+          </p>
+          <p v-else-if="!canBuy" class="hint warn">이 계정으로는 아이템을 살 수 없어요.</p>
           <p v-if="!loading && !shown.length" class="empty">
             {{ items.length ? '조건에 맞는 아이템이 없어요' : '아직 샵에 올라온 아이템이 없어요. 곧 채워질 거예요!' }}
           </p>
@@ -58,7 +62,10 @@
                 {{ SLOTS[r.slot].label }}<template v-if="r.slot === 'bottom' || r.slot === 'shoes'"> · {{ VARIANT_LABEL[r.variant] }}</template>
                 <template v-if="r.designer"> · {{ r.designer }}</template>
               </span>
-              <span v-if="owned.has(r.id)" class="owned">가지고 있어요</span>
+              <span v-if="wearAll" class="owned admin">
+                {{ r.price }} 코인<template v-if="hidden.has(r.id)"> · 샵에 안 올림</template>
+              </span>
+              <span v-else-if="owned.has(r.id)" class="owned">가지고 있어요</span>
               <el-button v-else size="small" type="warning" plain class="buy"
                          :disabled="!canBuy || balance < r.price" :loading="buying === r.id"
                          @click.stop="buy(r)">
@@ -96,6 +103,9 @@ const equipped = ref({})
 const tryOn = ref({})
 const balance = ref(userStore.coins)
 const canBuy = ref(true)
+// 최고관리자: 모든 아이템을 사지 않고 입는다. hidden 은 샵에 안 올린 아이템.
+const wearAll = ref(false)
+const hidden = ref(new Set())
 const slot = ref('')
 const mineOnly = ref(false)
 
@@ -124,6 +134,8 @@ function apply (data) {
   tryOn.value = { ...data.equipped }
   balance.value = data.balance
   canBuy.value = data.can_buy
+  wearAll.value = !!data.wear_all
+  hidden.value = new Set(data.hidden || [])
   userStore.setCoins(data.balance)
 }
 
@@ -319,6 +331,10 @@ onMounted(load)
     color: var(--el-color-success);
     font-weight: 600;
     line-height: 24px;
+    &.admin {
+      color: #909399;
+      font-weight: 400;
+    }
   }
   .buy {
     align-self: stretch;

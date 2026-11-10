@@ -70,6 +70,8 @@ def buy(user, item):
     """
     if not _earns(user):
         raise BuyError("이 계정으로는 살 수 없습니다")
+    if user.is_super_admin():
+        raise BuyError("최고관리자는 사지 않아도 모든 아이템을 입을 수 있습니다")
     if not item.visible:
         raise BuyError("샵에 없는 아이템입니다")
     with transaction.atomic():

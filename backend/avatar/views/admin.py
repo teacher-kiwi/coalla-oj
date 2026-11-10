@@ -1,8 +1,19 @@
 from account.decorators import super_admin_required
+from account.models import AdminType
 from utils.api import APIView, validate_serializer
 
-from ..models import AvatarItem
+from ..models import AvatarItem, OwnedItem
 from ..serializers import AvatarItemSerializer, EditAvatarItemSerializer
+
+
+def buyers(item):
+    """코인을 내고 산 사람. 최고관리자는 사지 않고 입으므로 세지 않는다."""
+    return item.owners.exclude(user__admin_type=AdminType.SUPER_ADMIN)
+
+
+def drop_admin_copies(item):
+    """최고관리자가 입으려고 넣어 둔 것을 치운다(코인을 내지 않았으니 돌려줄 것도 없다)"""
+    OwnedItem.objects.filter(item=item, user__admin_type=AdminType.SUPER_ADMIN).delete()
 
 
 class AvatarItemAdminAPI(APIView):
@@ -36,8 +47,10 @@ class AvatarItemAdminAPI(APIView):
         except (AvatarItem.DoesNotExist, TypeError, ValueError):
             return self.error("아이템이 없습니다")
         # 산 사람이 입고 있는 자리가 꼬이지 않게, 산 사람이 있으면 자리·종류는 그대로 둔다
-        if (data["slot"], data["variant"]) != (item.slot, item.variant) and item.owners.exists():
-            return self.error("산 사람이 있는 아이템은 종류를 바꿀 수 없습니다")
+        if (data["slot"], data["variant"]) != (item.slot, item.variant):
+            if buyers(item).exists():
+                return self.error("산 사람이 있는 아이템은 종류를 바꿀 수 없습니다")
+            drop_admin_copies(item)
         for k, v in data.items():
             setattr(item, k, v)
         item.save()
@@ -50,9 +63,10 @@ class AvatarItemAdminAPI(APIView):
         except (AvatarItem.DoesNotExist, ValueError):
             return self.error("아이템이 없습니다")
         # 산 사람이 있으면 지우지 않고 샵에서 내린다. 산 사람은 계속 입을 수 있다.
-        if item.owners.exists():
+        if buyers(item).exists():
             item.visible = False
             item.save(update_fields=["visible", "last_update_time"])
             return self.success({"hidden": True})
+        drop_admin_copies(item)
         item.delete()
         return self.success({"hidden": False})
