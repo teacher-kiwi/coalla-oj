@@ -11,10 +11,13 @@ class AvatarItemSerializer(serializers.ModelSerializer):
 
 
 class ShopItemSerializer(serializers.ModelSerializer):
-    """학생 화면용. 샵 공개 여부·만든 사람은 싣지 않는다."""
+    """학생 화면용. 샵 공개 여부·만든 사람·디자이너 이름은 싣지 않는다.
+
+    디자이너 이름은 2026-11 에 일단 감추기로 했다(나중에 다시 검토). variant 는 그림을 그리는 데 필요해서 싣는다.
+    """
     class Meta:
         model = AvatarItem
-        fields = ("id", "name", "slot", "variant", "parts", "price", "designer", "last_update_time")
+        fields = ("id", "name", "slot", "variant", "parts", "price", "last_update_time")
 
 
 class BuySerializer(serializers.Serializer):

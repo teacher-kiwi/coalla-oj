@@ -327,6 +327,8 @@ class ShopListTest(ShopTestBase):
         self.assertEqual(data["equipped"], {"hat": self.hat.id})
         self.assertEqual(data["balance"], 70)
         self.assertNotIn("visible", data["items"][0])
+        # 디자이너 이름은 감춰 둔다
+        self.assertNotIn("designer", data["items"][0])
 
 
 class EquipTest(ShopTestBase):

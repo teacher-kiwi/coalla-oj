@@ -58,10 +58,8 @@
                 <span v-else-if="tryOn[r.slot] === r.id" class="badge">입어보는 중</span>
               </div>
               <strong class="name">{{ r.name }}</strong>
-              <span class="kind">
-                {{ SLOTS[r.slot].label }}<template v-if="r.slot === 'bottom' || r.slot === 'shoes'"> · {{ VARIANT_LABEL[r.variant] }}</template>
-                <template v-if="r.designer"> · {{ r.designer }}</template>
-              </span>
+              <!-- 세부 종류(단화·부츠 등)와 디자이너 이름은 보여주지 않는다(2026-11 결정, 디자이너는 나중에 다시 검토) -->
+              <span class="kind">{{ SLOTS[r.slot].label }}</span>
               <span v-if="wearAll" class="owned admin">
                 {{ r.price }} 코인<template v-if="hidden.has(r.id)"> · 샵에 안 올림</template>
               </span>
@@ -87,7 +85,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@oj/api'
 import Panel from '@oj/components/Panel.vue'
 import CharacterAvatar from '@oj/components/CharacterAvatar.vue'
-import { SLOTS, SLOT_KEYS, VARIANT_LABEL, itemFromRecord } from '@/utils/character'
+import { SLOTS, SLOT_KEYS, itemFromRecord } from '@/utils/character'
 import { setLook } from '@/utils/looks'
 import { useUserStore } from '@/store/user'
 

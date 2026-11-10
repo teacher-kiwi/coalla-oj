@@ -153,7 +153,7 @@
               <table class="tbl">
                 <thead><tr><th>항목</th><th>필수</th><th>설명</th></tr></thead>
                 <tbody>
-                  <tr><td><code>slot</code></td><td>필수</td><td>아이템 종류. <code>hair</code> 헤어 · <code>hat</code> 모자·장식 · <code>face</code> 얼굴 · <code>acc</code> 안경·얼굴장식 · <code>top</code> 상의 · <code>bottom</code> 하의 · <code>shoes</code> 신발</td></tr>
+                  <tr><td><code>slot</code></td><td>필수</td><td>아이템 종류. <code>hair</code> 헤어 · <code>hat</code> 모자·머리장식 · <code>face</code> 얼굴 · <code>acc</code> 안경·얼굴장식 · <code>top</code> 상의 · <code>bottom</code> 하의 · <code>shoes</code> 신발</td></tr>
                   <tr><td><code>colors</code></td><td>필수</td><td>글자 한 개와 색 코드를 짝지어요. 예: <code>"r": "#e43b44"</code></td></tr>
                   <tr><td><code>parts</code></td><td>필수</td><td>부위별 그림. 부위 이름 아래에 <code>x</code>, <code>y</code>, <code>rows</code>를 적어요.</td></tr>
                   <tr><td><code>cover</code></td><td>모자만</td><td><code>full</code> 머리카락 전부 숨기기 · <code>top</code> 윗머리만 숨기기 · <code>none</code> 장식만</td></tr>
@@ -178,7 +178,7 @@
                 <thead><tr><th>종류</th><th>부위 이름 (가로×세로)</th><th>그릴 수 있는 곳</th></tr></thead>
                 <tbody>
                   <tr><td>헤어</td><td><code>head</code> 40×36</td><td>전체. y 0~15는 윗머리라 모자를 쓰면 숨겨질 수 있어요. 옆머리·묶은 머리는 y 16 아래에.</td></tr>
-                  <tr><td>모자·장식</td><td><code>head</code> 40×36</td><td>전체. 윗머리만 숨기는 모자는 y 15줄까지 덮는 걸 추천해요.</td></tr>
+                  <tr><td>모자·머리장식</td><td><code>head</code> 40×36</td><td>전체. 윗머리만 숨기는 모자는 y 15줄까지 덮는 걸 추천해요.</td></tr>
                   <tr><td>얼굴</td><td><code>head</code> 40×36</td><td>x 8~31, y 17~32 네모 안</td></tr>
                   <tr><td>안경·얼굴장식</td><td><code>head</code> 40×36</td><td>전체. 눈은 x 13~15, 24~26 / y 22~25 근처예요.</td></tr>
                   <tr><td>상의</td><td><code>torso</code> 24×18 · <code>armL</code> 10×16 · <code>armR</code> 10×16</td><td>전체. 팔의 y 11~12는 손이에요.</td></tr>

@@ -50,7 +50,7 @@ export const PAIR = { armL: 'armR', armR: 'armL', legL: 'legR', legR: 'legL' }
 //   하의 btype: pants 바지 · skirt 치마 / 신발 kind: low 단화 · boots 부츠
 export const SLOTS = {
   hair: { label: '헤어', variants: [] },
-  hat: { label: '모자·장식', variants: ['top', 'full', 'none'] },
+  hat: { label: '모자·머리장식', variants: ['top', 'full', 'none'] },
   face: { label: '얼굴', variants: [] },
   acc: { label: '안경·얼굴장식', variants: [] },
   top: { label: '상의', variants: [] },
