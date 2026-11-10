@@ -7,7 +7,7 @@ class AvatarItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = AvatarItem
         fields = ("id", "name", "slot", "variant", "parts", "price", "visible", "designer",
-                  "create_time", "last_update_time")
+                  "create_time", "last_update_time", "published_time")
 
 
 class ShopItemSerializer(serializers.ModelSerializer):
@@ -17,7 +17,7 @@ class ShopItemSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = AvatarItem
-        fields = ("id", "name", "slot", "variant", "parts", "price", "last_update_time")
+        fields = ("id", "name", "slot", "variant", "parts", "price", "last_update_time", "published_time")
 
 
 class BuySerializer(serializers.Serializer):

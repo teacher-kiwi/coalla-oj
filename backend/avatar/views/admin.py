@@ -1,3 +1,5 @@
+from django.utils.timezone import now
+
 from account.decorators import super_admin_required
 from account.models import AdminType
 from utils.api import APIView, validate_serializer
@@ -35,7 +37,8 @@ class AvatarItemAdminAPI(APIView):
     def post(self, request):
         data = request.data
         data.pop("id", None)
-        item = AvatarItem.objects.create(created_by=request.user, **data)
+        item = AvatarItem.objects.create(created_by=request.user, **data,
+                                         published_time=now() if data.get("visible") else None)
         return self.success(AvatarItemSerializer(item).data)
 
     @validate_serializer(EditAvatarItemSerializer)
@@ -53,6 +56,8 @@ class AvatarItemAdminAPI(APIView):
             drop_admin_copies(item)
         for k, v in data.items():
             setattr(item, k, v)
+        if item.visible and not item.published_time:
+            item.published_time = now()
         item.save()
         return self.success(AvatarItemSerializer(item).data)
 

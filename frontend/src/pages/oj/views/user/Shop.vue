@@ -4,7 +4,7 @@
       <template #title>캐릭터 샵</template>
       <div v-loading="loading" class="layout">
         <!-- 왼쪽: 입어보는 모습 -->
-        <aside class="stage panel-inset">
+        <aside class="stage">
           <div class="figure">
             <CharacterAvatar v-if="username" :username="username" :eq="tryEq" mode="full" :size="192" animate />
           </div>
@@ -33,11 +33,18 @@
         <!-- 오른쪽: 아이템 목록 -->
         <section class="list">
           <div class="filters">
-            <el-radio-group v-model="slot" size="small">
-              <el-radio-button value="">전체</el-radio-button>
-              <el-radio-button v-for="k in slotsWithItems" :key="k" :value="k">{{ SLOTS[k].label }}</el-radio-button>
-            </el-radio-group>
+            <!-- 붙은 버튼 묶음(radio-group)은 좁은 폭에서 두 줄로 꺾이면 테두리가 깨진다. 낱개 태그로 둔다. -->
+            <div class="slots" role="group" aria-label="아이템 종류">
+              <el-check-tag :checked="slot === ''" @change="slot = ''">전체</el-check-tag>
+              <el-check-tag v-for="k in slotsWithItems" :key="k" :checked="slot === k" @change="slot = k">
+                {{ SLOTS[k].label }}
+              </el-check-tag>
+            </div>
             <el-checkbox v-if="!wearAll" v-model="mineOnly" size="small">내 아이템만</el-checkbox>
+            <el-radio-group v-model="sort" size="small" class="sort" aria-label="정렬">
+              <el-radio-button value="new">최신순</el-radio-button>
+              <el-radio-button value="price">가격순</el-radio-button>
+            </el-radio-group>
           </div>
           <p v-if="wearAll" class="hint">
             최고관리자는 샵에 안 올린 것까지 모든 아이템을 사지 않고 입을 수 있습니다.
@@ -56,6 +63,7 @@
                 <CharacterAvatar :username="username" :eq="{ [r.slot]: drawable(r.id) }" mode="full" :size="112" />
                 <span v-if="equipped[r.slot] === r.id" class="badge on">입는 중</span>
                 <span v-else-if="tryOn[r.slot] === r.id" class="badge">입어보는 중</span>
+                <span v-if="isNew(r)" class="badge new">NEW</span>
               </div>
               <strong class="name">{{ r.name }}</strong>
               <!-- 세부 종류(단화·부츠 등)와 디자이너 이름은 보여주지 않는다(2026-11 결정, 디자이너는 나중에 다시 검토) -->
@@ -106,14 +114,25 @@ const wearAll = ref(false)
 const hidden = ref(new Set())
 const slot = ref('')
 const mineOnly = ref(false)
+// 최신순(샵에 올린 순서, 기본) 또는 가격순(싼 것부터. 지금 살 수 있는 것을 바로 찾게)
+const sort = ref('new')
+
+// 샵에 올린 지 한 달 안이면 NEW. 7일은 너무 짧아 새 아이템을 자주 올려야 한다(2026-11 결정).
+const NEW_DAYS = 30
+const now = Date.now()
+const publishedAt = r => (r.published_time ? Date.parse(r.published_time) : 0)
+const isNew = r => publishedAt(r) > now - NEW_DAYS * 24 * 3600 * 1000
 
 const byId = computed(() => new Map(items.value.map(r => [r.id, r])))
 const drawables = computed(() => new Map(items.value.map(r => [r.id, itemFromRecord(r)])))
 const drawable = id => drawables.value.get(id)
 
 const slotsWithItems = computed(() => SLOT_KEYS.filter(k => items.value.some(r => r.slot === k)))
-const shown = computed(() => items.value.filter(r =>
-  (!slot.value || r.slot === slot.value) && (!mineOnly.value || owned.value.has(r.id))))
+// 같은 값이면 최신 것을 앞에. 안 올린 아이템(관리자만 봄)은 올린 시각이 없어 id 로 가른다.
+const newer = (a, b) => (publishedAt(b) - publishedAt(a)) || (b.id - a.id)
+const shown = computed(() => items.value
+  .filter(r => (!slot.value || r.slot === slot.value) && (!mineOnly.value || owned.value.has(r.id)))
+  .sort((a, b) => sort.value === 'price' ? (a.price - b.price) || newer(a, b) : newer(a, b)))
 
 const tryEq = computed(() => {
   const eq = {}
@@ -198,8 +217,21 @@ onMounted(load)
 .shop {
   max-width: 1100px;
   margin: 0 auto;
+  // 한국어가 글자 중간에서 꺾이지 않게("누르/면")
+  word-break: keep-all;
+}
+// 카드(el-card)와 그 본문(el-card__body, overflow: auto)이 스크롤 상자가 되어, 그 안의 sticky 가
+// 화면이 아니라 카드를 기준으로 붙는다(스크롤해도 따라오지 않고 처음부터 80px 아래로 밀린다).
+// 이 화면에서만 풀어 준다.
+.shop :deep(.panel),
+.shop :deep(.el-card__body) {
+  overflow: visible;
 }
 .layout {
+  // 카드(Panel) 본문에는 안쪽 여백이 없다. 목록이 테두리에 붙지 않게 여기서 준다.
+  padding: 4px 20px 24px;
+  // Panel 본문이 break-all 이라 여기서 다시 정한다
+  word-break: keep-all;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 24px;
@@ -269,6 +301,18 @@ onMounted(load)
   align-items: center;
   gap: 8px 16px;
   margin-bottom: 14px;
+  .slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    .el-check-tag {
+      font-weight: 400;
+      padding: 5px 11px;
+    }
+  }
+  .sort {
+    margin-left: auto;
+  }
 }
 .empty {
   color: #909399;
@@ -307,6 +351,7 @@ onMounted(load)
     position: absolute;
     top: 6px;
     left: 6px;
+    font-weight: 600;
     padding: 1px 6px;
     border-radius: 10px;
     font-size: 11px;
@@ -316,6 +361,12 @@ onMounted(load)
       background: var(--el-color-success-light-8);
       color: var(--el-color-success);
     }
+    &.new {
+      left: auto;
+      right: 6px;
+      background: var(--el-color-danger);
+      color: #fff;
+    }
   }
   .name {
     font-size: 14px;
@@ -323,6 +374,11 @@ onMounted(load)
   .kind {
     font-size: 12px;
     color: #909399;
+  }
+  // 이름이 두 줄인 카드가 있어도 한 줄에 놓인 카드들의 버튼 높이를 맞춘다
+  .owned,
+  .buy {
+    margin-top: auto;
   }
   .owned {
     font-size: 13px;

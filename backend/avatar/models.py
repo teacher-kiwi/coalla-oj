@@ -65,6 +65,8 @@ class AvatarItem(models.Model):
     price = models.PositiveIntegerField(default=50)
     # 샵에 내놓았는가. 꺼 두면 관리자 화면에서만 보인다.
     visible = models.BooleanField(default=False)
+    # 샵에 처음 올린 시각. 샵의 최신순 정렬과 'NEW' 표시에 쓴다. 내렸다 다시 올려도 바꾸지 않는다.
+    published_time = models.DateTimeField(null=True, blank=True)
     # 디자이너 이름(선택). 나중에 학생 작품을 올릴 때 이름을 밝히는 데 쓴다.
     designer = models.CharField(max_length=30, blank=True, default="")
     created_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")

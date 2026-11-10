@@ -73,6 +73,23 @@ class AvatarItemAdminAPITest(APITestCase):
         self.assertSuccess(self.client.delete(self.url + f"?id={item.id}"))
         self.assertFalse(AvatarItem.objects.exists())
 
+    def test_published_time_set_once(self):
+        self.client.post(self.url, data=hat_data())
+        item = AvatarItem.objects.get()
+        self.assertIsNone(item.published_time)
+        self.client.put(self.url, data={**hat_data(visible=True), "id": item.id})
+        item.refresh_from_db()
+        first = item.published_time
+        self.assertIsNotNone(first)
+        # 내렸다 다시 올려도 처음 올린 시각 그대로
+        self.client.put(self.url, data={**hat_data(visible=False), "id": item.id})
+        self.client.put(self.url, data={**hat_data(visible=True), "id": item.id})
+        item.refresh_from_db()
+        self.assertEqual(item.published_time, first)
+        # 처음부터 올려 만들면 바로 정해진다
+        self.client.post(self.url, data=hat_data(name="파란 비니", visible=True))
+        self.assertIsNotNone(AvatarItem.objects.get(name="파란 비니").published_time)
+
     def test_update_missing_item(self):
         self.assertFailed(self.client.put(self.url, data={**hat_data(), "id": 999}))
 
