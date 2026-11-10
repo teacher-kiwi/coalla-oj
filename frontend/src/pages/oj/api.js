@@ -223,9 +223,6 @@ export default {
   getUserInfo (username = undefined) {
     return ajax('profile', 'get', { params: { username } })
   },
-  updateProfile (profile) {
-    return ajax('profile', 'put', { data: profile })
-  },
   getSessions () {
     return ajax('sessions', 'get')
   },

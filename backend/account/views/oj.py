@@ -1,4 +1,3 @@
-import os
 from importlib import import_module
 
 from django.conf import settings
@@ -14,8 +13,7 @@ from ..models import (RANKED_ADMIN_TYPES, my_student_ids, my_student_nicknames,
                       User, UserProfile)
 from ..serializers import (UserChangePasswordSerializer, UserLoginSerializer,
                            RankInfoSerializer, SSOSerializer)
-from ..serializers import (UserProfileSerializer,
-                           EditUserProfileSerializer, ImageUploadForm)
+from ..serializers import UserProfileSerializer
 
 
 class UserProfileAPI(APIView):
@@ -40,43 +38,6 @@ class UserProfileAPI(APIView):
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
         return self.success(UserProfileSerializer(user.userprofile, show_private=show_private).data)
-
-    @validate_serializer(EditUserProfileSerializer)
-    @login_required
-    def put(self, request):
-        data = request.data
-        user_profile = request.user.userprofile
-        for k, v in data.items():
-            setattr(user_profile, k, v)
-        user_profile.save()
-        return self.success(UserProfileSerializer(user_profile, show_private=True).data)
-
-
-class AvatarUploadAPI(APIView):
-    request_parsers = ()
-
-    @login_required
-    def post(self, request):
-        form = ImageUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            avatar = form.cleaned_data["image"]
-        else:
-            return self.error("파일 내용이 올바르지 않습니다")
-        if avatar.size > 2 * 1024 * 1024:
-            return self.error("이미지 크기가 너무 큽니다")
-        suffix = os.path.splitext(avatar.name)[-1].lower()
-        if suffix not in [".gif", ".jpg", ".jpeg", ".bmp", ".png"]:
-            return self.error("지원하지 않는 파일 형식입니다")
-
-        name = rand_str(10) + suffix
-        with open(os.path.join(settings.AVATAR_UPLOAD_DIR, name), "wb") as img:
-            for chunk in avatar:
-                img.write(chunk)
-        user_profile = request.user.userprofile
-
-        user_profile.avatar = f"{settings.AVATAR_URI_PREFIX}/{name}"
-        user_profile.save()
-        return self.success("Succeeded")
 
 
 class UserLoginAPI(APIView):
@@ -215,4 +176,4 @@ class SSOAPI(CSRFExemptAPIView):
             user = User.objects.get(auth_token=request.data["token"])
         except User.DoesNotExist:
             return self.error("사용자가 존재하지 않습니다")
-        return self.success({"username": user.username, "avatar": user.userprofile.avatar, "admin_type": user.admin_type})
+        return self.success({"username": user.username, "admin_type": user.admin_type})

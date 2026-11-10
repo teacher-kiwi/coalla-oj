@@ -4,23 +4,13 @@
       <div class="flex-container">
         <div class="menu">
           <el-menu :default-active="activeName" @select="goRoute" class="setting-menu">
-            <div class="avatar-editor">
-              <div class="avatar-container">
-                <img class="avatar" :src="userStore.profile.avatar" />
-                <div class="avatar-mask">
-                  <a @click.stop="goRoute('/setting/profile')">
-                    <div class="mask-content">
-                      <el-icon :size="30"><Camera /></el-icon>
-                      <p class="text">사진 변경</p>
-                    </div>
-                  </a>
-                </div>
-              </div>
+            <div class="me">
+              <CharacterAvatar v-if="userStore.user.username" :username="userStore.user.username"
+                               mode="full" :size="128" />
             </div>
 
             <el-menu-item v-if="isStudent" index="/setting/password">비밀번호 변경</el-menu-item>
             <template v-else>
-              <el-menu-item index="/setting/profile">프로필</el-menu-item>
               <el-menu-item index="/setting/account">계정</el-menu-item>
               <el-menu-item index="/setting/security">보안</el-menu-item>
             </template>
@@ -42,7 +32,7 @@
 <script setup>
 import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Camera } from '@element-plus/icons-vue'
+import CharacterAvatar from '@oj/components/CharacterAvatar.vue'
 import { useUserStore } from '@/store/user'
 const route = useRoute()
 const router = useRouter()
@@ -70,8 +60,6 @@ function goRoute (path) {
 </script>
 
 <style lang="less" scoped>
-  @avatar-radius: 50%;
-
   // 다른 화면과 같은 본문 폭을 쓰되 너무 벌어지지 않게 1100px 에서 멈춘다.
   // (예전 min-width: 800px 은 태블릿 세로 폭에서 화면을 넘겼다)
   .container {
@@ -88,44 +76,11 @@ function goRoute (path) {
     .menu {
       flex: 1 0 150px;
       max-width: 250px;
-      .avatar-editor {
-        padding: 10% 22%;
-        margin-bottom: 10px;
-        .avatar-container {
-          &:hover {
-            .avatar-mask {
-              opacity: .5;
-            }
-          }
-          position: relative;
-          .avatar {
-            width: 100%;
-            height: auto;
-            max-width: 100%;
-            display: block;
-            border-radius: @avatar-radius;
-            box-shadow: 0 0 1px 0;
-          }
-          .avatar-mask {
-            transition: opacity .2s ease-in;
-            z-index: 1;
-            border-radius: @avatar-radius;
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: black;
-            opacity: 0;
-            .mask-content {
-              position: absolute;
-              top: 50%; left: 50%;
-              z-index: 3;
-              color: #fff;
-              font-size: 16px;
-              text-align: center;
-              transform: translate(-50%, -50%);
-              .text { white-space: nowrap; }
-            }
-          }
-        }
+      // 프로필 사진 대신 캐릭터. 사진 올리기는 캐릭터로 바꾸면서 없앴다.
+      .me {
+        display: flex;
+        justify-content: center;
+        padding: 20px 0 12px;
       }
     }
     .panel {

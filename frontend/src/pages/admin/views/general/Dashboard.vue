@@ -4,7 +4,7 @@
       <el-card class="admin-info">
         <el-row :gutter="20">
           <el-col :span="10">
-            <img class="avatar" :src="userStore.profile.avatar" />
+            <CharacterAvatar :username="user.username || ''" mode="full" :size="128" />
           </el-col>
           <el-col :span="14">
             <p class="admin-info-name">{{ user.username }}</p>
@@ -63,6 +63,7 @@ import InfoCard from '@admin/components/infoCard.vue'
 import api from '@admin/api'
 import time from '@/utils/time'
 import { useUserStore } from '@/store/user'
+import CharacterAvatar from '@oj/components/CharacterAvatar.vue'
 const userStore = useUserStore()
 
 const infoData = reactive({
@@ -129,9 +130,6 @@ onMounted(() => {
       font-weight: 700;
       margin-bottom: 10px;
       color: #409EFF;
-    }
-    .avatar {
-      max-width: 100%;
     }
     .last-info {
       &-title {

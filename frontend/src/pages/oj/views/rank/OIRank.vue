@@ -10,7 +10,7 @@
         <el-table-column align="center" width="60">
           <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
         </el-table-column>
-        <el-table-column label="사용자" align="center">
+        <el-table-column label="사용자" align="left">
           <template #default="{ row }">
             <UserLabel :username="row.user.username" :nickname="row.user.nickname" />
           </template>
@@ -117,9 +117,5 @@ onMounted(() => {
     margin: 0 auto;
     width: 95%;
     height: 400px;
-  }
-  .truncate {
-    display: inline-block;
-    max-width: 200px;
   }
 </style>

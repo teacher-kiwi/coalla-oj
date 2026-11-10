@@ -20,7 +20,6 @@ const ContestRank = () => import('@oj/views/contest/children/ContestRank.vue')
 const ACMContestHelper = () => import('@oj/views/contest/children/ACMHelper.vue')
 
 const Settings = () => import('@oj/views/setting/Settings.vue')
-const ProfileSetting = () => import('@oj/views/setting/children/ProfileSetting.vue')
 const SecuritySetting = () => import('@oj/views/setting/children/SecuritySetting.vue')
 const TeacherSetting = () => import('@oj/views/setting/children/TeacherSetting.vue')
 const TeacherClassList = () => import('@oj/views/teacher/ClassList.vue')
@@ -153,13 +152,12 @@ export default [
         name: 'default-setting',
         path: '',
         meta: { requiresAuth: true, title: '설정' },
-        redirect: () => ({ name: 'profile-setting' })
+        redirect: () => ({ name: 'account-setting' })
       },
       {
-        name: 'profile-setting',
+        // 프로필 사진 설정이 있던 주소. 사진이 캐릭터로 바뀌어 화면이 없어졌다.
         path: 'profile',
-        meta: { requiresAuth: true, title: '프로필 설정' },
-        component: ProfileSetting
+        redirect: () => ({ name: 'account-setting' })
       },
       {
         name: 'account-setting',

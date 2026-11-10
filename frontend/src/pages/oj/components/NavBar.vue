@@ -77,7 +77,7 @@
           <el-dropdown-menu>
             <el-dropdown-item command="/user-home">프로필</el-dropdown-item>
             <el-dropdown-item command="/status?myself=1">내 채점</el-dropdown-item>
-            <el-dropdown-item command="/setting/profile">설정</el-dropdown-item>
+            <el-dropdown-item command="/setting">설정</el-dropdown-item>
             <el-dropdown-item v-if="userStore.isAdminRole" command="/admin">관리자 페이지</el-dropdown-item>
             <el-dropdown-item divided command="/logout">로그아웃</el-dropdown-item>
           </el-dropdown-menu>

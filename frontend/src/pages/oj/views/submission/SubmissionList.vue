@@ -75,7 +75,7 @@
           <el-table-column label="언어" align="center" width="110">
             <template #default="{ row }">{{ row.language === 'Block Coding' ? '블록 코딩' : row.language }}</template>
           </el-table-column>
-          <el-table-column label="작성자" align="center" :width="narrow ? 150 : 200">
+          <el-table-column label="작성자" align="left" :width="narrow ? 150 : 200">
             <template #default="{ row }">
               <UserLabel :username="row.username" :nickname="row.nickname" />
             </template>

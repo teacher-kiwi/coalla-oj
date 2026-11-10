@@ -135,15 +135,6 @@ class UserProfileAPITest(APITestCase):
         resp = self.client.get(self.url)
         self.assertSuccess(resp)
 
-    def test_update_profile(self):
-        self.create_user("test", "test123")
-        # submission_number 는 집계값이라 수정 요청에 실려도 반영되지 않아야 한다
-        resp = self.client.put(self.url, data={"avatar": "/x.png", "submission_number": 233})
-        self.assertSuccess(resp)
-        data = resp.data["data"]
-        self.assertEqual(data["avatar"], "/x.png")
-        self.assertEqual(data["submission_number"], 0)
-
     def test_own_profile_keeps_email(self):
         user = self.create_user("test", "test123")
         user.email = "me@test.com"
@@ -168,7 +159,7 @@ class UserProfileAPITest(APITestCase):
         data = resp.data["data"]
         self.assertEqual(set(data["user"]), {"id", "username"})
         self.assertEqual(set(data),
-                         {"user", "avatar", "accepted_number", "submission_number",
+                         {"user", "accepted_number", "submission_number",
                           "total_score", "acm_problems_status", "oi_problems_status"})
 
 

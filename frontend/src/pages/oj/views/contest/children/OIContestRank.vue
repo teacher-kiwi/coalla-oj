@@ -33,7 +33,7 @@
       <el-table-column align="center" width="60">
         <template #default="{ $index }">{{ $index + (page - 1) * limit + 1 }}</template>
       </el-table-column>
-      <el-table-column label="사용자" align="center">
+      <el-table-column label="사용자" align="left">
         <template #default="{ row }">
           <UserLabel :username="row.user.username" :nickname="row.user.nickname" />
         </template>
@@ -186,11 +186,6 @@ onMounted(() => {
 
   .setting-icon {
     cursor: pointer;
-  }
-
-  .truncate {
-    display: inline-block;
-    max-width: 150px;
   }
 
   #switches {

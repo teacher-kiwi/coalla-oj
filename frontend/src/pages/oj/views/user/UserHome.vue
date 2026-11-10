@@ -1,7 +1,8 @@
 <template>
   <div class="container">
     <div class="avatar-container">
-      <img class="avatar" :src="profile.avatar" />
+      <CharacterAvatar v-if="profile.user" :username="profile.user.username" mode="full"
+                       :size="128" animate />
     </div>
     <el-card class="profile-card">
       <div v-if="profile.user">
@@ -43,6 +44,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@oj/api'
+import CharacterAvatar from '@oj/components/CharacterAvatar.vue'
 import { useAppStore } from '@/store/app'
 const route = useRoute()
 const router = useRouter()
@@ -88,7 +90,10 @@ watch(() => route.fullPath, init)
   .container {
     position: relative;
     max-width: 860px;
-    margin: 100px auto 40px;
+    // 위쪽은 margin 이 아니라 padding 으로 띄운다. margin 이면 본문의 margin-top(80px)과
+    // 겹쳐 하나로 합쳐지고, 위로 튀어나온 캐릭터 동그라미가 상단 메뉴 밑으로 숨는다.
+    margin: 0 auto 40px;
+    padding-top: 90px;
     text-align: center;
     p {
       margin-top: 8px;
@@ -99,13 +104,16 @@ watch(() => route.fullPath, init)
       left: 50%;
       transform: translate(-50%);
       z-index: 1;
-      top: -90px;
-      .avatar {
-        width: 140px;
-        height: 140px;
-        border-radius: 50%;
-        box-shadow: 0 1px 1px 0;
-      }
+      top: 0;
+      // 전신 도트(64칸)를 2배로 키워 동그란 배경 가운데에 세운다
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: #eef4fb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
     }
     .profile-card :deep(.el-card__body) {
       padding: 80px 48px 40px;

@@ -2,7 +2,6 @@ import re
 import secrets
 
 from django.contrib.auth.models import AbstractBaseUser
-from django.conf import settings
 from django.db import models
 from utils.models import JSONField
 
@@ -103,7 +102,7 @@ class UserProfile(models.Model):
     # 학교·전공·블로그·GitHub·기분은 6단계에서 제거했다. 입력률이 0이었고,
     # 학교 정보는 학급(SchoolClass)이 대신한다. 실명도 함께 없앴다.
     # 교사가 학생을 알아보는 일은 ClassMembership.nickname 이 대신한다.
-    avatar = models.TextField(default=f"{settings.AVATAR_URI_PREFIX}/default.png")
+    # 프로필 사진(avatar)은 도트 캐릭터로 바꾸면서 없앴다(2026-11).
     accepted_number = models.IntegerField(default=0)
     total_score = models.BigIntegerField(default=0)
     submission_number = models.IntegerField(default=0)

@@ -83,7 +83,7 @@ class UserSerializer(serializers.ModelSerializer):
 _PUBLIC_USER_FIELDS = ("id", "username")
 # 푼 문제 목록(acm/oi_problems_status)은 사용자 홈이 "해결한 문제"를 그리는 데 쓴다.
 # 이미 공개된 accepted_number 를 문제별로 늘어놓은 것이라 새로 드러나는 정보는 없다.
-_PUBLIC_PROFILE_FIELDS = ("avatar", "accepted_number", "submission_number", "total_score",
+_PUBLIC_PROFILE_FIELDS = ("accepted_number", "submission_number", "total_score",
                           "acm_problems_status", "oi_problems_status")
 
 
@@ -131,10 +131,6 @@ class EditUserSerializer(serializers.Serializer):
     problem_permission = serializers.ChoiceField(choices=(ProblemPermission.NONE, ProblemPermission.OWN,
                                                           ProblemPermission.ALL))
     is_disabled = serializers.BooleanField()
-
-
-class EditUserProfileSerializer(serializers.Serializer):
-    avatar = serializers.CharField(max_length=256, allow_blank=True, required=False)
 
 
 class SSOSerializer(serializers.Serializer):
