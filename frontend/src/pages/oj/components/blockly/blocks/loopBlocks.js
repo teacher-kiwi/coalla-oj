@@ -84,14 +84,14 @@ pythonGenerator.forBlock["loop_range"] = function (block, generator) {
   return `for ${variable} in range(${from}, ${to}):\n${loopBody(block, generator)}`;
 };
 
-// 각 요소 반복: for 값 in 리스트
+// 각 요소 반복: for 값 in 리스트 (텍스트를 넣으면 한 글자씩: for 글자 in a)
 Blockly.Blocks["loop_each"] = {
   init: function () {
     this.jsonInit({
       message0: "새 변수 %1 을(를) 리스트 %2 의 요소로 반복",
       args0: [
         { type: "field_input", name: VAR_FIELD, text: "값" },
-        { type: "input_value", name: "LIST", check: "Array" },
+        { type: "input_value", name: "LIST", check: ["Array", "String"] },
       ],
       message1: "%1",
       args1: [{ type: "input_statement", name: "DO" }],
@@ -99,7 +99,7 @@ Blockly.Blocks["loop_each"] = {
       previousStatement: null,
       nextStatement: null,
       style: "loop_blocks",
-      tooltip: "리스트의 값을 앞에서부터 하나씩 변수에 넣으며 반복합니다.",
+      tooltip: "리스트의 값을 앞에서부터 하나씩 변수에 넣으며 반복합니다. 텍스트를 넣으면 한 글자씩 넣습니다.",
       helpUrl: "",
     });
     this.getField(VAR_FIELD).setValidator(validateName);

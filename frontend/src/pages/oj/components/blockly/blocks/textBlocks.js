@@ -23,7 +23,9 @@ Blockly.Blocks["text_get_nth"] = {
 };
 pythonGenerator.forBlock["text_get_nth"] = function (block, generator) {
   const txt = generator.valueToCode(block, "TXT", Order.MEMBER) || "''";
-  const index = generator.getAdjustedInt(block, "INDEX", 1);
+  // 학생이 넣은 번호를 그대로 쓴다(0번부터). Blockly 의 번호 보정 함수를 쓰면 a[int(x)] 처럼 군더더기가 붙고,
+  // 1부터 세는 설정이 켜지면 한 칸씩 밀린다.
+  const index = generator.valueToCode(block, "INDEX", Order.NONE) || "0";
   const code = `${txt}[${index}]`;
   return [code, Order.MEMBER];
 };

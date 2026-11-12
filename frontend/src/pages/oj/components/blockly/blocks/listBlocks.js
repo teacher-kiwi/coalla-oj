@@ -75,6 +75,29 @@ Blockly.Blocks["lists_length"] = {
   },
 };
 
+// 리스트(텍스트)에서 값의 개수: L.count(x)
+Blockly.Blocks["list_count"] = {
+  init: function () {
+    this.jsonInit({
+      message0: "%1 에서 %2 의 개수",
+      args0: [
+        { type: "input_value", name: "LIST", check: ["Array", "String"] },
+        { type: "input_value", name: "ITEM" },
+      ],
+      inputsInline: true,
+      output: "Number",
+      style: "math_blocks",
+      tooltip: "리스트에 그 값이 몇 개 있는지 셉니다. 텍스트를 넣으면 그 글자가 몇 번 나오는지 셉니다.",
+      helpUrl: "",
+    });
+  },
+};
+pythonGenerator.forBlock["list_count"] = function (block, generator) {
+  const list = generator.valueToCode(block, "LIST", Order.MEMBER) || "[]";
+  const item = generator.valueToCode(block, "ITEM", Order.NONE) || "0";
+  return [`${list}.count(${item})`, Order.FUNCTION_CALL];
+};
+
 // 리스트 인덱싱
 Blockly.Blocks["list_get_nth"] = {
   init: function () {
@@ -94,7 +117,9 @@ Blockly.Blocks["list_get_nth"] = {
 };
 pythonGenerator.forBlock["list_get_nth"] = function (block, generator) {
   const list = generator.valueToCode(block, "LIST", Order.MEMBER) || "[]";
-  const index = generator.getAdjustedInt(block, "INDEX", 1);
+  // 학생이 넣은 번호를 그대로 쓴다(0번부터). Blockly 의 번호 보정 함수를 쓰면 a[int(x)] 처럼 군더더기가 붙고,
+  // 1부터 세는 설정이 켜지면 한 칸씩 밀린다.
+  const index = generator.valueToCode(block, "INDEX", Order.NONE) || "0";
   const code = `${list}[${index}]`;
   return [code, Order.MEMBER];
 };

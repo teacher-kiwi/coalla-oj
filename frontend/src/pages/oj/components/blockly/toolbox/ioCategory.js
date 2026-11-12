@@ -43,7 +43,40 @@ const ioBlocks = [
   },
 ];
 
-// 입출력 블록 뒤에 Blockly 기본 변수 목록('변수 만들기' 버튼 포함)을 붙인다
+// 변수 블록 목록. Blockly 기본 목록과 같지만 '설정'·'바꾸기'를 앞 칸이 뚫린 우리 블록으로 바꿨다.
+// 앞 칸에는 가장 최근에 만든 변수 블록을 끼워 두어, 지금처럼 바로 쓰거나 빼고 리스트 값을 넣는다.
+export function variableFlyoutBlocks(workspace) {
+  const variables = workspace.getVariableMap().getVariablesOfType("");
+  if (!variables.length) return [];
+  const varBlock = (v) => ({
+    type: "variables_get",
+    fields: { VAR: { name: v.getName(), type: v.getType() } },
+  });
+  const latest = variables[variables.length - 1];
+  const sorted = [...variables].sort(Blockly.Variables.compareByName);
+  return [
+    { kind: "block", type: "variable_assign", gap: 8, inputs: { TARGET: { block: varBlock(latest) } } },
+    {
+      kind: "block",
+      type: "variable_change",
+      gap: 20,
+      inputs: {
+        TARGET: { block: varBlock(latest) },
+        DELTA: { shadow: { type: "math_number", fields: { NUM: 1 } } },
+      },
+    },
+    ...sorted.map((v) => ({ kind: "block", gap: 8, ...varBlock(v) })),
+  ];
+}
+
+// 입출력 블록 + '변수 만들기' 버튼 + 변수 블록
 export function ioVariableFlyout(workspace) {
-  return [...ioBlocks, ...Blockly.Variables.flyoutCategory(workspace, false)];
+  workspace.registerButtonCallback("CREATE_VARIABLE", (button) => {
+    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace());
+  });
+  return [
+    ...ioBlocks,
+    { kind: "button", text: "%{BKY_NEW_VARIABLE}", callbackkey: "CREATE_VARIABLE" },
+    ...variableFlyoutBlocks(workspace),
+  ];
 }

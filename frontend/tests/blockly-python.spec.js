@@ -176,7 +176,8 @@ describe('등록 상태', () => {
     const custom = ['text_to_number', 'calc_basic', 'calc_division', 'list_stats',
       'list_map_number', 'list_get_nth', 'list_append', 'list_pop', 'list_sort',
       'text_split', 'text_get_nth', 'input_readline', 'loop_range', 'loop_each',
-      'print_list_spaced']
+      'print_list_spaced', 'list_count', 'variable_assign', 'variable_change',
+      'procedure_return', 'procedure_call_value']
     for (const type of custom) {
       expect(Blockly.Blocks[type], `${type} 블록 정의`).toBeDefined()
       expect(pythonGenerator.forBlock[type], `${type} 생성기`).toBeTypeOf('function')
@@ -314,5 +315,201 @@ describe('리스트 띄어서 출력 (print_list_spaced)', () => {
     const block = makeBlock('print_list_spaced')
     connect(block, 'LIST', split)
     expect(pythonGenerator.blockToCode(block)).toBe('print(*input().strip().split())\n')
+  })
+})
+
+describe('n번 값 번호에 변수를 넣을 때', () => {
+  it('int() 없이 그대로 쓴다', () => {
+    const block = makeBlock('text_get_nth')
+    connect(block, 'TXT', variable('a'))
+    connect(block, 'INDEX', variable('x'))
+    expect(codeOf(block)).toBe('a[x]')
+
+    const list = makeBlock('list_get_nth')
+    connect(list, 'LIST', variable('L'))
+    connect(list, 'INDEX', variable('i'))
+    expect(codeOf(list)).toBe('L[i]')
+  })
+})
+
+describe('각 요소 반복에 텍스트', () => {
+  it('텍스트를 끼우면 한 글자씩 반복한다', () => {
+    const loop = makeBlock('loop_each')
+    connect(loop, 'LIST', variable('a'))
+    connect(loop, 'LIST', makeBlock('input_readline'))
+    expect(loop.getInputTargetBlock('LIST').type).toBe('input_readline')
+  })
+})
+
+describe('값의 개수 (list_count)', () => {
+  it('count 로 센다', () => {
+    const block = makeBlock('list_count')
+    connect(block, 'LIST', variable('a'))
+    connect(block, 'ITEM', text('S'))
+    expect(codeOf(block)).toBe("a.count('S')")
+  })
+})
+
+/** 앞 칸(TARGET)과 뒤 칸을 채운 설정·바꾸기 블록 */
+function assignBlock (type, target, valueInput, value) {
+  const block = makeBlock(type)
+  connect(block, 'TARGET', target)
+  if (value) connect(block, valueInput, value)
+  return block
+}
+
+function listItem (listName, index) {
+  const block = makeBlock('list_get_nth')
+  connect(block, 'LIST', variable(listName))
+  connect(block, 'INDEX', index)
+  return block
+}
+
+describe('설정 (variable_assign)', () => {
+  it('변수에 값을 넣는다', () => {
+    const block = assignBlock('variable_assign', variable('n'), 'VALUE', number(5))
+    expect(pythonGenerator.blockToCode(block)).toBe('n = 5\n')
+  })
+
+  it('리스트의 n번 값을 바꾼다', () => {
+    const block = assignBlock('variable_assign', listItem('승리', variable('i')), 'VALUE', number(0))
+    expect(pythonGenerator.blockToCode(block)).toBe('승리[i] = 0\n')
+  })
+
+  it('앞 칸에 바꿀 수 없는 블록을 넣으면 꺼져서 코드에서 빠진다', async () => {
+    // 숫자 = 값 은 문법 오류, 문자열 글자 바꾸기는 실행 오류다
+    for (const bad of [number(3), makeBlock('text_get_nth')]) {
+      const block = assignBlock('variable_assign', bad, 'VALUE', number(1))
+      await settle()
+      expect(block.isEnabled()).toBe(false)
+      expect(pythonGenerator.workspaceToCode(workspace)).not.toContain('= 1')
+      block.dispose()
+    }
+  })
+
+  it('고쳐 넣으면 다시 켜진다', async () => {
+    const block = assignBlock('variable_assign', number(3), 'VALUE', number(1))
+    await settle()
+    expect(block.isEnabled()).toBe(false)
+    block.getInputTargetBlock('TARGET').dispose()
+    connect(block, 'TARGET', variable('n'))
+    await settle()
+    expect(block.isEnabled()).toBe(true)
+  })
+
+  it('앞 칸이 비면 아무 코드도 만들지 않는다', () => {
+    const block = makeBlock('variable_assign')
+    expect(pythonGenerator.blockToCode(block)).toBe('')
+  })
+})
+
+describe('바꾸기 (variable_change)', () => {
+  it('+= 한 줄로 만든다', () => {
+    const block = assignBlock('variable_change', variable('점수'), 'DELTA', number(1))
+    expect(pythonGenerator.blockToCode(block)).toBe('점수 += 1\n')
+  })
+
+  it('리스트의 값도 바꿀 수 있다', () => {
+    const block = assignBlock('variable_change', listItem('승리', number(2)), 'DELTA', number(-1))
+    expect(pythonGenerator.blockToCode(block)).toBe('승리[2] += -1\n')
+  })
+
+  it('예전 바꾸기 블록도 같은 코드가 되고 import 가 붙지 않는다', () => {
+    const v = workspace.getVariableMap().createVariable('x')
+    const block = workspace.newBlock('math_change')
+    block.setFieldValue(v.getId(), 'VAR')
+    connect(block, 'DELTA', number(1))
+    const code = pythonGenerator.workspaceToCode(workspace)
+    expect(code).toContain('x += 1')
+    expect(code).not.toContain('isinstance')
+    expect(code).not.toContain('import')
+  })
+})
+
+/** 함수 만들기 블록 (이름만) */
+function defineFunction (name) {
+  const def = workspace.newBlock('procedures_defnoreturn')
+  def.setFieldValue(name, 'NAME')
+  return def
+}
+
+describe('함수 돌려줌 (procedure_return)', () => {
+  it('함수 안의 만약 블록 안에서 값을 돌려준다', async () => {
+    const def = defineFunction('판정')
+    const ifBlock = workspace.newBlock('controls_if')
+    connect(ifBlock, 'IF0', makeBlock('logic_boolean', { BOOL: 'TRUE' }))
+    def.getInput('STACK').connection.connect(ifBlock.previousConnection)
+    const ret = makeBlock('procedure_return')
+    connect(ret, 'VALUE', number(1))
+    ifBlock.getInput('DO0').connection.connect(ret.previousConnection)
+    await settle()
+    expect(ret.isEnabled()).toBe(true)
+    expect(pythonGenerator.workspaceToCode(workspace)).toContain('  if True:\n    return 1\n')
+  })
+
+  it('값 칸이 비면 return 만 쓴다', () => {
+    expect(pythonGenerator.blockToCode(makeBlock('procedure_return'))).toBe('return\n')
+  })
+
+  it('함수 밖에 두면 꺼진다', async () => {
+    const ret = makeBlock('procedure_return')
+    await settle()
+    expect(ret.isEnabled()).toBe(false)
+    expect(pythonGenerator.workspaceToCode(workspace)).not.toContain('return')
+  })
+
+  it('함수 만들기 블록에 설명 메모가 붙지 않는다', async () => {
+    await import('@oj/components/blockly/setup')
+    const def = defineFunction('f')
+    expect(def.getCommentText()).toBeNull()
+  })
+})
+
+describe('함수를 값으로 쓰기 (procedure_call_value)', () => {
+  it('함수 만들기 블록과 짝이 되어 같은 이름 함수를 새로 만들지 않는다', async () => {
+    const def = defineFunction('판정')
+    const ret = makeBlock('procedure_return')
+    connect(ret, 'VALUE', number(1))
+    def.getInput('STACK').connection.connect(ret.previousConnection)
+    const call = Blockly.serialization.blocks.append(
+      { type: 'procedure_call_value', extraState: { name: '판정', params: [] } }, workspace)
+    const set = assignBlock('variable_assign', variable('res'), 'VALUE', call)
+    await settle()
+
+    const defs = workspace.getAllBlocks(false).filter(b => b.type.startsWith('procedures_def'))
+    expect(defs).toHaveLength(1)
+    expect(call.isEnabled()).toBe(true)
+    expect(pythonGenerator.blockToCode(set)).toBe('res = 판정()\n')
+  })
+
+  it('함수 이름을 바꾸면 값 블록도 따라 바뀐다', async () => {
+    const def = defineFunction('f')
+    const call = Blockly.serialization.blocks.append(
+      { type: 'procedure_call_value', extraState: { name: 'f', params: [] } }, workspace)
+    await settle()
+    def.setFieldValue('g', 'NAME')
+    expect(call.getProcedureCall()).toBe('g')
+  })
+})
+
+describe('도구 상자 목록', () => {
+  it('변수 칸: 설정·바꾸기 블록 앞 칸에 최근 변수가 끼워져 나온다', async () => {
+    const { variableFlyoutBlocks } = await import('@oj/components/blockly/toolbox/ioCategory')
+    expect(variableFlyoutBlocks(workspace)).toEqual([])
+    workspace.getVariableMap().createVariable('a')
+    workspace.getVariableMap().createVariable('b')
+    const items = variableFlyoutBlocks(workspace)
+    expect(items.map(i => i.type)).toEqual(['variable_assign', 'variable_change', 'variables_get', 'variables_get'])
+    // 실제로 만들어 보면 b 변수가 끼워진 설정 블록이 된다
+    const block = Blockly.serialization.blocks.append(items[0], workspace)
+    expect(pythonGenerator.blockToCode(block)).toBe('b = 0\n')
+  })
+
+  it('함수 칸: 함수마다 실행 블록과 값 블록을 둘 다 준다', async () => {
+    const { procedureFlyout } = await import('@oj/components/blockly/toolbox/procedureCategory')
+    defineFunction('판정')
+    const types = procedureFlyout(workspace).map(i => i.type)
+    expect(types).toEqual(['procedures_defnoreturn', 'procedure_return',
+      'procedures_callnoreturn', 'procedure_call_value'])
   })
 })

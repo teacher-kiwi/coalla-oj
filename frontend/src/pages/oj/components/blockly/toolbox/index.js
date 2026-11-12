@@ -7,6 +7,7 @@ import { listCategory } from "./listCategory";
 import { procedureCategory } from "./procedureCategory";
 
 export { IO_VARIABLE_CATEGORY, ioVariableFlyout } from "./ioCategory";
+export { PROCEDURE_CATEGORY, procedureFlyout } from "./procedureCategory";
 
 export const toolboxConfig = {
   kind: "categoryToolbox",

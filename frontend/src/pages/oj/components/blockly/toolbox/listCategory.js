@@ -42,6 +42,18 @@ export const listCategory = {
       },
     },
 
+    // 값의 개수 (L.count(x))
+    {
+      kind: "block",
+      type: "list_count",
+      inputs: {
+        LIST: {
+          shadow: { type: "lists_create_with", extraState: { itemCount: 0 } },
+        },
+        ITEM: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+      },
+    },
+
     // 리스트 인덱싱
     {
       kind: "block",

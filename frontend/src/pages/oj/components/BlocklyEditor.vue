@@ -39,7 +39,9 @@ import { Document, Delete } from '@element-plus/icons-vue'
 import * as Blockly from 'blockly'
 import { pythonGenerator } from 'blockly/python'
 import './blockly/setup'
-import { toolboxConfig, IO_VARIABLE_CATEGORY, ioVariableFlyout } from './blockly/toolbox'
+import {
+  toolboxConfig, IO_VARIABLE_CATEGORY, ioVariableFlyout, PROCEDURE_CATEGORY, procedureFlyout
+} from './blockly/toolbox'
 
 const props = defineProps({
   initialBlocks: { type: String, default: '' },
@@ -98,6 +100,7 @@ function initBlockly () {
     renderer: 'thrasos'
   })
   workspace.registerToolboxCategoryCallback(IO_VARIABLE_CATEGORY, ioVariableFlyout)
+  workspace.registerToolboxCategoryCallback(PROCEDURE_CATEGORY, procedureFlyout)
 
   if (props.initialBlocks) {
     try {
