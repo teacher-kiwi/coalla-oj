@@ -20,6 +20,27 @@ const ioBlocks = [
     type: "input_readline",
   },
 
+  // 입력 한 줄을 나눠 리스트로: input().strip().split()
+  // 문제 입력이 대부분 "3 5" 처럼 한 줄에 띄어 주어져서 입력 블록 바로 아래에 둔다(리스트 칸에도 있음).
+  // 입력 블록은 흐린 기본값이라, 변수를 끼우면 다른 텍스트도 나눌 수 있다. 기준 칸이 비면 공백 기준.
+  {
+    kind: "block",
+    type: "text_split",
+    inputs: {
+      TXT: { shadow: { type: "input_readline" } },
+      SEP: { shadow: { type: "text" } },
+    },
+  },
+
+  // 나눈 값을 숫자로: list(map(int, ...)). 위 블록을 끼우면 숫자 여러 개 입력이 된다.
+  {
+    kind: "block",
+    type: "list_map_number",
+    inputs: {
+      LIST: { shadow: { type: "lists_create_with", extraState: { itemCount: 0 } } },
+    },
+  },
+
   {
     kind: "block",
     type: "text_print",

@@ -580,3 +580,25 @@ describe('딕셔너리', () => {
     expect(append.getInputTargetBlock('LIST')).toBeNull()
   })
 })
+
+describe('입출력 칸', () => {
+  it('입력 바로 아래에 분리하기·숫자로 변환 블록이 있다', async () => {
+    const { ioVariableFlyout } = await import('@oj/components/blockly/toolbox/ioCategory')
+    workspace.registerButtonCallback = () => {}
+    const types = ioVariableFlyout(workspace).map(i => i.type || i.kind)
+    expect(types.slice(0, 3)).toEqual(['input_readline', 'text_split', 'list_map_number'])
+  })
+
+  it('분리하기 블록을 꺼내면 바로 입력 한 줄을 공백으로 나눈다', async () => {
+    const { ioVariableFlyout } = await import('@oj/components/blockly/toolbox/ioCategory')
+    workspace.registerButtonCallback = () => {}
+    const [, splitItem, mapItem] = ioVariableFlyout(workspace)
+    const split = Blockly.serialization.blocks.append(splitItem, workspace)
+    expect(codeOf(split)).toBe('input().strip().split()')
+
+    // 숫자로 변환 블록에 끼우면 숫자 여러 개 입력이 된다
+    const map = Blockly.serialization.blocks.append(mapItem, workspace)
+    connect(map, 'LIST', split)
+    expect(codeOf(map)).toBe('list(map(int, input().strip().split()))')
+  })
+})
