@@ -10,10 +10,11 @@ import { pythonGenerator, Order } from "blockly/python";
 
 // 앞 칸에 넣을 수 있는 블록. 파이썬에서 '= 의 왼쪽'에 올 수 있는 것만 받는다.
 // 숫자·계산식은 문법 오류, 글자(문자열의 n번 글자)는 바꿀 수 없어 실행 오류가 난다.
-export const ASSIGNABLE_TYPES = new Set(["variables_get", "list_get_nth"]);
+// 딕셔너리의 키 값(dict_get)도 넣을 수 있다: 승리[손] = 0, 승리[손] += 1
+export const ASSIGNABLE_TYPES = new Set(["variables_get", "list_get_nth", "dict_get"]);
 
 const NOT_ASSIGNABLE = "NOT_ASSIGNABLE";
-const NOT_ASSIGNABLE_WARNING = "앞 칸에는 변수나 리스트의 값만 넣을 수 있어요.";
+const NOT_ASSIGNABLE_WARNING = "앞 칸에는 변수나 리스트·딕셔너리의 값만 넣을 수 있어요.";
 
 // 앞 칸이 비었거나 바꿀 수 없는 블록이면 블록을 끄고 이유를 보여 준다.
 // 꺼진 블록은 코드에서 빠지므로, 고칠 때까지 프로그램 전체가 문법 오류로 멈추지 않는다.
@@ -53,7 +54,7 @@ Blockly.Blocks["variable_assign"] = {
       previousStatement: null,
       nextStatement: null,
       style: "variable_blocks",
-      tooltip: "앞 칸의 변수(또는 리스트의 값)에 뒤 칸의 값을 넣습니다.",
+      tooltip: "앞 칸의 변수(또는 리스트·딕셔너리의 값)에 뒤 칸의 값을 넣습니다.",
       helpUrl: "",
     });
   },
@@ -79,7 +80,7 @@ Blockly.Blocks["variable_change"] = {
       previousStatement: null,
       nextStatement: null,
       style: "variable_blocks",
-      tooltip: "앞 칸의 변수(또는 리스트의 값)에 뒤 칸의 수를 더합니다. 빼려면 음수를 넣습니다.",
+      tooltip: "앞 칸의 변수(또는 리스트·딕셔너리의 값)에 뒤 칸의 수를 더합니다. 빼려면 음수를 넣습니다.",
       helpUrl: "",
     });
   },

@@ -7,3 +7,4 @@ import "./loopBlocks"; // 반복 카테고리
 import "./mathBlocks"; // 수학 카테고리
 import "./variableBlocks"; // 변수 설정·바꾸기
 import "./procedureBlocks"; // 함수 돌려줌·함수 값
+import "./dictBlocks"; // 딕셔너리(맵) 카테고리

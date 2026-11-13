@@ -4,6 +4,7 @@ import { loopCategory } from "./loopCategory";
 import { mathCategory } from "./mathCategory";
 import { textCategory } from "./textCategory";
 import { listCategory } from "./listCategory";
+import { dictCategory } from "./dictCategory";
 import { procedureCategory } from "./procedureCategory";
 
 export { IO_VARIABLE_CATEGORY, ioVariableFlyout } from "./ioCategory";
@@ -17,7 +18,8 @@ export const toolboxConfig = {
     loopCategory, // 반복
     mathCategory, // 수학
     textCategory, // 텍스트
-    listCategory, // 리스트
+    listCategory, // 리스트(배열)
+    dictCategory, // 딕셔너리(맵)
     procedureCategory, // 함수
   ],
 };

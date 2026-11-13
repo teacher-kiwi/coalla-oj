@@ -1,7 +1,8 @@
 // 리스트 카테고리 Toolbox 설정
+// 메뉴 이름에 일반 자료구조 이름을 괄호로 붙인다: 리스트(배열), 딕셔너리(맵)
 export const listCategory = {
   kind: "category",
-  name: "리스트",
+  name: "리스트(배열)",
   categorystyle: "list_category",
   contents: [
     { kind: "block", type: "lists_create_with" },

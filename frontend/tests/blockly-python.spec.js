@@ -177,7 +177,8 @@ describe('등록 상태', () => {
       'list_map_number', 'list_get_nth', 'list_append', 'list_pop', 'list_sort',
       'text_split', 'text_get_nth', 'input_readline', 'loop_range', 'loop_each',
       'print_list_spaced', 'list_count', 'variable_assign', 'variable_change',
-      'procedure_return', 'procedure_call_value']
+      'procedure_return', 'procedure_call_value', 'dict_create_empty', 'dict_get',
+      'dict_get_default', 'dict_has_key', 'dict_keys']
     for (const type of custom) {
       expect(Blockly.Blocks[type], `${type} 블록 정의`).toBeDefined()
       expect(pythonGenerator.forBlock[type], `${type} 생성기`).toBeTypeOf('function')
@@ -511,5 +512,71 @@ describe('도구 상자 목록', () => {
     const types = procedureFlyout(workspace).map(i => i.type)
     expect(types).toEqual(['procedures_defnoreturn', 'procedure_return',
       'procedures_callnoreturn', 'procedure_call_value'])
+  })
+})
+
+/** [d] 에서 키 [k] 의 값 */
+function dictItem (dictName, key) {
+  const block = makeBlock('dict_get')
+  connect(block, 'DICT', variable(dictName))
+  connect(block, 'KEY', key)
+  return block
+}
+
+describe('딕셔너리', () => {
+  it('빈 딕셔너리를 변수에 넣는다', () => {
+    const block = assignBlock('variable_assign', variable('승리'), 'VALUE', makeBlock('dict_create_empty'))
+    expect(pythonGenerator.blockToCode(block)).toBe('승리 = {}\n')
+  })
+
+  it('키의 값을 꺼낸다', () => {
+    expect(codeOf(dictItem('승리', text('S')))).toBe("승리['S']")
+  })
+
+  it('설정·바꾸기 앞 칸에 넣어 값을 넣고 바꾼다', async () => {
+    const set = assignBlock('variable_assign', dictItem('승리', text('S')), 'VALUE', number(0))
+    const change = assignBlock('variable_change', dictItem('승리', variable('손')), 'DELTA', number(1))
+    await settle()
+    expect(set.isEnabled()).toBe(true)
+    expect(change.isEnabled()).toBe(true)
+    expect(pythonGenerator.blockToCode(set)).toBe("승리['S'] = 0\n")
+    expect(pythonGenerator.blockToCode(change)).toBe('승리[손] += 1\n')
+  })
+
+  it('없으면 쓸 값을 주고 꺼낸다', () => {
+    const block = makeBlock('dict_get_default')
+    connect(block, 'DICT', variable('개수'))
+    connect(block, 'KEY', variable('글자'))
+    connect(block, 'DEFAULT', number(0))
+    expect(codeOf(block)).toBe('개수.get(글자, 0)')
+  })
+
+  it('키가 있는지 묻는다', () => {
+    const block = makeBlock('dict_has_key')
+    connect(block, 'DICT', variable('개수'))
+    connect(block, 'KEY', text('a'))
+    expect(codeOf(block)).toBe("'a' in 개수")
+    // 파이썬은 in 을 not 보다 먼저 계산하므로 괄호 없이도 'a' 가 없을 때 참이다
+    const not = makeBlock('logic_negate')
+    connect(not, 'BOOL', block)
+    expect(codeOf(not)).toBe("not 'a' in 개수")
+  })
+
+  it('키 목록으로 반복한다', () => {
+    const keys = makeBlock('dict_keys')
+    connect(keys, 'DICT', variable('개수'))
+    const loop = makeBlock('loop_each')
+    loop.setFieldValue('키', 'VAR')
+    connect(loop, 'LIST', keys)
+    putInside(loop, printOf(variable('키')))
+    expect(pythonGenerator.blockToCode(loop)).toBe('for 키 in list(개수):\n  print(키)\n')
+  })
+
+  it('빈 딕셔너리는 리스트 칸에 들어가지 않는다', () => {
+    // 리스트 블록에 딕셔너리를 넣으면 실행 오류가 나므로 연결 단계에서 막는다
+    const append = makeBlock('list_append')
+    const dict = makeBlock('dict_create_empty')
+    try { connect(append, 'LIST', dict) } catch (e) { /* 연결 거부 */ }
+    expect(append.getInputTargetBlock('LIST')).toBeNull()
   })
 })
